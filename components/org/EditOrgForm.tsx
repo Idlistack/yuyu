@@ -14,6 +14,8 @@ import Box from "@mui/material/Box";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { updateOrganisation } from "@/app/actions/org";
+import { uploadOrganisationLogo } from "@/app/actions/media";
+import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
 
@@ -26,6 +28,7 @@ export function EditOrgForm(props: {
   const { showToast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState(initial.logoUrl ?? "");
   const [dirty, setDirty] = useState(false);
   useUnsavedChangesGuard(dirty && !pending);
@@ -40,11 +43,29 @@ export function EditOrgForm(props: {
         setError(null);
         const fd = new FormData(e.currentTarget);
         startTransition(async () => {
+          let logoUrl = logoFile ? "" : logoPreviewUrl;
+          if (logoFile) {
+            const upload = new FormData();
+            upload.set("organisationSlug", organisationSlug);
+            upload.set("file", logoFile);
+            const result = await uploadOrganisationLogo(upload);
+            if (!result.ok) {
+              setError(result.error);
+              showToast(result.error, "error");
+              return;
+            }
+            if (!result.data) {
+              setError("Could not upload the logo.");
+              showToast("Could not upload the logo.", "error");
+              return;
+            }
+            logoUrl = result.data.url;
+          }
           const res = await updateOrganisation({
             organisationSlug,
             name: String(fd.get("name") ?? ""),
             description: String(fd.get("description") ?? ""),
-            logoUrl: String(fd.get("logoUrl") ?? ""),
+            logoUrl,
           });
           if (!res.ok) {
             setError(res.error);
@@ -75,7 +96,11 @@ export function EditOrgForm(props: {
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 Organisation settings
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
                 Update how your organisation appears on public pages.
               </Typography>
             </Box>
@@ -122,66 +147,37 @@ export function EditOrgForm(props: {
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 Logo
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
                 Add a logo for a more recognizable presence.
               </Typography>
             </Box>
           </Stack>
           <Divider />
-          <Grid container spacing={2} sx={{ alignItems: "stretch" }}>
-            <Grid size={{ xs: 12, md: 7 }}>
-              <TextField
-                name="logoUrl"
-                label="Logo URL (optional)"
-                fullWidth
-                type="url"
-                defaultValue={initial.logoUrl ?? ""}
-                onChange={(e) => setLogoPreviewUrl(e.target.value)}
-                helperText="Use a direct image URL (square works best)."
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Box
-                sx={{
-                  border: 1,
-                  borderColor: "divider",
-                  borderRadius: 2,
-                  overflow: "hidden",
-                  height: { xs: 160, md: "100%" },
-                  minHeight: { md: 120 },
-                  background:
-                    "linear-gradient(145deg, rgba(124,245,182,0.08), rgba(185,174,255,0.08))",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  p: 2,
-                }}
-              >
-                {logoPreviewUrl.trim() ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    alt="Logo preview"
-                    src={logoPreviewUrl}
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      objectFit: "contain",
-                      borderRadius: 12,
-                    }}
-                  />
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    Preview will show here.
-                  </Typography>
-                )}
-              </Box>
-            </Grid>
-          </Grid>
+          <ImageUploadPicker
+            initialUrl={initial.logoUrl}
+            label="Logo"
+            placeholder="Your logo will appear here."
+            disabled={pending}
+            onChange={(file, previewUrl) => {
+              setLogoFile(file);
+              setLogoPreviewUrl(previewUrl);
+              setDirty(true);
+            }}
+          />
         </Stack>
       </Paper>
 
       <Stack direction="row" spacing={2} useFlexGap sx={{ flexWrap: "wrap" }}>
-        <Button type="submit" variant="contained" disabled={pending} sx={{ textTransform: "none", borderRadius: 2, px: 2.5 }}>
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={pending}
+          sx={{ textTransform: "none", borderRadius: 2, px: 2.5 }}
+        >
           Save changes
         </Button>
       </Stack>

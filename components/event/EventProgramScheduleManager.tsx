@@ -19,10 +19,12 @@ import {
   setEventSessionDelay,
 } from "@/app/actions/event-website";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
 
 export type ProgramScheduleRow = {
   id: string;
   title: string;
+  descriptionHtml: string;
   startDateTime: string;
   endDateTime: string;
   effectiveStartDateTime: string;
@@ -64,7 +66,7 @@ function localValue(iso: string, timeZone: string) {
 }
 function zonedInputToIso(value: string, timeZone: string) {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
-  if (!match) return "";
+  if (!match) return null;
   const [, y, m, d, h, min] = match;
   const guess = Date.UTC(
     Number(y),
@@ -92,7 +94,10 @@ function zonedInputToIso(value: string, timeZone: string) {
       get("hour"),
       get("minute"),
     ) - guess;
-  return new Date(guess - offset).toISOString();
+  const iso = new Date(guess - offset).toISOString();
+  // A local time in a DST spring-forward gap does not exist. Refuse it rather
+  // than silently shifting the session to a different instant.
+  return localValue(iso, timeZone) === value ? iso : null;
 }
 function display(iso: string, timeZone: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -109,6 +114,7 @@ export function EventProgramScheduleManager({
   timeZone,
   sessions,
   speakers,
+  rooms,
 }: {
   organisationSlug: string;
   eventId: string;
@@ -116,6 +122,7 @@ export function EventProgramScheduleManager({
   timeZone: string;
   sessions: ProgramScheduleRow[];
   speakers: Array<{ id: string; name: string }>;
+  rooms: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -144,6 +151,12 @@ export function EventProgramScheduleManager({
   ) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const startDateTime = zonedInputToIso(String(form.get("start") ?? ""), timeZone);
+    const endDateTime = zonedInputToIso(String(form.get("end") ?? ""), timeZone);
+    if (!startDateTime || !endDateTime) {
+      setError("Choose a valid local time. This time does not exist in the event time zone.");
+      return;
+    }
     startTransition(async () =>
       complete(
         await saveSession({
@@ -152,14 +165,12 @@ export function EventProgramScheduleManager({
           ...(session ? { id: session.id } : {}),
           speakerIds: selectedSpeakerIds,
           title: String(form.get("title") ?? ""),
-          startDateTime: zonedInputToIso(
-            String(form.get("start") ?? ""),
-            timeZone,
-          ),
-          endDateTime: zonedInputToIso(String(form.get("end") ?? ""), timeZone),
+          descriptionHtml: String(form.get("descriptionHtml") ?? ""),
+          startDateTime,
+          endDateTime,
           type: String(form.get("type") ?? "TALK"),
           track: String(form.get("track") ?? ""),
-          roomId: session?.roomId ?? "",
+          roomId: String(form.get("roomId") ?? ""),
           visibility: String(form.get("visibility") ?? "PUBLISHED"),
           sortOrder: Number(form.get("sortOrder") ?? sessions.length),
         }),
@@ -201,6 +212,13 @@ export function EventProgramScheduleManager({
         defaultValue={session?.title ?? ""}
         required
       />
+      <RichTextEditor
+        name="descriptionHtml"
+        label="Session description"
+        defaultValue={session?.descriptionHtml ?? ""}
+        helperText="Optional details shown on the public session page."
+        minHeight={100}
+      />
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
         <TextField
           name="start"
@@ -215,6 +233,21 @@ export function EventProgramScheduleManager({
           required
           fullWidth
         />
+        <TextField
+          name="roomId"
+          label="Room"
+          select
+          defaultValue={session?.roomId ?? ""}
+          fullWidth
+          helperText={rooms.length ? undefined : "No rooms have been configured for this event yet."}
+        >
+          <MenuItem value="">No room</MenuItem>
+          {rooms.map((room) => (
+            <MenuItem key={room.id} value={room.id}>
+              {room.name}
+            </MenuItem>
+          ))}
+        </TextField>
         <TextField
           name="end"
           label="Planned end"
@@ -279,6 +312,7 @@ export function EventProgramScheduleManager({
         >
           <MenuItem value="PUBLISHED">Published</MenuItem>
           <MenuItem value="DRAFT">Draft</MenuItem>
+          <MenuItem value="HIDDEN">Hidden</MenuItem>
         </TextField>
         <TextField
           name="sortOrder"

@@ -182,14 +182,29 @@ export function CreateEventDialog(props: {
           </DialogTitle>
           <DialogContent>
             {/* Step Progress Indicators */}
-            <Box sx={{ mb: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: "0.5px" }}>
+            <Box
+              sx={{
+                mb: 2,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 700, letterSpacing: "0.5px" }}
+              >
                 {activeStep === 0 && "BASICS"}
                 {activeStep === 1 && "SCHEDULE"}
                 {activeStep === 2 && "LOCATION & PLATFORM"}
                 {activeStep === 3 && "ADDITIONAL SETTINGS"}
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600 }}
+              >
                 Step {activeStep + 1} of 4
               </Typography>
             </Box>
@@ -201,7 +216,10 @@ export function CreateEventDialog(props: {
                     flexGrow: 1,
                     height: 4,
                     borderRadius: 1,
-                    backgroundColor: stepIndex <= activeStep ? "primary.main" : "rgba(255,255,255,0.1)",
+                    backgroundColor:
+                      stepIndex <= activeStep
+                        ? "primary.main"
+                        : "rgba(255,255,255,0.1)",
                     transition: "all 0.3s ease",
                   }}
                 />
@@ -212,7 +230,13 @@ export function CreateEventDialog(props: {
               {error ? <Alert severity="error">{error}</Alert> : null}
 
               {/* Step 1: Basics */}
-              <Box sx={{ display: activeStep === 0 ? "flex" : "none", flexDirection: "column", gap: 2 }}>
+              <Box
+                sx={{
+                  display: activeStep === 0 ? "flex" : "none",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
                 <TextField
                   name="title"
                   label="Title"
@@ -223,6 +247,7 @@ export function CreateEventDialog(props: {
                 <TextField
                   name="description"
                   label="Description"
+                  required
                   fullWidth
                   multiline
                   minRows={3}
@@ -234,8 +259,16 @@ export function CreateEventDialog(props: {
                   onChange={(e) => {
                     const val = e.target.value;
                     if (val.endsWith(",")) {
-                      const tag = val.slice(0, -1).trim().toLowerCase().replace(/\s+/g, " ");
-                      if (tag && !tagsPreview.includes(tag) && tagsPreview.length < 12) {
+                      const tag = val
+                        .slice(0, -1)
+                        .trim()
+                        .toLowerCase()
+                        .replace(/\s+/g, " ");
+                      if (
+                        tag &&
+                        !tagsPreview.includes(tag) &&
+                        tagsPreview.length < 12
+                      ) {
                         setTagsPreview([...tagsPreview, tag]);
                       }
                       setTagInput("");
@@ -246,8 +279,15 @@ export function CreateEventDialog(props: {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      const tag = tagInput.trim().toLowerCase().replace(/\s+/g, " ");
-                      if (tag && !tagsPreview.includes(tag) && tagsPreview.length < 12) {
+                      const tag = tagInput
+                        .trim()
+                        .toLowerCase()
+                        .replace(/\s+/g, " ");
+                      if (
+                        tag &&
+                        !tagsPreview.includes(tag) &&
+                        tagsPreview.length < 12
+                      ) {
                         setTagsPreview([...tagsPreview, tag]);
                       }
                       setTagInput("");
@@ -256,12 +296,21 @@ export function CreateEventDialog(props: {
                   placeholder="Type a tag and press Enter or Comma"
                   helperText="Press Enter or Comma to add up to 12 tags (e.g. workshop, meetup, ai)."
                 />
-                <input type="hidden" name="tags" value={tagsPreview.join(",")} />
+                <input
+                  type="hidden"
+                  name="tags"
+                  value={tagsPreview.join(",")}
+                />
                 {tagsPreview.length > 0 ? (
                   <Stack
                     direction="row"
                     useFlexGap
-                    sx={{ flexWrap: "wrap", columnGap: 0.75, rowGap: 0.75, mt: 0.5 }}
+                    sx={{
+                      flexWrap: "wrap",
+                      columnGap: 0.75,
+                      rowGap: 0.75,
+                      mt: 0.5,
+                    }}
                   >
                     {tagsPreview.map((t) => (
                       <Chip
@@ -280,7 +329,13 @@ export function CreateEventDialog(props: {
               </Box>
 
               {/* Step 2: Schedule */}
-              <Box sx={{ display: activeStep === 1 ? "flex" : "none", flexDirection: "column", gap: 2 }}>
+              <Box
+                sx={{
+                  display: activeStep === 1 ? "flex" : "none",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DateTimePicker
                     label="Start"
@@ -341,19 +396,39 @@ export function CreateEventDialog(props: {
               </Box>
 
               {/* Step 3: Location */}
-              <Box sx={{ display: activeStep === 2 ? "flex" : "none", flexDirection: "column", gap: 2 }}>
+              <Box
+                sx={{
+                  display: activeStep === 2 ? "flex" : "none",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
                 <FormControlLabel
-                  control={<Switch name="isOnline" checked={isOnline} onChange={(e) => setIsOnline(e.target.checked)} />}
+                  control={
+                    <Switch
+                      name="isOnline"
+                      checked={isOnline}
+                      onChange={(e) => setIsOnline(e.target.checked)}
+                    />
+                  }
                   label="Online event"
                 />
-                <TextField 
-                  name="location" 
+                <TextField
+                  name="location"
                   label={isOnline ? "Online meeting link" : "Location"}
                   required
-                  fullWidth 
+                  fullWidth
                   type={isOnline ? "url" : "text"}
-                  placeholder={isOnline ? "https://meet.google.com/..." : "e.g., 123 Main St, San Francisco, CA"}
-                  helperText={isOnline ? "Enter a valid HTTP(S) meeting URL." : "Enter the venue or street address."}
+                  placeholder={
+                    isOnline
+                      ? "https://meet.google.com/..."
+                      : "e.g., 123 Main St, San Francisco, CA"
+                  }
+                  helperText={
+                    isOnline
+                      ? "Enter a valid HTTP(S) meeting URL."
+                      : "Enter the venue or street address."
+                  }
                 />
                 {!isOnline && (
                   <TextField
@@ -367,7 +442,13 @@ export function CreateEventDialog(props: {
               </Box>
 
               {/* Step 4: Settings */}
-              <Box sx={{ display: activeStep === 3 ? "flex" : "none", flexDirection: "column", gap: 2 }}>
+              <Box
+                sx={{
+                  display: activeStep === 3 ? "flex" : "none",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
                 <CoverImagePicker
                   disabled={pending}
                   onChange={(file) => setCoverImageFile(file)}
@@ -389,7 +470,9 @@ export function CreateEventDialog(props: {
                       defaultValue={EventStatus.DRAFT}
                     >
                       <MenuItem value={EventStatus.DRAFT}>Draft</MenuItem>
-                      <MenuItem value={EventStatus.PUBLISHED}>Published</MenuItem>
+                      <MenuItem value={EventStatus.PUBLISHED}>
+                        Published
+                      </MenuItem>
                     </TextField>
                     <TextField
                       name="privacyType"
@@ -451,7 +534,9 @@ export function CreateEventDialog(props: {
                   onClick={() => {
                     setError(null);
                     if (activeStep === 0) {
-                      const titleInput = formRef.current?.elements.namedItem("title") as HTMLInputElement | null;
+                      const titleInput = formRef.current?.elements.namedItem(
+                        "title",
+                      ) as HTMLInputElement | null;
                       if (!titleInput?.value.trim()) {
                         titleInput?.focus();
                         titleInput?.reportValidity();
@@ -473,14 +558,21 @@ export function CreateEventDialog(props: {
                       }
                     }
                     if (activeStep === 2) {
-                      const locInput = formRef.current?.elements.namedItem("location") as HTMLInputElement | null;
+                      const locInput = formRef.current?.elements.namedItem(
+                        "location",
+                      ) as HTMLInputElement | null;
                       if (!locInput?.value.trim()) {
                         locInput?.focus();
                         locInput?.reportValidity();
                         return;
                       }
-                      const mapLinkInput = formRef.current?.elements.namedItem("mapLinkUrl") as HTMLInputElement | null;
-                      if (mapLinkInput?.value && !mapLinkInput.checkValidity()) {
+                      const mapLinkInput = formRef.current?.elements.namedItem(
+                        "mapLinkUrl",
+                      ) as HTMLInputElement | null;
+                      if (
+                        mapLinkInput?.value &&
+                        !mapLinkInput.checkValidity()
+                      ) {
                         mapLinkInput.focus();
                         mapLinkInput.reportValidity();
                         return;

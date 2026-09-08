@@ -3,10 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { createOrganisationSchema, updateOrganisationSchema } from "@/lib/validators";
+import {
+  createOrganisationSchema,
+  updateOrganisationSchema,
+} from "@/lib/validators";
 import { flattenZodErrors } from "./utils";
 import { recordAuditEvent } from "@/lib/audit";
 import { isActionRateLimited } from "@/lib/actionRateLimit";
+import { isOrganisationUploadUrl } from "@/lib/uploadUrl";
 
 export type ActionResult<T = void> =
   | { ok: true; data?: T }
@@ -26,7 +30,10 @@ export async function createOrganisation(
     return { ok: false, error: "You must be signed in." };
   }
   if (await isActionRateLimited("create", session.user.id)) {
-    return { ok: false, error: "Too many creation attempts. Please try again later." };
+    return {
+      ok: false,
+      error: "Too many creation attempts. Please try again later.",
+    };
   }
 
   const parsed = createOrganisationSchema.safeParse(input);
@@ -60,7 +67,13 @@ export async function createOrganisation(
       return created;
     });
 
-    await recordAuditEvent({ action: "ORGANISATION_CREATED", actorUserId: session.user.id, organisationId: org.id, targetType: "Organisation", targetId: org.id });
+    await recordAuditEvent({
+      action: "ORGANISATION_CREATED",
+      actorUserId: session.user.id,
+      organisationId: org.id,
+      targetType: "Organisation",
+      targetId: org.id,
+    });
 
     revalidatePath("/dashboard");
     revalidatePath(`/${org.slug}`);
@@ -83,7 +96,9 @@ export async function createOrganisation(
   }
 }
 
-export async function updateOrganisation(input: unknown): Promise<ActionResult> {
+export async function updateOrganisation(
+  input: unknown,
+): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in." };
@@ -107,13 +122,25 @@ export async function updateOrganisation(input: unknown): Promise<ActionResult> 
 
   const membership = await prisma.membership.findUnique({
     where: {
-      userId_organisationId: { userId: session.user.id, organisationId: org.id },
+      userId_organisationId: {
+        userId: session.user.id,
+        organisationId: org.id,
+      },
     },
     select: { role: true },
   });
 
-  if (!membership || (membership.role !== "OWNER" && membership.role !== "ADMIN")) {
+  if (
+    !membership ||
+    (membership.role !== "OWNER" && membership.role !== "ADMIN")
+  ) {
     return { ok: false, error: "Only organisation admins can edit settings." };
+  }
+  if (
+    logoUrl &&
+    !isOrganisationUploadUrl(logoUrl, org.id, "organisation-logos")
+  ) {
+    return { ok: false, error: "Choose an uploaded organisation logo." };
   }
 
   try {
@@ -125,7 +152,13 @@ export async function updateOrganisation(input: unknown): Promise<ActionResult> 
         logoUrl: logoUrl || null,
       },
     });
-    await recordAuditEvent({ action: "ORGANISATION_UPDATED", actorUserId: session.user.id, organisationId: org.id, targetType: "Organisation", targetId: org.id });
+    await recordAuditEvent({
+      action: "ORGANISATION_UPDATED",
+      actorUserId: session.user.id,
+      organisationId: org.id,
+      targetType: "Organisation",
+      targetId: org.id,
+    });
     revalidatePath(`/dashboard/${org.slug}`);
     revalidatePath(`/dashboard/${org.slug}/members`);
     revalidatePath(`/${org.slug}`);
@@ -153,16 +186,16 @@ const RESERVED_SLUGS = new Set([
   "settings",
   "static",
   "public",
-  "assets"
+  "assets",
 ]);
 
 export async function checkSlugAvailability(slug: string): Promise<boolean> {
   const sanitized = slug.toLowerCase().trim();
-  
+
   if (!sanitized) {
     return false;
   }
-  
+
   if (RESERVED_SLUGS.has(sanitized)) {
     return false;
   }

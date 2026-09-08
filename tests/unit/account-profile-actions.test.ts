@@ -9,7 +9,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/permissions", () => ({ requireAuth: mocks.requireAuth }));
 vi.mock("@/lib/reauth", () => ({ hasRecentAuthentication: vi.fn() }));
-vi.mock("@/lib/actionRateLimit", () => ({ isActionRateLimited: mocks.rateLimit }));
+vi.mock("@/lib/actionRateLimit", () => ({
+  isActionRateLimited: mocks.rateLimit,
+}));
 vi.mock("@/lib/audit", () => ({ recordAuditEvent: mocks.profileAudit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db", () => ({
@@ -28,24 +30,37 @@ beforeEach(() => {
 });
 
 describe("account profile actions", () => {
-  it("stores a validated custom profile image URL", async () => {
-    await expect(updateAccountProfile({
-      name: "Person",
-      profileImageUrl: "https://images.example.com/person.png",
-    })).resolves.toEqual({
+  it("stores a validated uploaded custom profile image URL", async () => {
+    await expect(
+      updateAccountProfile({
+        name: "Person",
+        profileImageUrl: "/api/uploads/users/user_1/profile-images/person.webp",
+      }),
+    ).resolves.toEqual({
       ok: true,
-      data: { name: "Person", profileImageUrl: "https://images.example.com/person.png" },
+      data: {
+        name: "Person",
+        profileImageUrl: "/api/uploads/users/user_1/profile-images/person.webp",
+      },
     });
     expect(mocks.userUpdate).toHaveBeenCalledWith({
       where: { id: "user_1" },
-      data: { name: "Person", profileImageUrl: "https://images.example.com/person.png" },
+      data: {
+        name: "Person",
+        profileImageUrl: "/api/uploads/users/user_1/profile-images/person.webp",
+      },
     });
   });
 
-  it("rejects non-HTTP image URLs", async () => {
-    await expect(updateAccountProfile({ name: "Person", profileImageUrl: "javascript:alert(1)" })).resolves.toMatchObject({
+  it("rejects external image URLs", async () => {
+    await expect(
+      updateAccountProfile({
+        name: "Person",
+        profileImageUrl: "https://images.example.com/person.png",
+      }),
+    ).resolves.toMatchObject({
       ok: false,
-      fieldErrors: { profileImageUrl: ["Only HTTP and HTTPS image URLs are allowed"] },
+      fieldErrors: { profileImageUrl: ["Choose an uploaded profile image"] },
     });
   });
 });

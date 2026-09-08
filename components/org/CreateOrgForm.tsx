@@ -6,7 +6,13 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Alert from "@mui/material/Alert";
-import { createOrganisation, checkSlugAvailability } from "@/app/actions/org";
+import {
+  createOrganisation,
+  checkSlugAvailability,
+  updateOrganisation,
+} from "@/app/actions/org";
+import { uploadOrganisationLogo } from "@/app/actions/media";
+import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
 
 export function CreateOrgForm() {
   const router = useRouter();
@@ -14,7 +20,10 @@ export function CreateOrgForm() {
   const [pending, startTransition] = useTransition();
 
   const [slug, setSlug] = useState("");
-  const [slugState, setSlugState] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [slugState, setSlugState] = useState<
+    "idle" | "checking" | "available" | "taken"
+  >("idle");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   useEffect(() => {
     const trimmed = slug.trim();
@@ -27,7 +36,8 @@ export function CreateOrgForm() {
         const available = await checkSlugAvailability(trimmed);
         setSlugState(available ? "available" : "taken");
       } catch (err) {
-        if (process.env.NODE_ENV === "development") console.error("Failed to check slug availability", err);
+        if (process.env.NODE_ENV === "development")
+          console.error("Failed to check slug availability", err);
         setSlugState("idle");
       }
     }, 400);
@@ -58,7 +68,8 @@ export function CreateOrgForm() {
     isError = true;
   }
 
-  const isSubmitDisabled = pending || slugState === "checking" || slugState === "taken" || !slug;
+  const isSubmitDisabled =
+    pending || slugState === "checking" || slugState === "taken" || !slug;
 
   return (
     <Stack
@@ -74,18 +85,54 @@ export function CreateOrgForm() {
             name: String(fd.get("name") ?? ""),
             slug: slug,
             description: String(fd.get("description") ?? ""),
-            logoUrl: String(fd.get("logoUrl") ?? ""),
+            logoUrl: "",
           });
           if (!res.ok) {
             setError(res.error);
             return;
           }
-          if (res.data?.slug) router.push(`/${res.data.slug}`);
+          if (res.data?.slug) {
+            if (logoFile) {
+              const upload = new FormData();
+              upload.set("organisationSlug", res.data.slug);
+              upload.set("file", logoFile);
+              const uploaded = await uploadOrganisationLogo(upload);
+              if (!uploaded.ok) {
+                setError(uploaded.error);
+                return;
+              }
+              if (!uploaded.data) {
+                setError(
+                  "Organisation created, but the logo could not be uploaded.",
+                );
+                return;
+              }
+              const saved = await updateOrganisation({
+                organisationSlug: res.data.slug,
+                name: String(fd.get("name") ?? ""),
+                description: String(fd.get("description") ?? ""),
+                logoUrl: uploaded.data.url,
+              });
+              if (!saved.ok) {
+                setError(
+                  "Organisation created, but the logo could not be saved.",
+                );
+                return;
+              }
+            }
+            router.push(`/${res.data.slug}`);
+          }
         });
       }}
     >
       {error ? <Alert severity="error">{error}</Alert> : null}
-      <TextField name="name" label="Organisation name" required fullWidth autoFocus />
+      <TextField
+        name="name"
+        label="Organisation name"
+        required
+        fullWidth
+        autoFocus
+      />
       <TextField
         name="slug"
         label="URL slug"
@@ -98,10 +145,14 @@ export function CreateOrgForm() {
         slotProps={{
           formHelperText: {
             sx: {
-              color: isSuccess ? "#7CF5B6" : isError ? "error.main" : "text.secondary",
+              color: isSuccess
+                ? "#7CF5B6"
+                : isError
+                  ? "error.main"
+                  : "text.secondary",
               fontWeight: isSuccess || isError ? 500 : 400,
-            }
-          }
+            },
+          },
         }}
       />
       <TextField
@@ -111,7 +162,11 @@ export function CreateOrgForm() {
         multiline
         minRows={3}
       />
-      <TextField name="logoUrl" label="Logo URL (optional)" fullWidth />
+      <ImageUploadPicker
+        label="Logo"
+        placeholder="Your logo will appear here."
+        onChange={(file) => setLogoFile(file)}
+      />
       <Button
         type="submit"
         variant="contained"

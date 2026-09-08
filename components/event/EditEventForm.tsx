@@ -2,10 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  EventPrivacyType,
-  EventStatus,
-} from "@prisma/client";
+import { EventPrivacyType, EventStatus } from "@prisma/client";
 import type { EventClientDto } from "@/lib/eventDto";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -61,35 +58,33 @@ export function EditEventForm(props: {
   const [pending, startTransition] = useTransition();
   const [dirty, setDirty] = useState(false);
   useUnsavedChangesGuard(dirty && !pending);
-  const [coverPreviewUrl, setCoverPreviewUrl] = useState(event.coverImageUrl ?? "");
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState(
+    event.coverImageUrl ?? "",
+  );
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [isOnlinePreview, setIsOnlinePreview] = useState(event.isOnline);
   const [mapLinkPreviewUrl, setMapLinkPreviewUrl] = useState(
     event.mapLinkUrl ?? "",
   );
   const [tagsPreview, setTagsPreview] = useState(
-    Array.isArray(event.tags)
-      ? (event.tags ?? [])
-      : [],
+    Array.isArray(event.tags) ? (event.tags ?? []) : [],
   );
-  const [showRegistrationCountPreview, setShowRegistrationCountPreview] = useState(
-    event.showRegistrationCount ??
-      true,
-  );
+  const [showRegistrationCountPreview, setShowRegistrationCountPreview] =
+    useState(event.showRegistrationCount ?? true);
   const [start, setStart] = useState<Date | null>(
-    event.startDateTime instanceof Date ? event.startDateTime : new Date(event.startDateTime),
+    event.startDateTime instanceof Date
+      ? event.startDateTime
+      : new Date(event.startDateTime),
   );
   const [end, setEnd] = useState<Date | null>(
-    event.endDateTime instanceof Date ? event.endDateTime : new Date(event.endDateTime),
+    event.endDateTime instanceof Date
+      ? event.endDateTime
+      : new Date(event.endDateTime),
   );
 
-  const [status, setStatus] = useState<EventStatus>(
-    event.status === EventStatus.HIDDEN
-      ? EventStatus.PUBLISHED
-      : event.status
-  );
+  const [status, setStatus] = useState<EventStatus>(event.status);
   const [privacyType, setPrivacyType] = useState<EventPrivacyType>(
-    event.privacyType
+    event.privacyType,
   );
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -141,7 +136,9 @@ export function EditEventForm(props: {
         isOnline: fd.get("isOnline") === "on",
         capacity: capacityRaw,
         registrationClosesAt: String(fd.get("registrationClosesAt") ?? ""),
-        registrationLeadMinutes: String(fd.get("registrationLeadMinutes") ?? ""),
+        registrationLeadMinutes: String(
+          fd.get("registrationLeadMinutes") ?? "",
+        ),
         status,
         privacyType,
       });
@@ -206,15 +203,23 @@ export function EditEventForm(props: {
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     Basics
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
                     Update the public-facing title and description.
                   </Typography>
                 </Box>
                 <Chip
                   size="small"
                   variant="outlined"
-                  color={event.status === EventStatus.DRAFT ? "default" : "success"}
-                  label={event.status === EventStatus.DRAFT ? "Draft" : "Published"}
+                  color={
+                    event.status === EventStatus.DRAFT ? "default" : "success"
+                  }
+                  label={
+                    event.status === EventStatus.DRAFT ? "Draft" : "Published"
+                  }
                 />
               </Stack>
               <Divider />
@@ -232,11 +237,12 @@ export function EditEventForm(props: {
                   <TextField
                     name="description"
                     label="Description"
+                    required
                     fullWidth
                     multiline
                     minRows={4}
                     defaultValue={event.description}
-                    helperText="A short summary shown on the event page."
+                    helperText="Required. A short summary shown on the event page."
                   />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
@@ -268,7 +274,12 @@ export function EditEventForm(props: {
                       }}
                     >
                       {tagsPreview.slice(0, 12).map((t) => (
-                        <Chip key={t} size="small" label={t} variant="outlined" />
+                        <Chip
+                          key={t}
+                          size="small"
+                          label={t}
+                          variant="outlined"
+                        />
                       ))}
                     </Stack>
                   ) : null}
@@ -285,7 +296,11 @@ export function EditEventForm(props: {
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     Cover image
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
                     Add a visual to make your event page stand out.
                   </Typography>
                 </Box>
@@ -310,7 +325,11 @@ export function EditEventForm(props: {
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     Schedule
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
                     Set the date, time, and timezone for guests.
                   </Typography>
                 </Box>
@@ -385,7 +404,11 @@ export function EditEventForm(props: {
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     Location
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
                     Choose whether this is online and what guests should see.
                   </Typography>
                 </Box>
@@ -472,7 +495,11 @@ export function EditEventForm(props: {
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     Publishing
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
                     Control visibility, audience, and RSVP limits.
                   </Typography>
                 </Box>
@@ -491,6 +518,7 @@ export function EditEventForm(props: {
                   >
                     <MenuItem value={EventStatus.DRAFT}>Draft</MenuItem>
                     <MenuItem value={EventStatus.PUBLISHED}>Published</MenuItem>
+                    <MenuItem value={EventStatus.HIDDEN}>Hidden</MenuItem>
                   </TextField>
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
@@ -500,7 +528,9 @@ export function EditEventForm(props: {
                     select
                     fullWidth
                     value={privacyType}
-                    onChange={(e) => setPrivacyType(e.target.value as EventPrivacyType)}
+                    onChange={(e) =>
+                      setPrivacyType(e.target.value as EventPrivacyType)
+                    }
                     helperText="Applies when the event is published."
                   >
                     <MenuItem value={EventPrivacyType.PUBLIC}>
@@ -512,7 +542,9 @@ export function EditEventForm(props: {
                     <MenuItem value={EventPrivacyType.APPROVAL_REQUIRED}>
                       Approval required
                     </MenuItem>
-                    <MenuItem value={EventPrivacyType.INVITE_ONLY}>Invite only</MenuItem>
+                    <MenuItem value={EventPrivacyType.INVITE_ONLY}>
+                      Invite only
+                    </MenuItem>
                   </TextField>
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
@@ -527,10 +559,32 @@ export function EditEventForm(props: {
                   />
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField name="registrationClosesAt" label="Registration closes at" type="datetime-local" fullWidth defaultValue={event.registrationClosesAt ? toDatetimeLocalValue(new Date(event.registrationClosesAt)) : ""} slotProps={{ inputLabel: { shrink: true } }} helperText="Use this or a lead time, not both." />
+                  <TextField
+                    name="registrationClosesAt"
+                    label="Registration closes at"
+                    type="datetime-local"
+                    fullWidth
+                    defaultValue={
+                      event.registrationClosesAt
+                        ? toDatetimeLocalValue(
+                            new Date(event.registrationClosesAt),
+                          )
+                        : ""
+                    }
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    helperText="Use this or a lead time, not both."
+                  />
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField name="registrationLeadMinutes" label="Close before start (minutes)" type="number" fullWidth slotProps={{ htmlInput: { min: 0 } }} defaultValue={event.registrationLeadMinutes ?? ""} helperText="Relative cutoff; updates when the start time changes." />
+                  <TextField
+                    name="registrationLeadMinutes"
+                    label="Close before start (minutes)"
+                    type="number"
+                    fullWidth
+                    slotProps={{ htmlInput: { min: 0 } }}
+                    defaultValue={event.registrationLeadMinutes ?? ""}
+                    helperText="Relative cutoff; updates when the start time changes."
+                  />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
                   <Paper

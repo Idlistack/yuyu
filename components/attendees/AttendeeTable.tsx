@@ -87,8 +87,16 @@ export function AttendeeTable(props: {
   eventTitle?: string;
   collectionTruncated?: boolean;
 }) {
-  const { organisationSlug, eventId, eventInstanceId, attendees, canManage, registrationFields = [], eventTitle, collectionTruncated = false } =
-    props;
+  const {
+    organisationSlug,
+    eventId,
+    eventInstanceId,
+    attendees,
+    canManage,
+    registrationFields = [],
+    eventTitle,
+    collectionTruncated = false,
+  } = props;
   const router = useRouter();
   const { showToast } = useToast();
   const [search, setSearch] = useState("");
@@ -99,8 +107,11 @@ export function AttendeeTable(props: {
   const [pending, startTransition] = useTransition();
   const [answersOpen, setAnswersOpen] = useState(false);
   const [answersTitle, setAnswersTitle] = useState<string>("");
-  const [answersRows, setAnswersRows] = useState<{ label: string; value: string }[]>([]);
-  const [deleteConfirmAttendee, setDeleteConfirmAttendee] = useState<AttendeeRow | null>(null);
+  const [answersRows, setAnswersRows] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [deleteConfirmAttendee, setDeleteConfirmAttendee] =
+    useState<AttendeeRow | null>(null);
   const [editAttendee, setEditAttendee] = useState<AttendeeRow | null>(null);
 
   const rows = useMemo(() => {
@@ -110,12 +121,15 @@ export function AttendeeTable(props: {
       if (filter === "users" && !a.user) return false;
       if (statusFilter !== "all" && a.status !== statusFilter) return false;
       if (!q) return true;
-      const name = (a.user?.name ?? "").toLowerCase();
+      const name = (a.user?.name ?? a.guestName ?? "").toLowerCase();
       const email = (a.user?.email ?? a.guestEmail ?? "").toLowerCase();
       return name.includes(q) || email.includes(q);
     });
   }, [attendees, search, filter, statusFilter]);
-  const pageRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const pageRows = rows.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage,
+  );
 
   function targetPayload() {
     if (eventId) return { eventId };
@@ -133,12 +147,25 @@ export function AttendeeTable(props: {
 
   return (
     <Stack spacing={2}>
-      {collectionTruncated ? <Alert severity="warning">Only the 250 most recent registrations are loaded in this browser view.</Alert> : null}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} useFlexGap sx={{ flexWrap: "wrap" }}>
+      {collectionTruncated ? (
+        <Alert severity="warning">
+          Only the 250 most recent registrations are loaded in this browser
+          view.
+        </Alert>
+      ) : null}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        useFlexGap
+        sx={{ flexWrap: "wrap" }}
+      >
         <TextField
           label="Search name or email"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
           size="small"
           fullWidth
         />
@@ -147,7 +174,10 @@ export function AttendeeTable(props: {
           select
           size="small"
           value={filter}
-          onChange={(e) => { setFilter(e.target.value as FilterKind); setPage(0); }}
+          onChange={(e) => {
+            setFilter(e.target.value as FilterKind);
+            setPage(0);
+          }}
           sx={{ minWidth: 160 }}
         >
           <MenuItem value="all">All</MenuItem>
@@ -159,7 +189,10 @@ export function AttendeeTable(props: {
           select
           size="small"
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value as StatusFilter); setPage(0); }}
+          onChange={(e) => {
+            setStatusFilter(e.target.value as StatusFilter);
+            setPage(0);
+          }}
           sx={{ minWidth: 160 }}
         >
           <MenuItem value="all">All statuses</MenuItem>
@@ -168,19 +201,45 @@ export function AttendeeTable(props: {
           <MenuItem value="PENDING_APPROVAL">Pending approval</MenuItem>
           <MenuItem value="REJECTED">Rejected</MenuItem>
         </TextField>
-        {eventTitle ? <ExportEmailsButton eventTitle={eventTitle} attendees={rows} /> : null}
+        {eventTitle ? (
+          <ExportEmailsButton eventTitle={eventTitle} attendees={rows} />
+        ) : null}
       </Stack>
-      <TableContainer component={Paper} variant="outlined" sx={{ width: "100%", maxWidth: "100%", overflowX: "auto" }}>
-        <Table size="small" sx={{ width: "100%", minWidth: { xs: 0, sm: 760 } }}>
+      <TableContainer
+        component={Paper}
+        variant="outlined"
+        sx={{ width: "100%", maxWidth: "100%", overflowX: "auto" }}
+      >
+        <Table
+          size="small"
+          sx={{ width: "100%", minWidth: { xs: 0, sm: 760 } }}
+        >
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
-              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Email</TableCell>
-              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Answers</TableCell>
-              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Status</TableCell>
-              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Check-in</TableCell>
-              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>RSVP time</TableCell>
-              {canManage ? <TableCell align="center" sx={{ display: { xs: "none", sm: "table-cell" } }}>Ticket</TableCell> : null}
+              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                Email
+              </TableCell>
+              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                Answers
+              </TableCell>
+              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                Status
+              </TableCell>
+              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                Check-in
+              </TableCell>
+              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                RSVP time
+              </TableCell>
+              {canManage ? (
+                <TableCell
+                  align="center"
+                  sx={{ display: { xs: "none", sm: "table-cell" } }}
+                >
+                  Ticket
+                </TableCell>
+              ) : null}
               {canManage ? <TableCell align="right">Actions</TableCell> : null}
             </TableRow>
           </TableHead>
@@ -205,17 +264,40 @@ export function AttendeeTable(props: {
                 const answerCount = a.answers?.length ?? 0;
                 return (
                   <TableRow key={a.id}>
-                    <TableCell sx={{ maxWidth: { xs: 118, sm: "none" }, overflow: "hidden" }}>
-                      <Typography variant="body2" noWrap>{name}</Typography>
-                      <Chip label={statusLabel(a.status)} size="small" sx={{ display: { xs: "inline-flex", sm: "none" }, mt: 0.5, maxWidth: "100%" }} />
+                    <TableCell
+                      sx={{
+                        maxWidth: { xs: 118, sm: "none" },
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Typography variant="body2" noWrap>
+                        {name}
+                      </Typography>
+                      <Chip
+                        label={statusLabel(a.status)}
+                        size="small"
+                        sx={{
+                          display: { xs: "inline-flex", sm: "none" },
+                          mt: 0.5,
+                          maxWidth: "100%",
+                        }}
+                      />
                     </TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{email}</TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    <TableCell
+                      sx={{ display: { xs: "none", sm: "table-cell" } }}
+                    >
+                      {email}
+                    </TableCell>
+                    <TableCell
+                      sx={{ display: { xs: "none", sm: "table-cell" } }}
+                    >
                       {answerCount > 0 ? (
                         <Button
                           size="small"
                           variant="text"
-                          startIcon={<HelpOutlineOutlinedIcon fontSize="small" />}
+                          startIcon={
+                            <HelpOutlineOutlinedIcon fontSize="small" />
+                          }
                           onClick={() => {
                             setAnswersTitle(name);
                             setAnswersRows(a.answers ?? []);
@@ -230,10 +312,14 @@ export function AttendeeTable(props: {
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    <TableCell
+                      sx={{ display: { xs: "none", sm: "table-cell" } }}
+                    >
                       <Chip label={statusLabel(a.status)} size="small" />
                     </TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    <TableCell
+                      sx={{ display: { xs: "none", sm: "table-cell" } }}
+                    >
                       {a.checkedInAt ? (
                         <Chip
                           label={new Date(a.checkedInAt).toLocaleTimeString(
@@ -250,14 +336,27 @@ export function AttendeeTable(props: {
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{ts}</TableCell>
+                    <TableCell
+                      sx={{ display: { xs: "none", sm: "table-cell" } }}
+                    >
+                      {ts}
+                    </TableCell>
                     {canManage ? (
-                      <TableCell align="center" sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                      <TableCell
+                        align="center"
+                        sx={{ display: { xs: "none", sm: "table-cell" } }}
+                      >
                         <CopyTicketButton ticketUrl={a.ticketUrl} />
                       </TableCell>
                     ) : null}
                     {canManage ? (
-                      <TableCell align="right" sx={{ width: { xs: 126, sm: "auto" }, whiteSpace: "normal" }}>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          width: { xs: 126, sm: "auto" },
+                          whiteSpace: "normal",
+                        }}
+                      >
                         <Stack
                           direction={{ xs: "column", sm: "row" }}
                           spacing={0.5}
@@ -367,7 +466,11 @@ export function AttendeeTable(props: {
                             </>
                           ) : null}
                           <IconButton
-                            aria-label="Edit registration"
+                            aria-label={
+                              a.user
+                                ? "View registration"
+                                : "Edit registration or transfer ticket"
+                            }
                             disabled={pending}
                             onClick={() => setEditAttendee(a)}
                           >
@@ -396,12 +499,20 @@ export function AttendeeTable(props: {
         page={page}
         onPageChange={(_, nextPage) => setPage(nextPage)}
         rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={(event) => { setRowsPerPage(Number(event.target.value)); setPage(0); }}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(Number(event.target.value));
+          setPage(0);
+        }}
         rowsPerPageOptions={[25, 50, 100]}
         labelRowsPerPage="Attendees per page"
       />
 
-      <Dialog open={answersOpen} onClose={() => setAnswersOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={answersOpen}
+        onClose={() => setAnswersOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>Answers · {answersTitle}</DialogTitle>
         <DialogContent>
           {answersRows.length === 0 ? (
@@ -430,7 +541,10 @@ export function AttendeeTable(props: {
         open={!!deleteConfirmAttendee}
         title="Remove Attendee"
         message={`Are you sure you want to remove ${
-          deleteConfirmAttendee?.user?.name ?? deleteConfirmAttendee?.guestName ?? deleteConfirmAttendee?.guestEmail ?? "this attendee"
+          deleteConfirmAttendee?.user?.name ??
+          deleteConfirmAttendee?.guestName ??
+          deleteConfirmAttendee?.guestEmail ??
+          "this attendee"
         }'s RSVP registration?`}
         confirmLabel="Remove"
         loading={pending}
@@ -469,14 +583,24 @@ export function AttendeeTable(props: {
                     });
                   },
                 },
-                10000 // 10 seconds duration
+                10000, // 10 seconds duration
               );
               router.refresh();
             }
           });
         }}
       />
-      {editAttendee ? <EditRsvpDialog organisationSlug={organisationSlug} eventId={eventId} eventInstanceId={eventInstanceId} attendee={editAttendee} fields={registrationFields} onClose={() => setEditAttendee(null)} onUpdated={() => router.refresh()} /> : null}
+      {editAttendee ? (
+        <EditRsvpDialog
+          organisationSlug={organisationSlug}
+          eventId={eventId}
+          eventInstanceId={eventInstanceId}
+          attendee={editAttendee}
+          fields={registrationFields}
+          onClose={() => setEditAttendee(null)}
+          onUpdated={() => router.refresh()}
+        />
+      ) : null}
     </Stack>
   );
 }

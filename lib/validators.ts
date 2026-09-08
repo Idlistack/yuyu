@@ -1,16 +1,20 @@
 import { EventPrivacyType, EventStatus } from "@prisma/client";
 import { z } from "zod";
 import { isValidTimeZone } from "@/lib/timeZone";
+import { isUploadedImageUrl } from "@/lib/uploadUrl";
 
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const httpUrlSchema = z.string().url().refine((value) => {
-  try {
-    const protocol = new URL(value).protocol;
-    return protocol === "http:" || protocol === "https:";
-  } catch {
-    return false;
-  }
-}, "Only HTTP and HTTPS URLs are allowed");
+const httpUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const protocol = new URL(value).protocol;
+      return protocol === "http:" || protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "Only HTTP and HTTPS URLs are allowed");
 const optionalHttpUrlSchema = httpUrlSchema.optional().or(z.literal(""));
 const timeZoneSchema = z
   .string()
@@ -20,8 +24,7 @@ const timeZoneSchema = z
   .refine(isValidTimeZone, "Select a valid IANA timezone");
 const coverImageUrlSchema = z
   .union([
-    httpUrlSchema,
-    z.string().regex(/^\/api\/uploads\/.+/, "Invalid uploaded image URL"),
+    z.string().refine(isUploadedImageUrl, "Invalid uploaded image URL"),
     z.literal(""),
   ])
   .optional();
@@ -34,8 +37,14 @@ const attendeeNameSchema = z
   .refine((value) => /\p{L}/u.test(value), "Enter a valid name");
 
 const registrationCutoffSchema = {
-  registrationClosesAt: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.date().optional()),
-  registrationLeadMinutes: z.preprocess((value) => value === "" || value == null ? undefined : Number(value), z.number().int().min(0).max(525_600).optional()),
+  registrationClosesAt: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : value),
+    z.coerce.date().optional(),
+  ),
+  registrationLeadMinutes: z.preprocess(
+    (value) => (value === "" || value == null ? undefined : Number(value)),
+    z.number().int().min(0).max(525_600).optional(),
+  ),
 };
 
 function validateEventScheduleAndLocation(
@@ -87,21 +96,24 @@ export const createOrganisationSchema = z.object({
     .max(64)
     .regex(slugRegex, "Use lowercase letters, numbers, and single hyphens"),
   description: z.string().trim().max(2000).optional().default(""),
-  logoUrl: optionalHttpUrlSchema,
+  logoUrl: z.literal(""),
 });
 
 export const updateOrganisationSchema = z.object({
   organisationSlug: z.string().trim().min(1),
   name: z.string().trim().min(1, "Name is required").max(120),
   description: z.string().trim().max(2000).optional().default(""),
-  logoUrl: optionalHttpUrlSchema,
+  logoUrl: z
+    .string()
+    .refine(isUploadedImageUrl, "Invalid uploaded image URL")
+    .or(z.literal("")),
 });
 
 export const createEventSchema = z
   .object({
     organisationSlug: z.string().trim().min(1),
     title: z.string().trim().min(1, "Title is required").max(200),
-    description: z.string().trim().max(10000).optional().default(""),
+    description: z.string().trim().min(1, "Description is required").max(10000),
     tags: z
       .preprocess(
         (v) => {
@@ -118,10 +130,10 @@ export const createEventSchema = z
       )
       .optional(),
     coverImageUrl: coverImageUrlSchema,
-    showRegistrationCount: z.preprocess(
-      (v) => v === true || v === "true" || v === "on",
-      z.boolean(),
-    ).optional().default(true),
+    showRegistrationCount: z
+      .preprocess((v) => v === true || v === "true" || v === "on", z.boolean())
+      .optional()
+      .default(true),
     startDateTime: z.coerce.date(),
     endDateTime: z.coerce.date(),
     timezone: timeZoneSchema,
@@ -145,9 +157,31 @@ export const createEventSchema = z
   })
   .superRefine((data, ctx) => {
     validateEventScheduleAndLocation(data, ctx);
-    if (data.registrationClosesAt && data.registrationLeadMinutes != null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["registrationClosesAt"], message: "Choose one registration cutoff mode." });
-    if (data.registrationClosesAt && data.registrationClosesAt > data.startDateTime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["registrationClosesAt"], message: "Registration must close on or before the event starts." });
-    if (data.registrationLeadMinutes != null && data.registrationLeadMinutes * 60_000 > data.startDateTime.getTime() - Date.now()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["registrationLeadMinutes"], message: "Registration cutoff cannot be before now." });
+    if (data.registrationClosesAt && data.registrationLeadMinutes != null)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registrationClosesAt"],
+        message: "Choose one registration cutoff mode.",
+      });
+    if (
+      data.registrationClosesAt &&
+      data.registrationClosesAt > data.startDateTime
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registrationClosesAt"],
+        message: "Registration must close on or before the event starts.",
+      });
+    if (
+      data.registrationLeadMinutes != null &&
+      data.registrationLeadMinutes * 60_000 >
+        data.startDateTime.getTime() - Date.now()
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registrationLeadMinutes"],
+        message: "Registration cutoff cannot be before now.",
+      });
   });
 
 const rsvpTargetBase = z
@@ -189,7 +223,12 @@ export const updateRsvpRegistrationSchema = z
     eventInstanceId: z.string().trim().optional(),
     rsvpId: z.string().trim().min(1),
     name: attendeeNameSchema.optional().or(z.literal("")),
-    guestEmail: z.string().trim().email("Valid email required").optional().or(z.literal("")),
+    guestEmail: z
+      .string()
+      .trim()
+      .email("Valid email required")
+      .optional()
+      .or(z.literal("")),
     answers: z.record(z.string(), z.unknown()).optional().default({}),
   })
   .refine(
@@ -202,7 +241,7 @@ export const updateEventSchema = z
     organisationSlug: z.string().trim().min(1),
     eventId: z.string().trim().min(1),
     title: z.string().trim().min(1, "Title is required").max(200),
-    description: z.string().trim().max(10000).optional().default(""),
+    description: z.string().trim().min(1, "Description is required").max(10000),
     tags: z
       .preprocess(
         (v) => {
@@ -219,10 +258,10 @@ export const updateEventSchema = z
       )
       .optional(),
     coverImageUrl: coverImageUrlSchema,
-    showRegistrationCount: z.preprocess(
-      (v) => v === true || v === "true" || v === "on",
-      z.boolean(),
-    ).optional().default(true),
+    showRegistrationCount: z
+      .preprocess((v) => v === true || v === "true" || v === "on", z.boolean())
+      .optional()
+      .default(true),
     startDateTime: z.coerce.date(),
     endDateTime: z.coerce.date(),
     timezone: timeZoneSchema,
@@ -243,8 +282,21 @@ export const updateEventSchema = z
   })
   .superRefine((data, ctx) => {
     validateEventScheduleAndLocation(data, ctx);
-    if (data.registrationClosesAt && data.registrationLeadMinutes != null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["registrationClosesAt"], message: "Choose one registration cutoff mode." });
-    if (data.registrationClosesAt && data.registrationClosesAt > data.startDateTime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["registrationClosesAt"], message: "Registration must close on or before the event starts." });
+    if (data.registrationClosesAt && data.registrationLeadMinutes != null)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registrationClosesAt"],
+        message: "Choose one registration cutoff mode.",
+      });
+    if (
+      data.registrationClosesAt &&
+      data.registrationClosesAt > data.startDateTime
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registrationClosesAt"],
+        message: "Registration must close on or before the event starts.",
+      });
   });
 
 export const deleteEventSchema = z.object({
@@ -296,8 +348,7 @@ export const deleteRsvpSchema = z
     rsvpId: z.string().trim().min(1),
   })
   .refine(
-    (d) =>
-      Boolean(d.eventId?.length) !== Boolean(d.eventInstanceId?.length),
+    (d) => Boolean(d.eventId?.length) !== Boolean(d.eventInstanceId?.length),
     { message: "Event or instance is required.", path: ["eventId"] },
   );
 
@@ -314,14 +365,16 @@ const orgScoped = z.object({
   organisationSlug: z.string().trim().min(1),
 });
 
-export const rsvpTransitionSchema = orgScoped.extend({
-  rsvpId: z.string().trim().min(1),
-  eventId: z.string().trim().optional(),
-  eventInstanceId: z.string().trim().optional(),
-}).refine(
-  (d) => Boolean(d.eventId?.length) !== Boolean(d.eventInstanceId?.length),
-  { message: "Event or instance is required.", path: ["eventId"] },
-);
+export const rsvpTransitionSchema = orgScoped
+  .extend({
+    rsvpId: z.string().trim().min(1),
+    eventId: z.string().trim().optional(),
+    eventInstanceId: z.string().trim().optional(),
+  })
+  .refine(
+    (d) => Boolean(d.eventId?.length) !== Boolean(d.eventInstanceId?.length),
+    { message: "Event or instance is required.", path: ["eventId"] },
+  );
 
 export const addEventInviteSchema = orgScoped.extend({
   eventId: z.string().trim().min(1),
@@ -350,7 +403,12 @@ export const createSeriesSchema = z
     description: z.string().trim().max(10000).optional().default(""),
     anchorStartDateTime: z.coerce.date(),
     anchorEndDateTime: z.coerce.date(),
-    rruleLine: z.string().trim().min(1, "Recurrence rule is required").max(2048).refine((value) => !/[\r\n]/.test(value), "Use a single RRULE line"),
+    rruleLine: z
+      .string()
+      .trim()
+      .min(1, "Recurrence rule is required")
+      .max(2048)
+      .refine((value) => !/[\r\n]/.test(value), "Use a single RRULE line"),
     timezone: timeZoneSchema,
     capacity: z.preprocess((v) => {
       if (v === "" || v === null || v === undefined) return undefined;
@@ -367,10 +425,15 @@ export const createSeriesSchema = z
     message: "End must be after start",
     path: ["anchorEndDateTime"],
   })
-  .refine((d) => d.anchorEndDateTime.getTime() - d.anchorStartDateTime.getTime() <= 2_147_483_647, {
-    message: "A recurring occurrence must be shorter than 24 days",
-    path: ["anchorEndDateTime"],
-  });
+  .refine(
+    (d) =>
+      d.anchorEndDateTime.getTime() - d.anchorStartDateTime.getTime() <=
+      2_147_483_647,
+    {
+      message: "A recurring occurrence must be shorter than 24 days",
+      path: ["anchorEndDateTime"],
+    },
+  );
 
 export const updateSeriesMetaSchema = orgScoped.extend({
   eventSeriesId: z.string().trim().min(1),
@@ -390,44 +453,59 @@ export const deleteSeriesSchema = orgScoped.extend({
   eventSeriesId: z.string().trim().min(1),
 });
 
-export const checkInByTokenSchema = z.object({
-  organisationSlug: z.string().trim().min(1).max(120),
-  eventId: z.string().trim().min(1).max(128),
-  rawInput: z.string().trim().min(1).max(2048),
-  force: z.boolean().optional(),
-}).strict();
+export const checkInByTokenSchema = z
+  .object({
+    organisationSlug: z.string().trim().min(1).max(120),
+    eventId: z.string().trim().min(1).max(128),
+    rawInput: z.string().trim().min(1).max(2048),
+    force: z.boolean().optional(),
+  })
+  .strict();
 
-export const undoCheckInSchema = z.object({
-  organisationSlug: z.string().trim().min(1).max(120),
-  eventId: z.string().trim().min(1).max(128),
-  rsvpId: z.string().trim().min(1).max(128),
-}).strict();
+export const undoCheckInSchema = z
+  .object({
+    organisationSlug: z.string().trim().min(1).max(120),
+    eventId: z.string().trim().min(1).max(128),
+    rsvpId: z.string().trim().min(1).max(128),
+  })
+  .strict();
 
-export const attendeeLookupSchema = z.object({
-  organisationSlug: z.string().trim().min(1).max(120),
-  eventId: z.string().trim().min(1).max(128),
-  query: z.string().trim().min(2).max(200),
-}).strict();
+export const attendeeLookupSchema = z
+  .object({
+    organisationSlug: z.string().trim().min(1).max(120),
+    eventId: z.string().trim().min(1).max(128),
+    query: z.string().trim().min(2).max(200),
+  })
+  .strict();
 
-export const checkInByRsvpIdSchema = z.object({
-  organisationSlug: z.string().trim().min(1).max(120),
-  eventId: z.string().trim().min(1).max(128),
-  rsvpId: z.string().trim().min(1).max(128),
-  force: z.boolean().optional(),
-}).strict();
+export const checkInByRsvpIdSchema = z
+  .object({
+    organisationSlug: z.string().trim().min(1).max(120),
+    eventId: z.string().trim().min(1).max(128),
+    rsvpId: z.string().trim().min(1).max(128),
+    force: z.boolean().optional(),
+  })
+  .strict();
 
-export const offlineCheckInRosterSchema = z.object({
-  organisationSlug: z.string().trim().min(1).max(120),
-  eventId: z.string().trim().min(1).max(128),
-}).strict();
+export const offlineCheckInRosterSchema = z
+  .object({
+    organisationSlug: z.string().trim().min(1).max(120),
+    eventId: z.string().trim().min(1).max(128),
+  })
+  .strict();
 
 export const syncOfflineCheckInsSchema = offlineCheckInRosterSchema.extend({
-  checkIns: z.array(
-    z.object({
-      rsvpId: z.string().trim().min(1).max(128),
-      clientMutationId: z.string().trim().min(8).max(128),
-      checkedInAt: z.string().datetime(),
-      force: z.boolean().optional().default(false),
-    }).strict(),
-  ).min(1).max(500),
+  checkIns: z
+    .array(
+      z
+        .object({
+          rsvpId: z.string().trim().min(1).max(128),
+          clientMutationId: z.string().trim().min(8).max(128),
+          checkedInAt: z.string().datetime(),
+          force: z.boolean().optional().default(false),
+        })
+        .strict(),
+    )
+    .min(1)
+    .max(500),
 });

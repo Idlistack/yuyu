@@ -38,7 +38,9 @@ export default async function EventManagePage({ params }: Props) {
     select: { permissions: true },
   });
   const hasPermission = (permission: EventPermission) => isAdmin || Boolean(currentGrant?.permissions.includes(permission));
-  const canManageRegistrations = hasPermission(EventPermission.MANAGE_REGISTRATIONS);
+  // RSVP lifecycle actions are organisation-admin operations. Keep the
+  // dashboard controls aligned with the server-side mutation boundary.
+  const canManageRegistrations = isAdmin;
   const canManageInvitations = hasPermission(EventPermission.MANAGE_INVITATIONS);
   const canCheckIn = hasPermission(EventPermission.CHECK_IN);
 
@@ -231,6 +233,8 @@ website={{ page: event.page, highlights: event.highlights.map((x) => ({ id: x.id
         canManageCollaborators={Boolean(access.membership && isOrgAdmin(access.membership.role))}
         canManageRegistrations={canManageRegistrations}
         canCheckIn={canCheckIn}
+        canEditDetails={isAdmin}
+        canManageSchedule={hasPermission(EventPermission.PUBLISH_AND_SCHEDULE)}
         collaborators={collaborators.map((collaborator) => ({ id: collaborator.id, name: collaborator.user.name, email: collaborator.user.email, permissions: collaborator.permissions }))}
         pendingCollaboratorInvites={pendingCollaboratorInvites.map((invite) => ({ id: invite.id, email: invite.email, expiresAt: invite.expiresAt.toISOString() }))}
         analytics={{

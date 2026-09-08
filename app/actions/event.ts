@@ -25,21 +25,33 @@ import { isActionRateLimited } from "@/lib/actionRateLimit";
 import { createSafeWebpDerivative } from "@/lib/imageValidation";
 import { recordAuditEvent } from "@/lib/audit";
 import { z } from "zod";
+import { isOrganisationUploadUrl } from "@/lib/uploadUrl";
 
 const MAX_COVER_IMAGE_BYTES = 5 * 1024 * 1024;
-const publishEventSchema = z.object({ organisationSlug: z.string().trim().min(1).max(120), eventSlug: z.string().trim().min(1).max(64) }).strict();
+const publishEventSchema = z
+  .object({
+    organisationSlug: z.string().trim().min(1).max(120),
+    eventSlug: z.string().trim().min(1).max(64),
+  })
+  .strict();
 
 export async function uploadEventCoverImage(
   formData: FormData,
 ): Promise<ActionResult<{ url: string }>> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-  if (!(await isUserEmailVerified(session.user.id))) return { ok: false, error: "Verify your email before uploading event images." };
+  if (!(await isUserEmailVerified(session.user.id)))
+    return {
+      ok: false,
+      error: "Verify your email before uploading event images.",
+    };
   if (await isActionRateLimited("upload", session.user.id)) {
     return { ok: false, error: "Too many uploads. Please try again later." };
   }
 
-  const organisationSlug = String(formData.get("organisationSlug") ?? "").trim();
+  const organisationSlug = String(
+    formData.get("organisationSlug") ?? "",
+  ).trim();
   const file = formData.get("file");
   if (!organisationSlug || !(file instanceof File)) {
     return { ok: false, error: "Choose an image to upload." };
@@ -47,15 +59,23 @@ export async function uploadEventCoverImage(
   if (file.size === 0 || file.size > MAX_COVER_IMAGE_BYTES) {
     return { ok: false, error: "Cover images must be 5 MB or smaller." };
   }
-  const org = await prisma.organisation.findUnique({ where: { slug: organisationSlug } });
+  const org = await prisma.organisation.findUnique({
+    where: { slug: organisationSlug },
+  });
   if (!org) return { ok: false, error: "Organisation not found." };
   const membership = await getMembership(session.user.id, org.id);
   if (!canCreateEvent(membership)) {
-    return { ok: false, error: "You do not have permission to upload cover images." };
+    return {
+      ok: false,
+      error: "You do not have permission to upload cover images.",
+    };
   }
-
   try {
-    const derivative = await createSafeWebpDerivative(file, { width: 2400, height: 2400, fit: "inside" });
+    const derivative = await createSafeWebpDerivative(file, {
+      width: 2400,
+      height: 2400,
+      fit: "inside",
+    });
     if ("error" in derivative) return { ok: false, error: derivative.error };
     const key = `organisations/${org.id}/event-covers/${crypto.randomUUID()}.webp`;
     await uploadFile({
@@ -71,7 +91,11 @@ export async function uploadEventCoverImage(
   }
 }
 
-function revalidateEventPaths(orgSlug: string, eventSlug: string, eventId: string) {
+function revalidateEventPaths(
+  orgSlug: string,
+  eventSlug: string,
+  eventId: string,
+) {
   revalidatePath(`/${orgSlug}`);
   revalidatePath(`/${orgSlug}/${eventSlug}`);
   revalidatePath(`/dashboard/${orgSlug}`);
@@ -84,7 +108,9 @@ function validationError(error: Parameters<typeof flattenZodErrors>[0]) {
   return { error: message, fieldErrors };
 }
 
-export async function createEvent(input: unknown): Promise<ActionResult<{ id: string; slug: string }>> {
+export async function createEvent(
+  input: unknown,
+): Promise<ActionResult<{ id: string; slug: string }>> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in." };
@@ -93,7 +119,10 @@ export async function createEvent(input: unknown): Promise<ActionResult<{ id: st
     return { ok: false, error: "Verify your email before creating events." };
   }
   if (await isActionRateLimited("create", session.user.id)) {
-    return { ok: false, error: "Too many creation attempts. Please try again later." };
+    return {
+      ok: false,
+      error: "Too many creation attempts. Please try again later.",
+    };
   }
 
   const parsed = createEventSchema.safeParse(input);
@@ -120,11 +149,14 @@ export async function createEvent(input: unknown): Promise<ActionResult<{ id: st
       error: "Only owners and admins can create events.",
     };
   }
-
   if (
-    data.status !== EventStatus.DRAFT &&
-    !canPublishEvents(membership)
+    data.coverImageUrl &&
+    !isOrganisationUploadUrl(data.coverImageUrl, org.id, "event-covers")
   ) {
+    return { ok: false, error: "Choose an uploaded cover image." };
+  }
+
+  if (data.status !== EventStatus.DRAFT && !canPublishEvents(membership)) {
     return {
       ok: false,
       error: "Only owners and admins can publish or hide events.",
@@ -194,7 +226,8 @@ export async function updateEvent(input: unknown): Promise<ActionResult> {
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in." };
   }
-  if (await isActionRateLimited("action", session.user.id)) return { ok: false, error: "Too many updates. Please try again later." };
+  if (await isActionRateLimited("action", session.user.id))
+    return { ok: false, error: "Too many updates. Please try again later." };
 
   const parsed = updateEventSchema.safeParse(input);
   if (!parsed.success) {
@@ -216,10 +249,7 @@ export async function updateEvent(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "You do not have permission to edit events." };
   }
 
-  if (
-    data.status !== EventStatus.DRAFT &&
-    !canPublishEvents(membership)
-  ) {
+  if (data.status !== EventStatus.DRAFT && !canPublishEvents(membership)) {
     return {
       ok: false,
       error: "Only owners and admins can change visibility.",
@@ -230,12 +260,20 @@ export async function updateEvent(input: unknown): Promise<ActionResult> {
     where: { id: data.eventId, organisationId: org.id },
   });
   if (!event) return { ok: false, error: "Event not found." };
+  if (
+    data.coverImageUrl &&
+    !isOrganisationUploadUrl(data.coverImageUrl, org.id, "event-covers")
+  ) {
+    return { ok: false, error: "Choose an uploaded cover image." };
+  }
 
   try {
     const saved = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${event.id} FOR UPDATE`;
       if (data.capacity != null) {
-        const confirmed = await tx.rSVP.count({ where: { eventId: event.id, status: "CONFIRMED" } });
+        const confirmed = await tx.rSVP.count({
+          where: { eventId: event.id, status: "CONFIRMED" },
+        });
         if (confirmed > data.capacity) return false;
       }
       await tx.event.update({
@@ -261,7 +299,12 @@ export async function updateEvent(input: unknown): Promise<ActionResult> {
       });
       return true;
     });
-    if (!saved) return { ok: false, error: "Capacity cannot be lower than the current confirmed attendance." };
+    if (!saved)
+      return {
+        ok: false,
+        error:
+          "Capacity cannot be lower than the current confirmed attendance.",
+      };
 
     await recordAuditEvent({
       action: "EVENT_UPDATED",
@@ -285,7 +328,8 @@ export async function deleteEvent(input: unknown): Promise<ActionResult> {
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in." };
   }
-  if (await isActionRateLimited("action", session.user.id)) return { ok: false, error: "Too many updates. Please try again later." };
+  if (await isActionRateLimited("action", session.user.id))
+    return { ok: false, error: "Too many updates. Please try again later." };
 
   const parsed = deleteEventSchema.safeParse(input);
   if (!parsed.success) {
@@ -339,7 +383,8 @@ export async function updateEventSlug(
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in." };
   }
-  if (await isActionRateLimited("action", session.user.id)) return { ok: false, error: "Too many updates. Please try again later." };
+  if (await isActionRateLimited("action", session.user.id))
+    return { ok: false, error: "Too many updates. Please try again later." };
 
   const parsed = updateEventSlugSchema.safeParse(input);
   if (!parsed.success) {
@@ -413,7 +458,11 @@ export async function cloneEvent(
   if (!(await isUserEmailVerified(session.user.id))) {
     return { ok: false, error: "Verify your email before creating events." };
   }
-  if (await isActionRateLimited("create", session.user.id)) return { ok: false, error: "Too many creation attempts. Please try again later." };
+  if (await isActionRateLimited("create", session.user.id))
+    return {
+      ok: false,
+      error: "Too many creation attempts. Please try again later.",
+    };
 
   const parsed = cloneEventSchema.safeParse(input);
   if (!parsed.success) {
@@ -501,7 +550,8 @@ export async function publishEvent(input: unknown): Promise<ActionResult> {
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in." };
   }
-  if (await isActionRateLimited("action", session.user.id)) return { ok: false, error: "Too many updates. Please try again later." };
+  if (await isActionRateLimited("action", session.user.id))
+    return { ok: false, error: "Too many updates. Please try again later." };
   const parsed = publishEventSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid publish request." };
 

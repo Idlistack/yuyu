@@ -13,6 +13,8 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { updateAccountProfile } from "@/app/actions/account";
+import { uploadAccountProfileImage } from "@/app/actions/media";
+import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
 import { useToast } from "@/components/feedback/ToastProvider";
 
 export function AccountProfileForm(props: {
@@ -23,13 +25,23 @@ export function AccountProfileForm(props: {
   gravatarUrl: string | null;
   createdAtLabel: string;
 }) {
-  const { email, image, profileImageUrl: initialProfileImageUrl, gravatarUrl, createdAtLabel } = props;
+  const {
+    email,
+    image,
+    profileImageUrl: initialProfileImageUrl,
+    gravatarUrl,
+    createdAtLabel,
+  } = props;
   const [name, setName] = useState(props.initialName);
-  const [profileImageUrl, setProfileImageUrl] = useState(initialProfileImageUrl ?? "");
+  const [profileImageUrl, setProfileImageUrl] = useState(
+    initialProfileImageUrl ?? "",
+  );
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { showToast } = useToast();
-  const avatarSource = profileImageUrl.trim() || image || gravatarUrl || undefined;
+  const avatarSource =
+    profileImageUrl.trim() || image || gravatarUrl || undefined;
   const avatarSourceDescription = profileImageUrl.trim()
     ? "Custom profile image."
     : image
@@ -45,7 +57,27 @@ export function AccountProfileForm(props: {
         event.preventDefault();
         setError(null);
         startTransition(async () => {
-          const result = await updateAccountProfile({ name, profileImageUrl });
+          let uploadedUrl = profileImageUrl;
+          if (profileImageFile) {
+            const upload = new FormData();
+            upload.set("file", profileImageFile);
+            const response = await uploadAccountProfileImage(upload);
+            if (!response.ok) {
+              setError(response.error);
+              showToast(response.error, "error");
+              return;
+            }
+            if (!response.data) {
+              setError("Could not upload the profile image.");
+              showToast("Could not upload the profile image.", "error");
+              return;
+            }
+            uploadedUrl = response.data.url;
+          }
+          const result = await updateAccountProfile({
+            name,
+            profileImageUrl: uploadedUrl,
+          });
           if (!result.ok) {
             setError(result.error);
             showToast(result.error, "error");
@@ -53,23 +85,43 @@ export function AccountProfileForm(props: {
           }
           setName(result.data?.name ?? name.trim());
           setProfileImageUrl(result.data?.profileImageUrl ?? "");
+          setProfileImageFile(null);
           showToast("Profile saved", "success");
         });
       }}
     >
       {error ? <Alert severity="error">{error}</Alert> : null}
-      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: "16px" }}>
+      <Paper
+        variant="outlined"
+        sx={{ p: { xs: 2, sm: 3 }, borderRadius: "16px" }}
+      >
         <Stack spacing={2.5}>
           <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-            <Avatar src={avatarSource} alt={name} sx={{ width: 72, height: 72, fontSize: 28 }}>
+            <Avatar
+              src={avatarSource}
+              alt={name}
+              sx={{ width: 72, height: 72, fontSize: 28 }}
+            >
               {initials}
             </Avatar>
             <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>{name || "Your profile"}</Typography>
-              <Stack direction="row" spacing={0.25} sx={{ alignItems: "center" }}>
-                <Typography variant="body2" color="text.secondary" noWrap>{email ?? "No email address"}</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                {name || "Your profile"}
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={0.25}
+                sx={{ alignItems: "center" }}
+              >
+                <Typography variant="body2" color="text.secondary" noWrap>
+                  {email ?? "No email address"}
+                </Typography>
                 <Tooltip title={avatarSourceDescription}>
-                  <IconButton size="small" aria-label="Profile image source" sx={{ p: 0.25, color: "text.secondary" }}>
+                  <IconButton
+                    size="small"
+                    aria-label="Profile image source"
+                    sx={{ p: 0.25, color: "text.secondary" }}
+                  >
                     <InfoOutlinedIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
@@ -86,21 +138,37 @@ export function AccountProfileForm(props: {
             fullWidth
             slotProps={{ htmlInput: { maxLength: 120 } }}
           />
-          <TextField
-            label="Profile image URL"
-            value={profileImageUrl}
-            onChange={(event) => setProfileImageUrl(event.target.value)}
-            type="url"
-            autoComplete="url"
-            fullWidth
-            helperText="Optional. Use an HTTP or HTTPS image URL. Leave blank to use your provider image or Gravatar."
-            slotProps={{ htmlInput: { maxLength: 2048 } }}
+          <ImageUploadPicker
+            initialUrl={initialProfileImageUrl}
+            label="Profile image"
+            placeholder="Your uploaded profile image will appear here."
+            disabled={pending}
+            objectFit="cover"
+            onChange={(file, previewUrl) => {
+              setProfileImageFile(file);
+              setProfileImageUrl(previewUrl);
+            }}
           />
-          <TextField label="Email address" value={email ?? ""} fullWidth disabled helperText="Email changes will be available in a future update." />
+          <Typography variant="caption" color="text.secondary">
+            Remove your uploaded image to use your provider image or Gravatar
+            when available.
+          </Typography>
+          <TextField
+            label="Email address"
+            value={email ?? ""}
+            fullWidth
+            disabled
+            helperText="Email changes will be available in a future update."
+          />
           <Typography variant="caption" color="text.secondary">
             Account created {createdAtLabel}
           </Typography>
-          <Button type="submit" variant="contained" disabled={pending} sx={{ alignSelf: "flex-start" }}>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={pending}
+            sx={{ alignSelf: "flex-start" }}
+          >
             {pending ? "Saving…" : "Save profile"}
           </Button>
         </Stack>

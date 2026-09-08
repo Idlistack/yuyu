@@ -10,18 +10,19 @@ import { isActionRateLimited } from "@/lib/actionRateLimit";
 import { recordAuditEvent } from "@/lib/audit";
 import { flattenZodErrors } from "./utils";
 import type { ActionResult } from "./org";
+import { isUploadedImageUrl, isUserUploadUrl } from "@/lib/uploadUrl";
 
 const updateProfileSchema = z.object({
-  name: z.string().trim().min(1, "Name is required").max(120, "Name must be at most 120 characters"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(120, "Name must be at most 120 characters"),
   profileImageUrl: z
     .string()
     .trim()
     .max(2048, "Profile image URL must be at most 2048 characters")
-    .url("Enter a valid image URL")
-    .refine((value) => {
-      const protocol = new URL(value).protocol;
-      return protocol === "http:" || protocol === "https:";
-    }, "Only HTTP and HTTPS image URLs are allowed")
+    .refine(isUploadedImageUrl, "Choose an uploaded profile image")
     .or(z.literal("")),
 });
 
@@ -39,7 +40,9 @@ const updatePasswordSchema = z
     path: ["confirmPassword"],
   });
 
-export async function updateAccountProfile(input: unknown): Promise<ActionResult<{ name: string; profileImageUrl: string | null }>> {
+export async function updateAccountProfile(
+  input: unknown,
+): Promise<ActionResult<{ name: string; profileImageUrl: string | null }>> {
   const session = await requireAuth();
   if (await isActionRateLimited("action", session.user.id)) {
     return { ok: false, error: "Too many updates. Please try again later." };
@@ -56,6 +59,12 @@ export async function updateAccountProfile(input: unknown): Promise<ActionResult
 
   const { name, profileImageUrl } = parsed.data;
   const savedProfileImageUrl = profileImageUrl || null;
+  if (
+    savedProfileImageUrl &&
+    !isUserUploadUrl(savedProfileImageUrl, session.user.id)
+  ) {
+    return { ok: false, error: "Choose your uploaded profile image." };
+  }
   await prisma.user.update({
     where: { id: session.user.id },
     data: { name, profileImageUrl: savedProfileImageUrl },
@@ -71,7 +80,9 @@ export async function updateAccountProfile(input: unknown): Promise<ActionResult
   return { ok: true, data: { name, profileImageUrl: savedProfileImageUrl } };
 }
 
-export async function updateAccountPassword(input: unknown): Promise<ActionResult<{ passwordSet: true }>> {
+export async function updateAccountPassword(
+  input: unknown,
+): Promise<ActionResult<{ passwordSet: true }>> {
   const session = await requireAuth();
   if (await isActionRateLimited("auth", session.user.id)) {
     return { ok: false, error: "Too many attempts. Please try again later." };
@@ -90,15 +101,25 @@ export async function updateAccountPassword(input: unknown): Promise<ActionResul
     where: { id: session.user.id },
     select: { email: true, passwordHash: true },
   });
-  if (!user?.email) return { ok: false, error: "An email address is required to set a password." };
+  if (!user?.email)
+    return {
+      ok: false,
+      error: "An email address is required to set a password.",
+    };
 
   if (user.passwordHash) {
-    if (!parsed.data.currentPassword) return { ok: false, error: "Enter your current password." };
-    if (!(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
+    if (!parsed.data.currentPassword)
+      return { ok: false, error: "Enter your current password." };
+    if (
+      !(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))
+    ) {
       return { ok: false, error: "Current password is incorrect." };
     }
   } else if (!(await hasRecentAuthentication())) {
-    return { ok: false, error: "Sign in with Google again before adding a password." };
+    return {
+      ok: false,
+      error: "Sign in with Google again before adding a password.",
+    };
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
@@ -110,7 +131,9 @@ export async function updateAccountPassword(input: unknown): Promise<ActionResul
     await tx.session.deleteMany({ where: { userId: session.user.id } });
     await tx.auditEvent.create({
       data: {
-        action: user.passwordHash ? "ACCOUNT_PASSWORD_CHANGED" : "ACCOUNT_PASSWORD_ADDED",
+        action: user.passwordHash
+          ? "ACCOUNT_PASSWORD_CHANGED"
+          : "ACCOUNT_PASSWORD_ADDED",
         actorUserId: session.user.id,
         targetType: "User",
         targetId: session.user.id,
