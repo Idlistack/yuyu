@@ -11,6 +11,7 @@ import { countConfirmedForEvent } from "@/lib/rsvpCapacity";
 import { EventWebsiteShell } from "@/components/event/EventWebsiteShell";
 import { effectiveEventProgram } from "@/lib/eventProgram";
 import { plainTextToSafeHtml, sanitizeRichText } from "@/lib/richText";
+import { isRegistrationClosed } from "@/lib/registrationCutoff";
 
 type Props = { params: Promise<{ orgSlug: string; eventSlug: string }> };
 
@@ -214,6 +215,11 @@ export default async function EventPage({ params }: Props) {
           : [],
       }))}
       confirmedCount={event.showRegistrationCount ? confirmed : null}
+      registrationOpen={
+        event.status === "PUBLISHED" &&
+        event.endDateTime > new Date() &&
+        !isRegistrationClosed(event)
+      }
     />
   );
 }

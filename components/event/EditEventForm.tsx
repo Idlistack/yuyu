@@ -47,6 +47,42 @@ function toDatetimeLocalValue(d: Date) {
   return new Date(t.getTime() - off).toISOString().slice(0, 16);
 }
 
+function zonedDatetimeLocalValue(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+function zonedInputToIso(value: string, timeZone: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute] = match;
+  const guess = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(guess));
+  const get = (type: string) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const offset = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute")) - guess;
+  const iso = new Date(guess - offset).toISOString();
+  return zonedDatetimeLocalValue(new Date(iso), timeZone) === value ? iso : null;
+}
+
 export function EditEventForm(props: {
   organisationSlug: string;
   event: EventClientDto;
@@ -101,6 +137,15 @@ export function EditEventForm(props: {
     const form = e.currentTarget;
     const fd = new FormData(form);
     const capacityRaw = String(fd.get("capacity") ?? "").trim();
+    const timezone = String(fd.get("timezone") ?? "UTC");
+    const registrationClosesAtRaw = String(fd.get("registrationClosesAt") ?? "").trim();
+    const registrationClosesAt = registrationClosesAtRaw
+      ? zonedInputToIso(registrationClosesAtRaw, timezone)
+      : "";
+    if (registrationClosesAtRaw && !registrationClosesAt) {
+      setError("Choose a valid registration closing time in the event time zone.");
+      return;
+    }
     const status = String(fd.get("status") ?? EventStatus.DRAFT) as EventStatus;
     const privacyType = String(
       fd.get("privacyType") ?? EventPrivacyType.PUBLIC,
@@ -130,12 +175,12 @@ export function EditEventForm(props: {
         showRegistrationCount: fd.get("showRegistrationCount") === "on",
         startDateTime: String(fd.get("startDateTime") ?? ""),
         endDateTime: String(fd.get("endDateTime") ?? ""),
-        timezone: String(fd.get("timezone") ?? "UTC"),
+        timezone,
         location: String(fd.get("location") ?? ""),
         mapLinkUrl: String(fd.get("mapLinkUrl") ?? ""),
         isOnline: fd.get("isOnline") === "on",
         capacity: capacityRaw,
-        registrationClosesAt: String(fd.get("registrationClosesAt") ?? ""),
+        registrationClosesAt,
         registrationLeadMinutes: String(
           fd.get("registrationLeadMinutes") ?? "",
         ),
@@ -566,8 +611,9 @@ export function EditEventForm(props: {
                     fullWidth
                     defaultValue={
                       event.registrationClosesAt
-                        ? toDatetimeLocalValue(
+                        ? zonedDatetimeLocalValue(
                             new Date(event.registrationClosesAt),
+                            event.timezone,
                           )
                         : ""
                     }

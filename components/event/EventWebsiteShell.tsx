@@ -86,6 +86,7 @@ type Props = {
   }>;
   registrationFields: RegistrationFieldDefinition[];
   confirmedCount: number | null;
+  registrationOpen: boolean;
 };
 
 const fmt = (value: string, zone: string) =>
@@ -135,12 +136,34 @@ export function EventWebsiteShell(p: Props) {
   const shown = new Set(
     p.page.sections.filter((x) => x.isVisible).map((x) => x.type),
   );
-  const section = (type: string, child: React.ReactNode) =>
-    shown.has(type) ? (
-      <Box component="section" sx={{ py: { xs: 3.5, md: 5 } }}>
+  const sectionContent: Array<[string, boolean]> = [
+    ["ABOUT", true],
+    ["HIGHLIGHTS", p.highlights.length > 0],
+    ["SCHEDULE", p.sessions.length > 0],
+    ["SPEAKERS", p.speakers.length > 0],
+    ["SPONSORS", p.sponsors.length > 0],
+    ["VENUE", Boolean(p.venue && !p.event.isOnline)],
+    ["FAQ", p.faqs.length > 0],
+    ["RESOURCES", p.resources.length > 0],
+  ];
+  const renderedSectionTypes = sectionContent
+    .filter(([type, hasContent]) => shown.has(type) && hasContent)
+    .map(([type]) => type);
+  const section = (type: string, child: React.ReactNode) => {
+    if (!child || !renderedSectionTypes.includes(type)) return null;
+
+    return (
+      <Box
+        component="section"
+        sx={{
+          pt: renderedSectionTypes[0] === type ? { xs: 3.5, md: 5 } : 0,
+          pb: { xs: 3.5, md: 5 },
+        }}
+      >
         {child}
       </Box>
-    ) : null;
+    );
+  };
   const mapQuery = p.venue
     ? mapSearchQuery(p.venue.location, p.venue.mapLinkUrl)
     : null;
@@ -353,6 +376,8 @@ export function EventWebsiteShell(p: Props) {
                     </Box>
                     {p.event.status === "CANCELLED" ? (
                       <Alert severity="error">Event cancelled</Alert>
+                    ) : !p.registrationOpen ? (
+                      <Alert severity="info">Registration is closed.</Alert>
                     ) : (
                       <Button
                         variant="contained"
