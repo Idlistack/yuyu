@@ -25,6 +25,7 @@ Google OAuth users rely on the Google account's MFA policy; the application TOTP
 ## Events
 
 - Draft, published, and hidden event states.
+- A single event publication state controls both public website visibility and RSVP availability.
 - Title, description, tags, timezone, dates, location, online status, capacity, and cover image.
 - Public, hidden-link, approval-required, and invite-only privacy modes.
 - Optional display of confirmed registration counts.

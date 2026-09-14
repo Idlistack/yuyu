@@ -23,3 +23,14 @@ export function plainTextToSafeHtml(value: string) {
     .replace(/\r\n?/g, "\n")
     .replace(/\n/g, "<br>");
 }
+
+/** Build a compact plain-text summary from already-sanitized rich text. */
+export function richTextToPlainText(value: string) {
+  const withBlockSeparators = value.replace(
+    /<\/?(?:p|br|h2|h3|li|blockquote)\b[^>]*>/gi,
+    " ",
+  );
+  return sanitizeHtml(withBlockSeparators, { allowedTags: [], allowedAttributes: {} })
+    .replace(/\s+/g, " ")
+    .trim();
+}

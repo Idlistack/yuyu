@@ -27,11 +27,9 @@ import {
   uploadEventSpeakerPhoto,
   uploadEventSponsorLogo,
 } from "@/app/actions/event-website";
-import { uploadEventPageLogo } from "@/app/actions/media";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
-import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
 
 const sectionTypes = [
   "HERO",
@@ -518,8 +516,6 @@ export function EventWebsiteManager(props: Props) {
     row: ContentRow;
   } | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [pageLogoFile, setPageLogoFile] = useState<File | null>(null);
-  const [pageLogoUrl, setPageLogoUrl] = useState(props.page?.logoUrl ?? "");
   useUnsavedChangesGuard(dirty && !pending);
   useEffect(() => {
     const markPageDirty = (event: Event) => {
@@ -579,33 +575,14 @@ export function EventWebsiteManager(props: Props) {
   const savePage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    let logoUrl = pageLogoUrl;
-    if (pageLogoFile) {
-      const upload = new FormData();
-      upload.set("organisationSlug", target.organisationSlug);
-      upload.set("eventId", target.eventId);
-      upload.set("file", pageLogoFile);
-      const result = await uploadEventPageLogo(upload);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      if (!result.data) {
-        setError("Could not upload the event page logo.");
-        return;
-      }
-      logoUrl = result.data.url;
-      setPageLogoUrl(logoUrl);
-      setPageLogoFile(null);
-    }
     save(
       saveEventPage,
       {
         ...target,
-        tagline: String(form.get("tagline") ?? ""),
-        logoUrl,
+        tagline: props.page?.tagline ?? "",
+        logoUrl: props.page?.logoUrl ?? "",
         accentColor: String(form.get("accentColor") ?? ""),
-        aboutHtml: String(form.get("aboutHtml") ?? ""),
+        aboutHtml: props.page?.aboutHtml ?? "",
         sections,
       },
       true,
@@ -635,8 +612,8 @@ export function EventWebsiteManager(props: Props) {
             <div>
               <Typography variant="h6">Event page</Typography>
               <Typography variant="body2" color="text.secondary">
-                Set the essentials, choose what visitors see, and preview the
-                result.
+                Choose what visitors see, arrange the sections, and preview the
+                result. Edit the event introduction in Details.
               </Typography>
             </div>
             <Stack direction="row" spacing={1}>
@@ -654,26 +631,7 @@ export function EventWebsiteManager(props: Props) {
               </Button>
             </Stack>
           </Stack>
-          <TextField
-            name="tagline"
-            label="Tagline"
-            defaultValue={props.page?.tagline ?? ""}
-            size="small"
-            helperText="A short line beneath the event title."
-          />
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-            <ImageUploadPicker
-              initialUrl={props.page?.logoUrl}
-              label="Event page logo"
-              placeholder="Your event page logo will appear here."
-              disabled={pending}
-              onChange={(file, previewUrl) => {
-                setPageLogoFile(file);
-                setPageLogoUrl(previewUrl);
-                setDirty(true);
-                setSaved(false);
-              }}
-            />
             <TextField
               name="accentColor"
               label="Accent colour"
@@ -683,13 +641,6 @@ export function EventWebsiteManager(props: Props) {
               fullWidth
             />
           </Stack>
-          <RichTextEditor
-            name="aboutHtml"
-            label="About the event"
-            defaultValue={props.page?.aboutHtml ?? ""}
-            helperText="Use the toolbar to format text—no HTML needed."
-            minHeight={140}
-          />
           <Divider />
           <Stack spacing={0.5}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>

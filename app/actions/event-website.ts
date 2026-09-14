@@ -197,35 +197,6 @@ export async function uploadEventSponsorLogo(
   }
 }
 
-export async function setEventPagePublished(
-  input: unknown,
-): Promise<ActionResult> {
-  const parsed = target.extend({ isPublished: z.boolean() }).safeParse(input);
-  if (!parsed.success) return fail("Invalid event website release request.");
-  const c = await context(parsed.data, EventPermission.PUBLISH_AND_SCHEDULE);
-  if (!c)
-    return fail("You do not have permission to release this event website.");
-  await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${c.event.id} FOR UPDATE`;
-    await tx.eventPage.upsert({
-      where: { eventId: c.event.id },
-      create: { eventId: c.event.id, isPublished: parsed.data.isPublished },
-      update: { isPublished: parsed.data.isPublished },
-    });
-  });
-  await recordAuditEvent({
-    action: parsed.data.isPublished
-      ? "EVENT_PAGE_PUBLISHED"
-      : "EVENT_PAGE_UNPUBLISHED",
-    actorUserId: c.session.user.id,
-    organisationId: c.org.id,
-    targetType: "Event",
-    targetId: c.event.id,
-  });
-  paths(c.org.slug, c.event);
-  return { ok: true };
-}
-
 export async function saveEventPage(input: unknown): Promise<ActionResult> {
   const schema = target
     .extend({

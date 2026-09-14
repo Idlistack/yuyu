@@ -26,6 +26,7 @@ import { createSafeWebpDerivative } from "@/lib/imageValidation";
 import { recordAuditEvent } from "@/lib/audit";
 import { z } from "zod";
 import { isOrganisationUploadUrl } from "@/lib/uploadUrl";
+import { richTextToPlainText, sanitizeRichText } from "@/lib/richText";
 
 const MAX_COVER_IMAGE_BYTES = 5 * 1024 * 1024;
 const publishEventSchema = z
@@ -135,6 +136,11 @@ export async function createEvent(
   }
 
   const data = parsed.data;
+  const aboutHtml = sanitizeRichText(data.aboutHtml);
+  const description = richTextToPlainText(aboutHtml).slice(0, 10_000);
+  if (!description) {
+    return { ok: false, error: "About the event is required." };
+  }
   const org = await prisma.organisation.findUnique({
     where: { slug: data.organisationSlug },
   });
@@ -155,7 +161,6 @@ export async function createEvent(
   ) {
     return { ok: false, error: "Choose an uploaded cover image." };
   }
-
   if (data.status !== EventStatus.DRAFT && !canPublishEvents(membership)) {
     return {
       ok: false,
@@ -186,7 +191,7 @@ export async function createEvent(
         organisationId: org.id,
         title: data.title,
         slug,
-        description: data.description ?? "",
+        description,
         tags: data.tags ?? [],
         showRegistrationCount: data.showRegistrationCount ?? true,
         coverImageUrl: data.coverImageUrl || null,
@@ -201,6 +206,12 @@ export async function createEvent(
         privacyType: data.privacyType ?? EventPrivacyType.PUBLIC,
         registrationClosesAt: data.registrationClosesAt ?? null,
         registrationLeadMinutes: data.registrationLeadMinutes ?? null,
+        page: {
+          create: {
+            isPublished: data.status === EventStatus.PUBLISHED,
+            aboutHtml,
+          },
+        },
       },
     });
 
@@ -260,11 +271,28 @@ export async function updateEvent(input: unknown): Promise<ActionResult> {
     where: { id: data.eventId, organisationId: org.id },
   });
   if (!event) return { ok: false, error: "Event not found." };
+  const aboutHtml =
+    data.pageAboutHtml !== undefined
+      ? sanitizeRichText(data.pageAboutHtml)
+      : undefined;
+  const description =
+    aboutHtml !== undefined
+      ? richTextToPlainText(aboutHtml).slice(0, 10_000)
+      : (data.description ?? event.description);
+  if (aboutHtml !== undefined && !description) {
+    return { ok: false, error: "About the event is required." };
+  }
   if (
     data.coverImageUrl &&
     !isOrganisationUploadUrl(data.coverImageUrl, org.id, "event-covers")
   ) {
     return { ok: false, error: "Choose an uploaded cover image." };
+  }
+  if (
+    data.pageLogoUrl &&
+    !isOrganisationUploadUrl(data.pageLogoUrl, org.id, "event-page-logos")
+  ) {
+    return { ok: false, error: "Choose an uploaded event page logo." };
   }
 
   try {
@@ -280,7 +308,7 @@ export async function updateEvent(input: unknown): Promise<ActionResult> {
         where: { id: event.id },
         data: {
           title: data.title,
-          description: data.description ?? "",
+          description,
           tags: data.tags ?? [],
           showRegistrationCount: data.showRegistrationCount ?? true,
           coverImageUrl: data.coverImageUrl || null,
@@ -295,6 +323,28 @@ export async function updateEvent(input: unknown): Promise<ActionResult> {
           privacyType: data.privacyType,
           registrationClosesAt: data.registrationClosesAt ?? null,
           registrationLeadMinutes: data.registrationLeadMinutes ?? null,
+        },
+      });
+      await tx.eventPage.upsert({
+        where: { eventId: event.id },
+        create: {
+          eventId: event.id,
+          isPublished: data.status === EventStatus.PUBLISHED,
+          tagline: data.pageTagline ?? "",
+          logoUrl: data.pageLogoUrl || null,
+          aboutHtml: aboutHtml ?? "",
+        },
+        update: {
+          isPublished: data.status === EventStatus.PUBLISHED,
+          ...(data.pageTagline !== undefined
+            ? { tagline: data.pageTagline }
+            : {}),
+          ...(data.pageLogoUrl !== undefined
+            ? { logoUrl: data.pageLogoUrl || null }
+            : {}),
+          ...(data.pageAboutHtml !== undefined
+            ? { aboutHtml }
+            : {}),
         },
       });
       return true;

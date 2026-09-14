@@ -10,20 +10,14 @@ vi.mock("@/lib/eventAccess", () => ({ canAccessEvent: mocks.canAccess }));
 vi.mock("@/lib/audit", () => ({ recordAuditEvent: mocks.audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { EventPageSectionType, EventPermission } from "@prisma/client";
-import { saveEventPage, setEventPagePublished } from "@/app/actions/event-website";
+import { EventPageSectionType } from "@prisma/client";
+import { saveEventPage } from "@/app/actions/event-website";
 
 beforeEach(() => {
   vi.clearAllMocks(); mocks.auth.mockResolvedValue({ user: { id: "user_1" } }); mocks.rateLimit.mockResolvedValue(false); mocks.orgFind.mockResolvedValue({ id: "org_1", slug: "org" }); mocks.eventFind.mockResolvedValue({ id: "event_1", slug: "event" }); mocks.canAccess.mockResolvedValue(true); mocks.transaction.mockImplementation(async (callback: (tx: { $queryRaw: typeof mocks.lock; eventPage: { upsert: typeof mocks.pageUpsert } }) => Promise<unknown>) => callback({ $queryRaw: mocks.lock, eventPage: { upsert: mocks.pageUpsert } }));
 });
 
-describe("event website release boundary", () => {
-  it("requires publish-and-schedule permission for the explicit release action", async () => {
-    await expect(setEventPagePublished({ organisationSlug: "org", eventId: "event_1", isPublished: true })).resolves.toEqual({ ok: true });
-    expect(mocks.canAccess).toHaveBeenCalledWith(expect.objectContaining({ permission: EventPermission.PUBLISH_AND_SCHEDULE }));
-    expect(mocks.pageUpsert).toHaveBeenCalledWith(expect.objectContaining({ update: { isPublished: true } }));
-  });
-
+describe("event website content boundary", () => {
   it("rejects attempts to smuggle release state through the content-save action", async () => {
     const sections = Object.values(EventPageSectionType).map((type, sortOrder) => ({ type, isVisible: true, sortOrder }));
     await expect(saveEventPage({ organisationSlug: "org", eventId: "event_1", isPublished: true, tagline: "Launch", aboutHtml: "", sections }))

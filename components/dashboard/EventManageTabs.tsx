@@ -29,7 +29,6 @@ import { ManualRsvpDialog } from "@/components/attendees/ManualRsvpDialog";
 import { useRouter } from "next/navigation";
 import { CollaboratorInvitePanel } from "@/components/event/CollaboratorInvitePanel";
 import { EventWebsiteManager } from "@/components/event/EventWebsiteManager";
-import { EventWebsiteReleaseControl } from "@/components/event/EventWebsiteReleaseControl";
 
 type InviteRow = { id: string; email: string; createdAt: string };
 
@@ -42,9 +41,9 @@ export function EventManageTabs(props: {
   registrationFields: RegistrationFieldRow[];
   feedbackUrl: string;
   feedbackForm: { isOpen: boolean; title: string; thankYouMessage: string; certificateEnabled: boolean } | null;
+  feedbackFields: RegistrationFieldRow[];
   feedbackResponses: FeedbackResponseRow[];
   feedbackResponsesTruncated: boolean;
-  feedbackFields: RegistrationFieldRow[];
   referenceTime: string;
   analytics: {
     total: number;
@@ -102,12 +101,7 @@ export function EventManageTabs(props: {
       {tab === 1 ? <Stack spacing={3}>{canManageSchedule ? <Paper variant="outlined" sx={{ p: 2.5 }}><Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}><div><Typography variant="h6">Programme schedule</Typography><Typography variant="body2" color="text.secondary">Add sessions, adjust planned times, and apply live cascading delays from the dedicated schedule workspace.</Typography></div><Button component={Link} href={`/dashboard/${organisationSlug}/event/${event.id}/schedule`} variant="outlined">Open schedule</Button></Stack></Paper> : <Typography color="text.secondary">You do not have permission to manage the programme.</Typography>}{canEditDetails ? <EventWebsiteManager organisationSlug={organisationSlug} eventId={event.id} eventSlug={event.slug} {...website} /> : <Typography color="text.secondary">You do not have permission to edit the event page.</Typography>}</Stack> : null}
       {tab === 2 ? (
         <Stack spacing={3}>
-          {canManageSchedule ? <EventWebsiteReleaseControl
-            organisationSlug={organisationSlug}
-            eventId={event.id}
-            isPublished={website.page?.isPublished ?? false}
-          /> : null}
-          {canEditDetails ? <EditEventForm organisationSlug={organisationSlug} event={event} /> : <Typography color="text.secondary">You do not have permission to edit event details.</Typography>}
+          {canEditDetails ? <EditEventForm organisationSlug={organisationSlug} event={event} page={website.page} /> : <Typography color="text.secondary">You do not have permission to edit event details.</Typography>}
         </Stack>
       ) : null}
       {tab === 3 ? (

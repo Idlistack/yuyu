@@ -20,6 +20,7 @@ import Fab from "@mui/material/Fab";
 import AddIcon from "@mui/icons-material/Add";
 import { createEvent, uploadEventCoverImage } from "@/app/actions/event";
 import { CoverImagePicker } from "@/components/event/CoverImagePicker";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
@@ -108,7 +109,7 @@ export function CreateEventDialog(props: {
       const res = await createEvent({
         organisationSlug,
         title: String(fd.get("title") ?? ""),
-        description: String(fd.get("description") ?? ""),
+        aboutHtml: String(fd.get("aboutHtml") ?? ""),
         tags: String(fd.get("tags") ?? ""),
         coverImageUrl,
         startDateTime: String(fd.get("startDateTime") ?? ""),
@@ -244,13 +245,11 @@ export function CreateEventDialog(props: {
                   fullWidth
                   autoFocus
                 />
-                <TextField
-                  name="description"
-                  label="Description"
-                  required
-                  fullWidth
-                  multiline
-                  minRows={3}
+                <RichTextEditor
+                  name="aboutHtml"
+                  label="About the event"
+                  helperText="Required. Share the key details attendees should know."
+                  minHeight={160}
                 />
                 <TextField
                   label="Tags"

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { plainTextToSafeHtml, sanitizeRichText } from "@/lib/richText";
+import {
+  plainTextToSafeHtml,
+  richTextToPlainText,
+  sanitizeRichText,
+} from "@/lib/richText";
 
 describe("event website rich text", () => {
   it("keeps constrained formatting and removes active markup", () => {
@@ -13,5 +17,10 @@ describe("event website rich text", () => {
   it("escapes plain event descriptions before they enter an HTML render slot", () => {
     expect(plainTextToSafeHtml('<img src=x onerror="alert(1)">\nSafe & sound'))
       .toBe("&lt;img src=x onerror=\"alert(1)\"&gt;<br>Safe &amp; sound");
+  });
+
+  it("derives a compact plain-text summary from formatted About content", () => {
+    expect(richTextToPlainText("<h2>Welcome</h2><p>Bring your <strong>ideas</strong>.</p>"))
+      .toBe("Welcome Bring your ideas.");
   });
 });

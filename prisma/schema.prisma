@@ -422,7 +422,7 @@ model EventScheduleItem {
 model EventPage {
   id          String @id @default(cuid())
   eventId     String @unique
-  /// Event website content remains private until an authorised organiser releases it.
+  /// Website visibility follows the owning event's published status.
   isPublished Boolean @default(false)
   tagline     String @default("")
   logoUrl     String?

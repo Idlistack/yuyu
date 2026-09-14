@@ -28,6 +28,13 @@ const coverImageUrlSchema = z
     z.literal(""),
   ])
   .optional();
+const eventPageLogoUrlSchema = z
+  .union([
+    z.string().refine(isUploadedImageUrl, "Invalid uploaded image URL"),
+    z.literal(""),
+    z.null(),
+  ])
+  .optional();
 
 export function isValidAttendeeName(value: string) {
   return (
@@ -121,7 +128,8 @@ export const createEventSchema = z
   .object({
     organisationSlug: z.string().trim().min(1),
     title: z.string().trim().min(1, "Title is required").max(200),
-    description: z.string().trim().min(1, "Description is required").max(10000),
+    description: z.string().trim().max(10000).optional(),
+    aboutHtml: z.string().max(50_000),
     tags: z
       .preprocess(
         (v) => {
@@ -249,7 +257,7 @@ export const updateEventSchema = z
     organisationSlug: z.string().trim().min(1),
     eventId: z.string().trim().min(1),
     title: z.string().trim().min(1, "Title is required").max(200),
-    description: z.string().trim().min(1, "Description is required").max(10000),
+    description: z.string().trim().max(10000).optional(),
     tags: z
       .preprocess(
         (v) => {
@@ -286,6 +294,9 @@ export const updateEventSchema = z
     }, z.number().int().positive().optional()),
     status: z.nativeEnum(EventStatus),
     privacyType: z.nativeEnum(EventPrivacyType),
+    pageTagline: z.string().trim().max(240).optional(),
+    pageLogoUrl: eventPageLogoUrlSchema,
+    pageAboutHtml: z.string().max(50_000).optional(),
     ...registrationCutoffSchema,
   })
   .superRefine((data, ctx) => {

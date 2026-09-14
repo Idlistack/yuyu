@@ -23,7 +23,10 @@ import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import { updateEvent, uploadEventCoverImage } from "@/app/actions/event";
+import { uploadEventPageLogo } from "@/app/actions/media";
 import { CoverImagePicker } from "@/components/event/CoverImagePicker";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
+import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -86,8 +89,13 @@ function zonedInputToIso(value: string, timeZone: string) {
 export function EditEventForm(props: {
   organisationSlug: string;
   event: EventClientDto;
+  page: {
+    tagline: string;
+    logoUrl: string | null;
+    aboutHtml: string;
+  } | null;
 }) {
-  const { organisationSlug, event } = props;
+  const { organisationSlug, event, page } = props;
   const router = useRouter();
   const { showToast } = useToast();
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +106,10 @@ export function EditEventForm(props: {
     event.coverImageUrl ?? "",
   );
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [pageLogoPreviewUrl, setPageLogoPreviewUrl] = useState(
+    page?.logoUrl ?? "",
+  );
+  const [pageLogoFile, setPageLogoFile] = useState<File | null>(null);
   const [isOnlinePreview, setIsOnlinePreview] = useState(event.isOnline);
   const [mapLinkPreviewUrl, setMapLinkPreviewUrl] = useState(
     event.mapLinkUrl ?? "",
@@ -165,11 +177,24 @@ export function EditEventForm(props: {
         }
         coverImageUrl = upload.data!.url;
       }
+      let pageLogoUrl = pageLogoPreviewUrl;
+      if (pageLogoFile) {
+        const uploadData = new FormData();
+        uploadData.set("organisationSlug", organisationSlug);
+        uploadData.set("eventId", event.id);
+        uploadData.set("file", pageLogoFile);
+        const upload = await uploadEventPageLogo(uploadData);
+        if (!upload.ok) {
+          setError(upload.error);
+          showToast(upload.error, "error");
+          return;
+        }
+        pageLogoUrl = upload.data!.url;
+      }
       const res = await updateEvent({
         organisationSlug,
         eventId: event.id,
         title: String(fd.get("title") ?? ""),
-        description: String(fd.get("description") ?? ""),
         tags: String(fd.get("tags") ?? ""),
         coverImageUrl,
         showRegistrationCount: fd.get("showRegistrationCount") === "on",
@@ -186,6 +211,9 @@ export function EditEventForm(props: {
         ),
         status,
         privacyType,
+        pageTagline: String(fd.get("pageTagline") ?? ""),
+        pageLogoUrl,
+        pageAboutHtml: String(fd.get("pageAboutHtml") ?? ""),
       });
       if (!res.ok) {
         setError(res.error);
@@ -253,7 +281,7 @@ export function EditEventForm(props: {
                     color="text.secondary"
                     sx={{ mt: 0.5 }}
                   >
-                    Update the public-facing title and description.
+                    Update the public-facing title and introduction.
                   </Typography>
                 </Box>
                 <Chip
@@ -280,14 +308,32 @@ export function EditEventForm(props: {
                 </Grid>
                 <Grid size={{ xs: 12 }}>
                   <TextField
-                    name="description"
-                    label="Description"
-                    required
+                    name="pageTagline"
+                    label="Tagline"
                     fullWidth
-                    multiline
-                    minRows={4}
-                    defaultValue={event.description}
-                    helperText="Required. A short summary shown on the event page."
+                    defaultValue={page?.tagline ?? ""}
+                    helperText="A short line beneath the event title."
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <ImageUploadPicker
+                    initialUrl={page?.logoUrl}
+                    label="Event page logo"
+                    placeholder="Your event page logo will appear here."
+                    disabled={pending}
+                    onChange={(file, previewUrl) => {
+                      setPageLogoFile(file);
+                      setPageLogoPreviewUrl(previewUrl);
+                    }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <RichTextEditor
+                    name="pageAboutHtml"
+                    label="About the event"
+                    defaultValue={page?.aboutHtml ?? ""}
+                    helperText="Required. Use the toolbar to format text—no HTML needed."
+                    minHeight={140}
                   />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
@@ -559,7 +605,7 @@ export function EditEventForm(props: {
                     fullWidth
                     value={status}
                     onChange={(e) => setStatus(e.target.value as EventStatus)}
-                    helperText="Drafts are not visible to guests."
+                    helperText="Published events make the website public and open registration."
                   >
                     <MenuItem value={EventStatus.DRAFT}>Draft</MenuItem>
                     <MenuItem value={EventStatus.PUBLISHED}>Published</MenuItem>
