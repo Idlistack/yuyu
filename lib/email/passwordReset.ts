@@ -1,4 +1,4 @@
-import { getEmailTransport } from "./transporter";
+import { assertEmailAccepted, getEmailTransport } from "./transporter";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]!);
@@ -62,7 +62,7 @@ export async function sendPasswordResetEmail(params: {
     return;
   }
 
-  await transporter.sendMail({
+  const result = await transporter.sendMail({
     messageId: params.messageId,
     from,
     to: params.to,
@@ -70,4 +70,5 @@ export async function sendPasswordResetEmail(params: {
     text,
     html,
   });
+  assertEmailAccepted(result);
 }

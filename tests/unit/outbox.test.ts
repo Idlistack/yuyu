@@ -96,6 +96,36 @@ describe("outbox delivery", () => {
     expect(JSON.stringify(mocks.updateMany.mock.calls)).not.toContain("token-secret");
   });
 
+  it("keeps authentication-email retries within the one-hour capability lifetime", async () => {
+    vi.useFakeTimers();
+    try {
+      const now = new Date("2030-01-01T00:00:00.000Z");
+      vi.setSystemTime(now);
+      mocks.verification.mockRejectedValue(Object.assign(new Error("temporary SMTP failure"), { code: "ETIMEDOUT" }));
+      mocks.findMany.mockResolvedValue([message({
+        kind: "email-verification",
+        attempts: 4,
+        payload: {
+          to: "person@example.test",
+          verificationUrl: "https://events.test/verify-email?token=secret",
+          expiresAt: "2030-01-01T01:00:00.000Z",
+        },
+      })]);
+
+      await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 0, failed: 1 });
+      expect(mocks.updateMany).toHaveBeenLastCalledWith({
+        where: expect.objectContaining({ id: "msg_1", status: OutboxStatus.PROCESSING, lockedAt: expect.any(Date) }),
+        data: expect.objectContaining({
+          status: OutboxStatus.PENDING,
+          availableAt: new Date("2030-01-01T00:08:00.000Z"),
+          lockedAt: null,
+        }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("drops an expired invite without attempting delivery", async () => {
     mocks.findMany.mockResolvedValue([message({
       kind: "collaborator-invite",

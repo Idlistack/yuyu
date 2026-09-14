@@ -139,6 +139,17 @@ function messageId(id: string) {
   return `<yuyu-${id}@outbox.invalid>`;
 }
 
+function retryDelayMs(kind: string, attempts: number) {
+  const exponentialDelay = 2 ** attempts * 60_000;
+  // Verification and reset capabilities expire after one hour. Retrying them
+  // on the normal 32/60-minute cadence can leave most of the configured
+  // attempts unusable, so keep their retries within the capability lifetime.
+  const maximumDelay = kind === "password-reset" || kind === "email-verification"
+    ? 8 * 60_000
+    : 60 * 60_000;
+  return Math.min(maximumDelay, exponentialDelay);
+}
+
 class PermanentOutboxError extends Error {
   override name = "PermanentOutboxError";
 }
@@ -301,7 +312,7 @@ export async function deliverOutboxBatch(limit = 20) {
       sent += 1;
     } catch (error) {
       const attempts = message.attempts + 1;
-      const retryAt = new Date(Date.now() + Math.min(60 * 60_000, 2 ** attempts * 60_000));
+      const retryAt = new Date(Date.now() + retryDelayMs(message.kind, attempts));
       const terminal = error instanceof PermanentOutboxError || attempts >= 8;
       if (containsCapability(message.kind, message.payload) && terminal) {
         await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });

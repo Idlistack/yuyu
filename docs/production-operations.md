@@ -21,7 +21,7 @@ production topology. Kubernetes operators should use the
 1. Build and test the immutable image in CI.
 2. Run `npm run db:status`, then `npm run db:deploy` once as a release job using the migration database role. Run `npm run storage:migrate` when legacy database assets remain.
 3. Deploy application instances using a least-privileged runtime database role and production secrets from a secrets manager.
-4. Verify the in-process outbox worker has recorded a fresh heartbeat after deployment. Optionally configure an independent scheduler to call `POST /api/internal/outbox` every minute with `Authorization: Bearer $CRON_SECRET`; also configure an authenticated readiness probe to call `GET /api/health/db` with `Authorization: Bearer $HEALTHCHECK_SECRET`.
+4. Verify the in-process outbox worker has recorded a fresh heartbeat after deployment. Configure an independent scheduler to call `POST /api/internal/outbox` every minute with `Authorization: Bearer $CRON_SECRET` as a recovery path; also configure an authenticated readiness probe to call `GET /api/health/db` with `Authorization: Bearer $HEALTHCHECK_SECRET`.
 5. Verify readiness, error rate, email queue depth, database connections, and Redis health before shifting traffic.
 
 ## Instance-managed services
@@ -71,7 +71,7 @@ The backup fields do not run, retain, or restore backups. Keep those controls wi
     --confirm-database yuyu
   ```
 - Test a point-in-time database restore every quarter and record the recovery time and data-loss window.
-- Alert on failed backups, failed migrations, outbox messages in `FAILED`, unavailable Redis, elevated 5xx rates, and database saturation.
+- Alert on failed backups, failed migrations, a stale outbox heartbeat, pending/processing email queue growth, outbox messages in `FAILED`, unavailable Redis, elevated 5xx rates, and database saturation. Treat a provider acceptance response as SMTP handoff, not inbox placement; monitor bounces and delivery events with the selected transactional-email provider.
 - Rotate `AUTH_SECRET`, `CRON_SECRET`, OAuth credentials, SMTP credentials, and database credentials through the secrets manager; rehearse revocation.
 - Keep an incident log, publish a security-contact address, and document breach notification responsibilities for each deployment region.
 

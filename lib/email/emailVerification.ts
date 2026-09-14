@@ -1,4 +1,4 @@
-import { getEmailTransport } from "./transporter";
+import { assertEmailAccepted, getEmailTransport } from "./transporter";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]!);
@@ -20,5 +20,6 @@ export async function sendEmailVerificationEmail(params: {
     console.log("[EMAIL MOCK] Verification email queued");
     return;
   }
-  await transporter.sendMail({ messageId: params.messageId, from, to: params.to, subject: "Verify your Yuyu email", text, html });
+  const result = await transporter.sendMail({ messageId: params.messageId, from, to: params.to, subject: "Verify your Yuyu email", text, html });
+  assertEmailAccepted(result);
 }
