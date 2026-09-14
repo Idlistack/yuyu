@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { requireOrgRole } from "@/lib/permissions";
 import { recordAuditEvent } from "@/lib/audit";
 import { isActionRateLimited } from "@/lib/actionRateLimit";
+import { getFeedbackTemplate } from "@/lib/feedbackTemplates";
 
 const base = z.object({ organisationSlug: z.string().trim().min(1).max(120), eventId: z.string().trim().min(1).max(128) });
 
@@ -28,6 +29,70 @@ const feedbackFieldType = z.enum([
   RegistrationFieldType.CHECKBOX,
   RegistrationFieldType.NUMBER,
 ]);
+
+const feedbackTemplateSchema = base.extend({
+  templateId: z.string().trim().min(1).max(64),
+}).strict();
+
+/**
+ * Replaces only unanswered draft questions. Historical feedback retains its
+ * immutable field snapshot, so a template can never reinterpret responses.
+ */
+export async function applyFeedbackTemplate(input: unknown): Promise<ActionResult<{ fields: Array<{ id: string; key: string; label: string; type: RegistrationFieldType; required: boolean; options: string[] }> }>> {
+  const parsed = feedbackTemplateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Choose a feedback template." };
+  const template = getFeedbackTemplate(parsed.data.templateId);
+  if (!template) return { ok: false, error: "That feedback template is unavailable." };
+  const context = await access(parsed.data);
+  if (!context || "error" in context) return { ok: false, error: context?.error ?? "Event not found." };
+
+  const result = await prisma.$transaction(async (tx) => {
+    const existing = await tx.eventFeedbackForm.findUnique({ where: { eventId: context.event.id }, select: { id: true } });
+    if (existing) {
+      await tx.$queryRaw`SELECT "id" FROM "EventFeedbackForm" WHERE "id" = ${existing.id} FOR UPDATE`;
+      if (await tx.eventFeedbackResponse.count({ where: { formId: existing.id } }) > 0) {
+        return { error: "A template cannot replace a feedback form that already has responses." } as const;
+      }
+    }
+    const form = await tx.eventFeedbackForm.upsert({
+      where: { eventId: context.event.id },
+      create: { eventId: context.event.id, isOpen: false, title: template.title, thankYouMessage: template.thankYouMessage },
+      update: { isOpen: false, title: template.title, thankYouMessage: template.thankYouMessage },
+    });
+    if (!existing) await tx.$queryRaw`SELECT "id" FROM "EventFeedbackForm" WHERE "id" = ${form.id} FOR UPDATE`;
+    await tx.eventFeedbackField.deleteMany({ where: { formId: form.id } });
+    const fields = [];
+    for (const [sortOrder, field] of template.fields.entries()) {
+      fields.push(await tx.eventFeedbackField.create({
+        data: { formId: form.id, key: field.key, label: field.label, type: field.type, required: field.required, options: field.options, sortOrder },
+        select: { id: true, key: true, label: true, type: true, required: true, options: true },
+      }));
+    }
+    await recordAuditEvent({
+      action: "FEEDBACK_TEMPLATE_APPLIED",
+      actorUserId: context.userId,
+      organisationId: context.organisation.id,
+      targetType: "EventFeedbackForm",
+      targetId: form.id,
+      metadata: { eventId: context.event.id, templateId: template.id, fieldCount: fields.length },
+      client: tx,
+    });
+    return { fields } as const;
+  });
+  if ("error" in result && typeof result.error === "string") return { ok: false, error: result.error };
+  revalidatePath(feedbackPath(context.organisation.slug, context.event.slug));
+  return {
+    ok: true,
+    data: {
+      fields: result.fields.map((field) => ({
+        ...field,
+        options: Array.isArray(field.options)
+          ? field.options.filter((value): value is string => typeof value === "string")
+          : [],
+      })),
+    },
+  };
+}
 
 export async function saveFeedbackSettings(input: unknown): Promise<ActionResult<{ formId: string }>> {
   const parsed = base.extend({ isOpen: z.boolean(), title: z.string().trim().min(1).max(120), thankYouMessage: z.string().trim().min(1).max(500), certificateEnabled: z.boolean() }).strict().safeParse(input);

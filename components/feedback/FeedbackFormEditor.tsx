@@ -20,9 +20,10 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { deleteFeedbackField, saveFeedbackField, saveFeedbackSettings } from "@/app/actions/feedback-form";
+import { applyFeedbackTemplate, deleteFeedbackField, saveFeedbackField, saveFeedbackSettings } from "@/app/actions/feedback-form";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
+import { feedbackTemplates, type FeedbackTemplate } from "@/lib/feedbackTemplates";
 
 type Field = { id: string; key: string; label: string; type: RegistrationFieldType; required: boolean; options: string[] };
 
@@ -39,6 +40,7 @@ export function FeedbackFormEditor(props: {
   const [certificateEnabled, setCertificateEnabled] = useState(props.form?.certificateEnabled ?? false);
   const [fields, setFields] = useState(props.fields);
   const [dialog, setDialog] = useState(false);
+  const [templateDialog, setTemplateDialog] = useState(false);
   const [label, setLabel] = useState("");
   const [type, setType] = useState<RegistrationFieldType>("TEXTAREA");
   const [required, setRequired] = useState(false);
@@ -101,6 +103,24 @@ export function FeedbackFormEditor(props: {
   };
 
   const markDirty = () => setDirty(true);
+  const applyTemplate = (template: FeedbackTemplate) => {
+    startTransition(async () => {
+      const result = await applyFeedbackTemplate({ organisationSlug: props.organisationSlug, eventId: props.eventId, templateId: template.id });
+      if (!result.ok) {
+        setMessageIsError(true);
+        setMessage(result.error);
+        return;
+      }
+      setFields(result.data!.fields);
+      setTitle(template.title);
+      setThankYouMessage(template.thankYouMessage);
+      setIsOpen(false);
+      setDirty(false);
+      setTemplateDialog(false);
+      setMessageIsError(false);
+      setMessage(`${template.name} template applied. Review and customize it before opening the form.`);
+    });
+  };
   return (
     <Stack spacing={3}>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}>
@@ -111,6 +131,15 @@ export function FeedbackFormEditor(props: {
         <Button startIcon={<ContentCopyIcon />} variant="outlined" onClick={() => void navigator.clipboard.writeText(props.feedbackUrl).then(() => { setMessageIsError(false); setMessage("Feedback link copied."); }, () => { setMessageIsError(true); setMessage("Could not copy the feedback link."); })}>Copy feedback link</Button>
       </Stack>
       {message ? <Alert severity={messageIsError ? "error" : "info"} onClose={() => setMessage(null)}>{message}</Alert> : null}
+      <Paper variant="outlined" sx={{ p: 3 }}>
+        <Stack spacing={1.5}>
+          <Box>
+            <Typography variant="h6">Start with a template</Typography>
+            <Typography variant="body2" color="text.secondary">Use a ready-made question set, then tailor it to this event. Applying a template replaces unanswered questions and closes the form for review.</Typography>
+          </Box>
+          <Box><Button variant="outlined" onClick={() => setTemplateDialog(true)} disabled={pending}>Browse feedback templates</Button></Box>
+        </Stack>
+      </Paper>
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2}>
           <TextField label="Form title" value={title} onChange={(event) => { setTitle(event.target.value); markDirty(); }} fullWidth />
@@ -148,6 +177,26 @@ export function FeedbackFormEditor(props: {
           </Stack>
         </DialogContent>
         <DialogActions><Button onClick={() => setDialog(false)}>Cancel</Button><Button onClick={addField} disabled={pending || !label.trim()} variant="contained">Add question</Button></DialogActions>
+      </Dialog>
+      <Dialog open={templateDialog} onClose={() => !pending && setTemplateDialog(false)} fullWidth maxWidth="md">
+        <DialogTitle>Choose a feedback template</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ mt: 1 }}>
+            {feedbackTemplates.map((template) => (
+              <Paper key={template.id} variant="outlined" sx={{ p: 2 }}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}>
+                  <Box>
+                    <Typography variant="subtitle1">{template.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">{template.description}</Typography>
+                    <Typography variant="caption" color="text.secondary">{template.fields.length} questions · {template.title}</Typography>
+                  </Box>
+                  <Button variant="contained" onClick={() => applyTemplate(template)} disabled={pending}>Use template</Button>
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions><Button onClick={() => setTemplateDialog(false)} disabled={pending}>Cancel</Button></DialogActions>
       </Dialog>
       <ConfirmationDialog
         open={Boolean(deleteField)}

@@ -64,7 +64,7 @@ Only eligible confirmed attendees receive a scannable ticket by default. Organis
 
 ## Feedback and certificates
 
-- Per-event feedback form with configurable title, thank-you message, open/closed state, and custom questions.
+- Per-event feedback form with configurable title, thank-you message, open/closed state, and custom questions. Organisers can start from quick pulse, event review, or session-and-speaker-review templates, then tailor the form before opening it.
 - When certificates are disabled, feedback is anonymous: no email or RSVP identity is collected, and repeat responses are allowed.
 - When certificates are enabled, the submitted email must match a confirmed RSVP. Repeat submissions from the same email are allowed.
 - Successful eligible submissions can download a generated JPEG certificate using an opaque token.

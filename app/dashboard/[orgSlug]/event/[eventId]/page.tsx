@@ -17,6 +17,7 @@ type Props = {
   params: Promise<{ orgSlug: string; eventId: string }>;
 };
 const MAX_BROWSER_ATTENDEES = 250;
+const MAX_BROWSER_FEEDBACK_RESPONSES = 250;
 
 export const metadata = { title: "Manage event", robots: { index: false, follow: false } };
 
@@ -168,6 +169,37 @@ export default async function EventManagePage({ params }: Props) {
     id: field.id, key: field.key, label: field.label, type: field.type, required: field.required, sortOrder: field.sortOrder,
     options: Array.isArray(field.options) ? field.options.filter((value): value is string => typeof value === "string") : [],
   }));
+  const feedbackResponseRecords = isAdmin && feedbackFormRecord ? await prisma.eventFeedbackResponse.findMany({
+    where: { formId: feedbackFormRecord.id },
+    select: {
+      id: true,
+      submittedAt: true,
+      answers: {
+        select: {
+          fieldKey: true,
+          fieldLabel: true,
+          valueText: true,
+          valueBool: true,
+          valueNumber: true,
+          valueDate: true,
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+    orderBy: { submittedAt: "desc" },
+    take: MAX_BROWSER_FEEDBACK_RESPONSES + 1,
+  }) : [];
+  const feedbackResponsesTruncated = feedbackResponseRecords.length > MAX_BROWSER_FEEDBACK_RESPONSES;
+  const feedbackResponses = feedbackResponseRecords.slice(0, MAX_BROWSER_FEEDBACK_RESPONSES).map((response) => {
+    const grouped: Record<string, { label: string; values: string[] }> = {};
+    for (const answer of response.answers) {
+      const value = answer.valueText ?? (answer.valueBool != null ? (answer.valueBool ? "Yes" : "No") : null) ?? (answer.valueNumber != null ? String(answer.valueNumber) : null) ?? answer.valueDate?.toLocaleDateString() ?? null;
+      if (value === null) continue;
+      if (!grouped[answer.fieldKey]) grouped[answer.fieldKey] = { label: answer.fieldLabel, values: [] };
+      grouped[answer.fieldKey]!.values.push(value);
+    }
+    return { id: response.id, submittedAt: response.submittedAt.toISOString(), answers: Object.values(grouped).map((answer) => ({ label: answer.label, value: answer.values.join(", ") })) };
+  });
 
   return (
     <Stack spacing={3}>
@@ -223,6 +255,8 @@ export default async function EventManagePage({ params }: Props) {
         feedbackUrl={`${origin}/${organisation.slug}/${event.slug}/feedback`}
         feedbackForm={feedbackForm}
         feedbackFields={feedbackFields}
+        feedbackResponses={feedbackResponses}
+        feedbackResponsesTruncated={feedbackResponsesTruncated}
         invites={invites.map((i) => ({
           ...i,
           createdAt: i.createdAt.toISOString(),

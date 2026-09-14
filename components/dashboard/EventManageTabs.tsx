@@ -14,6 +14,7 @@ import { EventManageOverview } from "@/components/dashboard/EventManageOverview"
 import { EventAnalyticsPanel } from "@/components/dashboard/EventAnalyticsPanel";
 import { EventManageMore } from "@/components/dashboard/EventManageMore";
 import { FeedbackFormEditor } from "@/components/feedback/FeedbackFormEditor";
+import { FeedbackResponsesPanel, type FeedbackResponseRow } from "@/components/feedback/FeedbackResponsesPanel";
 import {
   EventRegistrationFormEditor,
   type RegistrationFieldRow,
@@ -41,6 +42,8 @@ export function EventManageTabs(props: {
   registrationFields: RegistrationFieldRow[];
   feedbackUrl: string;
   feedbackForm: { isOpen: boolean; title: string; thankYouMessage: string; certificateEnabled: boolean } | null;
+  feedbackResponses: FeedbackResponseRow[];
+  feedbackResponsesTruncated: boolean;
   feedbackFields: RegistrationFieldRow[];
   referenceTime: string;
   analytics: {
@@ -60,7 +63,7 @@ export function EventManageTabs(props: {
   canEditDetails: boolean;
   canManageSchedule: boolean;
 }) {
-  const { organisationSlug, event, attendees, attendeesTruncated, invites, analytics, registrationFields, feedbackUrl, feedbackForm, feedbackFields, referenceTime, website, canManageCollaborators, canManageRegistrations, canCheckIn, canEditDetails, canManageSchedule, collaborators, pendingCollaboratorInvites } = props;
+  const { organisationSlug, event, attendees, attendeesTruncated, invites, analytics, registrationFields, feedbackUrl, feedbackForm, feedbackFields, feedbackResponses, feedbackResponsesTruncated, referenceTime, website, canManageCollaborators, canManageRegistrations, canCheckIn, canEditDetails, canManageSchedule, collaborators, pendingCollaboratorInvites } = props;
   const [tab, setTab] = useState(0);
   const [manualRsvpOpen, setManualRsvpOpen] = useState(false);
   const router = useRouter();
@@ -159,7 +162,10 @@ export function EventManageTabs(props: {
         />
       ) : null}
       {tab === 7 ? (
-        <FeedbackFormEditor organisationSlug={organisationSlug} eventId={event.id} feedbackUrl={feedbackUrl} form={feedbackForm} fields={feedbackFields} />
+        <Stack spacing={3}>
+          <FeedbackFormEditor organisationSlug={organisationSlug} eventId={event.id} feedbackUrl={feedbackUrl} form={feedbackForm} fields={feedbackFields} />
+          {canEditDetails ? <FeedbackResponsesPanel responses={feedbackResponses} truncated={feedbackResponsesTruncated} /> : <Typography color="text.secondary">You do not have permission to view feedback responses.</Typography>}
+        </Stack>
       ) : null}
       {tab === 8 ? (
         <Stack spacing={2}>

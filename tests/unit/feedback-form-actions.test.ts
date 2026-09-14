@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   requireRole: vi.fn(), limited: vi.fn(), eventFind: vi.fn(), transaction: vi.fn(),
   formUpsert: vi.fn(), formFind: vi.fn(), fieldFind: vi.fn(), fieldUpdate: vi.fn(),
   fieldDelete: vi.fn(), fieldCount: vi.fn(), fieldAggregate: vi.fn(), fieldCreate: vi.fn(),
-  query: vi.fn(), audit: vi.fn(),
+  fieldDeleteMany: vi.fn(), responseCount: vi.fn(), query: vi.fn(), audit: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions", () => ({ requireOrgRole: mocks.requireRole }));
@@ -16,14 +16,15 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const tx = {
   $queryRaw: mocks.query,
   eventFeedbackForm: { upsert: mocks.formUpsert, findUnique: mocks.formFind },
-  eventFeedbackField: { findFirst: mocks.fieldFind, update: mocks.fieldUpdate, delete: mocks.fieldDelete, count: mocks.fieldCount, aggregate: mocks.fieldAggregate, create: mocks.fieldCreate },
+  eventFeedbackField: { findFirst: mocks.fieldFind, update: mocks.fieldUpdate, delete: mocks.fieldDelete, deleteMany: mocks.fieldDeleteMany, count: mocks.fieldCount, aggregate: mocks.fieldAggregate, create: mocks.fieldCreate },
+  eventFeedbackResponse: { count: mocks.responseCount },
 };
 vi.mock("@/lib/db", () => ({ prisma: {
   event: { findFirst: mocks.eventFind },
   $transaction: mocks.transaction,
 } }));
 
-import { deleteFeedbackField, saveFeedbackField, saveFeedbackSettings } from "@/app/actions/feedback-form";
+import { applyFeedbackTemplate, deleteFeedbackField, saveFeedbackField, saveFeedbackSettings } from "@/app/actions/feedback-form";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -33,6 +34,8 @@ beforeEach(() => {
   mocks.formUpsert.mockResolvedValue({ id: "form_1", isOpen: true, certificateEnabled: false });
   mocks.formFind.mockResolvedValue({ id: "form_1" });
   mocks.fieldCount.mockResolvedValue(1);
+  mocks.responseCount.mockResolvedValue(0);
+  mocks.fieldCreate.mockImplementation(async ({ data }: { data: { key: string; label: string; type: RegistrationFieldType; required: boolean; options: string[] } }) => ({ id: `field_${data.key}`, ...data }));
   mocks.transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
 });
 
@@ -63,5 +66,20 @@ describe("feedback form maintenance", () => {
     const result = await deleteFeedbackField({ organisationSlug: "org", eventId: "event_1", fieldId: "field_1" });
     expect(result).toEqual({ ok: false, error: "Answered feedback fields cannot be deleted." });
     expect(mocks.fieldDelete).not.toHaveBeenCalled();
+  });
+
+  it("applies a starter template atomically only before feedback is submitted", async () => {
+    const result = await applyFeedbackTemplate({ organisationSlug: "org", eventId: "event_1", templateId: "QUICK_PULSE" });
+    expect(result).toMatchObject({ ok: true, data: { fields: [{ key: "overall_experience" }, { key: "comments" }] } });
+    expect(mocks.fieldDeleteMany).toHaveBeenCalledWith({ where: { formId: "form_1" } });
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "FEEDBACK_TEMPLATE_APPLIED", metadata: expect.objectContaining({ templateId: "QUICK_PULSE", fieldCount: 2 }) }));
+  });
+
+  it("does not replace a form that already has feedback responses", async () => {
+    mocks.responseCount.mockResolvedValue(1);
+    const result = await applyFeedbackTemplate({ organisationSlug: "org", eventId: "event_1", templateId: "QUICK_PULSE" });
+    expect(result).toEqual({ ok: false, error: "A template cannot replace a feedback form that already has responses." });
+    expect(mocks.formUpsert).not.toHaveBeenCalled();
+    expect(mocks.fieldDeleteMany).not.toHaveBeenCalled();
   });
 });
