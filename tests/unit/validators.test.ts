@@ -116,6 +116,7 @@ describe("event validation", () => {
     organisationSlug: "demo",
     title: "Launch night",
     description: "A useful description.",
+    aboutHtml: "<p>A useful description.</p>",
     startDateTime: "2026-10-01T18:00:00.000Z",
     endDateTime: "2026-10-01T20:00:00.000Z",
     timezone: "UTC",
@@ -228,10 +229,13 @@ describe("event validation", () => {
     ).toBe(false);
   });
 
-  it("requires an event description", () => {
+  it("requires the About content field while keeping the derived description optional", () => {
+    expect(
+      createEventSchema.safeParse({ ...baseEvent, aboutHtml: undefined }).success,
+    ).toBe(false);
     expect(
       createEventSchema.safeParse({ ...baseEvent, description: "" }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(createEventSchema.safeParse(baseEvent).success).toBe(true);
   });
 });
