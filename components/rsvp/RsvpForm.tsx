@@ -246,7 +246,7 @@ export function RsvpForm(props: {
                     inputMode="tel"
                     placeholder="Phone number"
                     slotProps={{
-                      htmlInput: { inputMode: "numeric", pattern: "[0-9]*", maxLength: 14 },
+                      htmlInput: { inputMode: "numeric", pattern: "[0-9]*", maxLength: parts.dial === "+91" ? 10 : 14 },
                       input: {
                         startAdornment: (
                           <InputAdornment position="start">
@@ -278,7 +278,7 @@ export function RsvpForm(props: {
                         ),
                       },
                     }}
-                    helperText="Include country code (default +91)."
+                    helperText={parts.dial === "+91" ? "Indian mobile numbers must be 10 digits and start with 6–9." : "Include country code."}
                   />
                 );
               }
@@ -555,7 +555,7 @@ export function RsvpForm(props: {
                     inputMode="tel"
                     placeholder="Phone number"
                     slotProps={{
-                      htmlInput: { inputMode: "numeric", pattern: "[0-9]*", maxLength: 14 },
+                      htmlInput: { inputMode: "numeric", pattern: "[0-9]*", maxLength: parts.dial === "+91" ? 10 : 14 },
                       input: {
                         startAdornment: (
                           <InputAdornment position="start">
@@ -587,7 +587,7 @@ export function RsvpForm(props: {
                         ),
                       },
                     }}
-                    helperText="Include country code (default +91)."
+                    helperText={parts.dial === "+91" ? "Indian mobile numbers must be 10 digits and start with 6–9." : "Include country code."}
                   />
                 );
               }

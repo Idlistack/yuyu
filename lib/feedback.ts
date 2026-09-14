@@ -5,6 +5,11 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import type { ActionResult } from "@/app/actions/org";
 import { prisma } from "@/lib/db";
+import {
+  isValidInternationalPhone,
+  normalizeInternationalPhone,
+  phoneValidationMessage,
+} from "@/lib/phone";
 
 const submissionSchema = z.object({
   orgSlug: z.string().trim().min(1).max(120),
@@ -79,12 +84,13 @@ function validateAnswers(fields: Array<{ id: string; key: string; label: string;
     const maxTextLength = field.type === "TEXTAREA" ? 10_000 : field.type === "EMAIL" ? 320 : field.type === "PHONE" ? 40 : 500;
     if (text.length > maxTextLength) return { error: `${field.label} is too long.` };
     if (field.type === "EMAIL" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return { error: `${field.label} must be a valid email.` };
-    if (field.type === "PHONE" && !/^\+\d{8,15}$/.test(text.replace(/[()\s-]/g, ""))) return { error: `${field.label} must include a country code.` };
+    const phone = field.type === "PHONE" ? normalizeInternationalPhone(text) : null;
+    if (phone !== null && !isValidInternationalPhone(phone)) return { error: phoneValidationMessage(field.label, phone) };
     if (field.type === "SELECT" || field.type === "RADIO") {
       const options = optionsFromJson(field.options);
       if (options.length > 0 && !options.includes(text)) return { error: `${field.label} must be one of the available options.` };
     }
-    rows.push({ fieldId: field.id, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type, valueText: field.type === "PHONE" ? text.replace(/[()\s-]/g, "") : text });
+    rows.push({ fieldId: field.id, fieldKey: field.key, fieldLabel: field.label, fieldType: field.type, valueText: phone ?? text });
   }
   return { rows };
 }

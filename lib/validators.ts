@@ -29,12 +29,20 @@ const coverImageUrlSchema = z
   ])
   .optional();
 
+export function isValidAttendeeName(value: string) {
+  return (
+    value.length <= 200 &&
+    /\p{L}/u.test(value) &&
+    !/[<>\u0000-\u001F\u007F]/.test(value)
+  );
+}
+
 const attendeeNameSchema = z
   .string()
   .trim()
   .min(1, "Name is required")
   .max(200, "Name must be at most 200 characters")
-  .refine((value) => /\p{L}/u.test(value), "Enter a valid name");
+  .refine(isValidAttendeeName, "Enter a valid name");
 
 const registrationCutoffSchema = {
   registrationClosesAt: z.preprocess(

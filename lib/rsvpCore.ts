@@ -6,11 +6,21 @@ import {
   RsvpStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { manualRsvpSchema, rsvpGuestSchema, rsvpLoggedInSchema } from "@/lib/validators";
+import {
+  isValidAttendeeName,
+  manualRsvpSchema,
+  rsvpGuestSchema,
+  rsvpLoggedInSchema,
+} from "@/lib/validators";
 import type { ActionResult } from "@/app/actions/org";
 import { flattenZodErrors } from "@/app/actions/utils";
 import { enqueueRsvpConfirmation } from "@/lib/outbox";
 import { isRegistrationClosed } from "@/lib/registrationCutoff";
+import {
+  isValidInternationalPhone,
+  normalizeInternationalPhone,
+  phoneValidationMessage,
+} from "@/lib/phone";
 
 function normalizeGuestEmail(email: string) {
   return email.trim().toLowerCase();
@@ -149,21 +159,6 @@ function isBasicEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
-function normalizePhoneBasic(v: string) {
-  // Keep leading +, strip spaces/dashes/parentheses.
-  const s = v.trim().replace(/[()\s-]+/g, "");
-  return s;
-}
-
-function isBasicE164(v: string) {
-  // Basic: + then 8-15 digits (E.164 max 15 digits).
-  return /^\+\d{8,15}$/.test(v);
-}
-
-function isValidAttendeeName(v: string) {
-  return v.length <= 200 && /\p{L}/u.test(v);
-}
-
 function coerceFiniteNumber(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   if (typeof v === "string") {
@@ -239,11 +234,11 @@ export function validateAndNormalizeAnswers(params: {
         break;
       }
       case RegistrationFieldType.PHONE: {
-        const s = typeof raw === "string" ? normalizePhoneBasic(raw) : "";
+        const s = typeof raw === "string" ? normalizeInternationalPhone(raw) : "";
         if (f.required && !s) return { error: `${f.label} is required.` };
         if (!s) break;
-        if (!isBasicE164(s)) {
-          return { error: `${f.label} must be a valid phone number (include country code).` };
+        if (!isValidInternationalPhone(s)) {
+          return { error: phoneValidationMessage(f.label, s) };
         }
         rows.push({ fieldId: f.id, valueText: s });
         break;

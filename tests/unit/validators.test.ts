@@ -237,7 +237,7 @@ describe("event validation", () => {
 });
 
 describe("attendee name validation", () => {
-  it("rejects numeric-only guest names and accepts names containing letters", () => {
+  it("rejects numeric-only and markup guest names while accepting ordinary names", () => {
     const base = {
       orgSlug: "demo",
       eventSlug: "launch-night",
@@ -249,5 +249,9 @@ describe("attendee name validation", () => {
     expect(
       rsvpGuestSchema.safeParse({ ...base, name: "Asha 123" }).success,
     ).toBe(true);
+    expect(
+      rsvpGuestSchema.safeParse({ ...base, name: "<script>alert(1)</script>" })
+        .success,
+    ).toBe(false);
   });
 });
