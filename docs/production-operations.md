@@ -33,7 +33,7 @@ The backup fields do not run, retain, or restore backups. Keep those controls wi
 ## Backup and incident minimums
 
 - The repository provides database archives for operator-initiated backups and restores. Install PostgreSQL `psql`, `pg_dump`, and `pg_restore` clients compatible with the managed PostgreSQL server in the production release environment. The commands use a temporary owner-only PostgreSQL password file rather than placing the database URL/password in child-process arguments. The `backups/` directory is gitignored, must reside on encrypted host storage, and retains the newest seven complete archive pairs.
-- Create a local backup from the repository directory with `npm run db:backup`. This reads only `DATABASE_URL`, requires its TLS setting, queries the live database size to require 20% plus 256 MiB of free-space headroom, and writes a compressed custom PostgreSQL archive plus a SHA-256 metadata sidecar.
+- Create a local backup from the repository directory with `npm run db:backup`. The command loads `.env` when that file is present for local operation, while explicitly injected environment values retain precedence in CI and production. It reads only `DATABASE_URL` for the database connection, requires its TLS setting, queries the live database size to require 20% plus 256 MiB of free-space headroom, and writes a compressed custom PostgreSQL archive plus a SHA-256 metadata sidecar.
 - To additionally copy an archive to a **dedicated private backup bucket**, pass all S3 settings only to the command (never save them in application settings or repository files):
 
   ```bash

@@ -19,7 +19,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:verify": "node scripts/verify-production-schema.mjs",
-    "db:backup": "node scripts/db-backup.mjs",
+    "db:backup": "node --env-file-if-exists=.env scripts/db-backup.mjs",
     "db:restore": "node scripts/db-restore.mjs",
     "storage:migrate": "node scripts/migrate-assets-to-s3.mjs",
     "db:push": "prisma db push",

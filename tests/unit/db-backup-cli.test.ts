@@ -16,6 +16,11 @@ describe("database backup command safety", () => {
     expect(() => backup.databaseDetails("https://example.com/yuyu?sslmode=require")).toThrow("PostgreSQL");
   });
 
+  it("returns useful reviewed errors without exposing unexpected provider details", () => {
+    expect(backup.backupFailureMessage(new backup.BackupOperationError("DATABASE_URL is required."))).toBe("DATABASE_URL is required.");
+    expect(backup.backupFailureMessage(new Error("postgresql://user:password@private.example/yuyu"))).not.toContain("postgresql://");
+  });
+
   it("identifies development and local restore targets", () => {
     expect(backup.isUnsafeRestoreDatabase("postgresql://user:secret@localhost/yuyu?sslmode=require")).toBe(true);
     expect(backup.isUnsafeRestoreDatabase("postgresql://user:secret@db.example/yuyu_test?sslmode=require")).toBe(true);

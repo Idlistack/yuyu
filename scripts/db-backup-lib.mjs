@@ -14,8 +14,22 @@ const minimumFreeBytes = 256 * 1024 * 1024;
 const metadataMaximumBytes = 64 * 1024;
 const commandTimeoutMs = 60 * 60 * 1000;
 
+export class BackupOperationError extends Error {
+  name = "BackupOperationError";
+}
+
 function fail(message) {
-  throw new Error(message);
+  throw new BackupOperationError(message);
+}
+
+/**
+ * Backup failures may originate in PostgreSQL, filesystem, or S3 libraries.
+ * Only surface deliberate, reviewed validation errors to a CLI user: provider
+ * errors can include connection details or request metadata.
+ */
+export function backupFailureMessage(error) {
+  if (error instanceof BackupOperationError) return error.message;
+  return "An unexpected backup operation failed. Check restricted operational logs and verify PostgreSQL client availability, storage permissions, and the configured database connection.";
 }
 
 export function parseOptions(argv) {
@@ -91,10 +105,10 @@ async function run(command, argumentsList, environment = process.env) {
   await new Promise((resolve, reject) => {
     const child = spawn(command, argumentsList, { stdio: ["ignore", "ignore", "ignore"], env: environment });
     const timeout = setTimeout(() => child.kill("SIGTERM"), commandTimeoutMs);
-    child.once("error", () => { clearTimeout(timeout); reject(new Error("Required PostgreSQL command is unavailable.")); });
+    child.once("error", () => { clearTimeout(timeout); reject(new BackupOperationError("Required PostgreSQL command is unavailable.")); });
     child.once("exit", (code) => {
       clearTimeout(timeout);
-      if (code === 0) resolve(); else reject(new Error("PostgreSQL command failed."));
+      if (code === 0) resolve(); else reject(new BackupOperationError("PostgreSQL command failed."));
     });
   });
 }
@@ -105,10 +119,10 @@ async function commandOutput(command, argumentsList, environment = process.env) 
     const child = spawn(command, argumentsList, { stdio: ["ignore", "pipe", "ignore"], env: environment });
     const timeout = setTimeout(() => child.kill("SIGTERM"), commandTimeoutMs);
     child.stdout.on("data", (chunk) => { output += chunk.toString(); });
-    child.once("error", () => { clearTimeout(timeout); reject(new Error("Required PostgreSQL command is unavailable.")); });
+    child.once("error", () => { clearTimeout(timeout); reject(new BackupOperationError("Required PostgreSQL command is unavailable.")); });
     child.once("exit", (code) => {
       clearTimeout(timeout);
-      if (code === 0) resolve(output.trim()); else reject(new Error("PostgreSQL command failed."));
+      if (code === 0) resolve(output.trim()); else reject(new BackupOperationError("PostgreSQL command failed."));
     });
   });
 }
