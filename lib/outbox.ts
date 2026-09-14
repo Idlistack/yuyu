@@ -175,9 +175,18 @@ function asRsvpStatusPayload(value: Prisma.JsonValue): RsvpStatusPayload | null 
     !isEmail(payload.to) ||
     !isBoundedString(payload.eventTitle, 200) ||
     typeof payload.approved !== "boolean" ||
+    (payload.approved && !isBoundedString(payload.checkInToken, 128)) ||
     (payload.checkInToken !== undefined && !isBoundedString(payload.checkInToken, 128))
   ) return null;
   return payload as RsvpStatusPayload;
+}
+
+async function hasCurrentRsvpStatus(checkInToken: string, status: RsvpStatus) {
+  const rsvp = await prisma.rSVP.findUnique({
+    where: { checkInToken },
+    select: { status: true },
+  });
+  return rsvp?.status === status;
 }
 
 function asPasswordResetPayload(value: Prisma.JsonValue): PasswordResetPayload | null {
@@ -247,11 +256,19 @@ export async function deliverOutboxBatch(limit = 20) {
       if (message.kind === "rsvp-confirmation") {
         const payload = asRsvpConfirmationPayload(message.payload);
         if (!payload) throw new PermanentOutboxError();
+        if (!(await hasCurrentRsvpStatus(payload.checkInToken, payload.status))) {
+          await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });
+          continue;
+        }
         await sendRSVPConfirmation({ ...payload, messageId: stableMessageId });
       } else if (message.kind === "rsvp-status") {
         const payload = asRsvpStatusPayload(message.payload);
         if (!payload) throw new PermanentOutboxError();
         if (payload.approved) {
+          if (!(await hasCurrentRsvpStatus(payload.checkInToken!, RsvpStatus.CONFIRMED))) {
+            await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });
+            continue;
+          }
           await sendRSVPConfirmation({
             to: payload.to,
             eventTitle: payload.eventTitle,

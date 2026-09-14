@@ -694,8 +694,8 @@ export function EventCheckInClient(props: {
 
       <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", alignSelf: "flex-start" }}>
         <Switch id="check-in-override" checked={override} onChange={(_, v) => setOverride(v)} color="warning" />
-        <Typography component="label" htmlFor="check-in-override" variant="body2">Override (waitlist / pending approval)</Typography>
-        <Tooltip title="Allows check-in for waitlisted or pending-approval attendees. Rejected and invalid registrations remain blocked." enterTouchDelay={0}>
+        <Typography component="label" htmlFor="check-in-override" variant="body2">Override waitlist</Typography>
+        <Tooltip title="Allows check-in for waitlisted attendees only. Pending approval and rejected registrations remain blocked." enterTouchDelay={0}>
           <IconButton size="small" aria-label="About override check-in"><InfoOutlinedIcon fontSize="small" /></IconButton>
         </Tooltip>
       </Stack>

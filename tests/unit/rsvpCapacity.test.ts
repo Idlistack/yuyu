@@ -22,6 +22,7 @@ const tx = {
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.$transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
+  tx.$queryRaw.mockResolvedValue([{ capacity: 2, status: "PUBLISHED", endDateTime: new Date("2035-01-01T00:00:00.000Z") }]);
 });
 
 describe("RSVP restore capacity", () => {
@@ -46,7 +47,6 @@ describe("confirmRsvpWithinCapacity", () => {
   const params = {
     rsvpId: "rsvp_1",
     eventId: "event_1",
-    capacity: 2,
     expectedStatuses: [RsvpStatus.WAITLISTED],
   };
 
@@ -74,5 +74,12 @@ describe("confirmRsvpWithinCapacity", () => {
     tx.rSVP.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(confirmRsvpWithinCapacity(params)).resolves.toBe("changed");
+  });
+
+  it("does not approve an RSVP after the event has closed", async () => {
+    tx.$queryRaw.mockResolvedValue([{ capacity: 2, status: "CANCELLED", endDateTime: new Date("2035-01-01T00:00:00.000Z") }]);
+
+    await expect(confirmRsvpWithinCapacity({ ...params, requireOpen: true })).resolves.toBe("closed");
+    expect(tx.rSVP.updateMany).not.toHaveBeenCalled();
   });
 });

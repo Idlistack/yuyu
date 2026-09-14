@@ -14,9 +14,11 @@ describe("public visibility and identifier utilities", () => {
     expect(slugifyTitle("  Hello, Secure World! ")).toBe("hello-secure-world");
     expect(withSlugSuffix("event", 3)).toBe("event-3");
   });
-  it("blocks rejected check-ins and requires an override for waitlisted attendees", () => {
+  it("blocks rejected and pending-approval check-ins, while allowing an explicit waitlist override", () => {
     expect(gateCheckInForStatus("REJECTED", false).ok).toBe(false);
     expect(gateCheckInForStatus("WAITLISTED", false)).toMatchObject({ ok: false, needsForce: true });
     expect(gateCheckInForStatus("WAITLISTED", true).ok).toBe(true);
+    expect(gateCheckInForStatus("PENDING_APPROVAL", false)).toMatchObject({ ok: false, blocked: true });
+    expect(gateCheckInForStatus("PENDING_APPROVAL", true)).toMatchObject({ ok: false, blocked: true });
   });
 });

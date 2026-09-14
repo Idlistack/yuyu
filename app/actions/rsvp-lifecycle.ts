@@ -125,10 +125,13 @@ export async function approveRsvp(input: unknown): Promise<ActionResult> {
     const result = await confirmRsvpWithinCapacity({
       rsvpId: rsvp.id,
       eventId: ctx.event.id,
-      capacity: ctx.event.capacity,
       expectedStatuses: [RsvpStatus.PENDING_APPROVAL],
+      requireOpen: true,
       ...(to ? { notification: { to, eventTitle: ctx.event.title, checkInToken: rsvp.checkInToken } } : {}),
     });
+    if (result === "closed") {
+      return { ok: false, error: "This event is no longer open for approvals." };
+    }
     if (result === "full") {
       return {
         ok: false,
@@ -151,10 +154,13 @@ export async function approveRsvp(input: unknown): Promise<ActionResult> {
   const result = await confirmRsvpWithinCapacity({
     rsvpId: rsvp.id,
     eventInstanceId: instance.id,
-    capacity: series.capacity,
     expectedStatuses: [RsvpStatus.PENDING_APPROVAL],
+    requireOpen: true,
     ...(to ? { notification: { to, eventTitle: series.title, checkInToken: rsvp.checkInToken } } : {}),
   });
+  if (result === "closed") {
+    return { ok: false, error: "This occurrence is no longer open for approvals." };
+  }
   if (result === "full") {
     return {
       ok: false,
@@ -278,7 +284,6 @@ export async function promoteFromWaitlist(input: unknown): Promise<ActionResult>
     const result = await confirmRsvpWithinCapacity({
       rsvpId: rsvp.id,
       eventId: ctx.event.id,
-      capacity: ctx.event.capacity,
       expectedStatuses: [RsvpStatus.WAITLISTED],
       ...(to ? { notification: { to, eventTitle: ctx.event.title, checkInToken: rsvp.checkInToken } } : {}),
     });
@@ -301,7 +306,6 @@ export async function promoteFromWaitlist(input: unknown): Promise<ActionResult>
   const result = await confirmRsvpWithinCapacity({
     rsvpId: rsvp.id,
     eventInstanceId: instance.id,
-    capacity: series.capacity,
     expectedStatuses: [RsvpStatus.WAITLISTED],
     ...(to ? { notification: { to, eventTitle: series.title, checkInToken: rsvp.checkInToken } } : {}),
   });

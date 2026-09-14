@@ -61,7 +61,6 @@ describe.sequential("RSVP capacity integration", () => {
     await expect(confirmRsvpWithinCapacity({
       rsvpId: second.id,
       eventId: event.id,
-      capacity: event.capacity,
       expectedStatuses: [RsvpStatus.WAITLISTED],
     })).resolves.toBe("full");
 
@@ -75,7 +74,6 @@ describe.sequential("RSVP capacity integration", () => {
     await expect(confirmRsvpWithinCapacity({
       rsvpId: second.id,
       eventId: event.id,
-      capacity: event.capacity,
       expectedStatuses: [RsvpStatus.WAITLISTED],
       notification: {
         to: second.guestEmail!,
@@ -99,7 +97,6 @@ describe.sequential("RSVP capacity integration", () => {
     await expect(confirmRsvpWithinCapacity({
       rsvpId: second.id,
       eventId: event.id,
-      capacity: event.capacity,
       expectedStatuses: [RsvpStatus.WAITLISTED],
     })).resolves.toBe("changed");
   });

@@ -11,13 +11,14 @@ const mocks = vi.hoisted(() => ({
   collaborator: vi.fn(),
   passwordReset: vi.fn(),
   verification: vi.fn(),
+  rsvpFind: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ prisma: { outboxMessage: {
   updateMany: mocks.updateMany,
   findMany: mocks.findMany,
   deleteMany: mocks.deleteMany,
-} } }));
+}, rSVP: { findUnique: mocks.rsvpFind } } }));
 vi.mock("@/lib/email", () => ({
   sendRSVPConfirmation: mocks.rsvp,
   sendApprovalNotification: mocks.approval,
@@ -51,6 +52,7 @@ describe("outbox delivery", () => {
     // stale-claim recovery, then per-message claim/finalization
     mocks.updateMany.mockResolvedValue({ count: 1 });
     mocks.deleteMany.mockResolvedValue({ count: 1 });
+    mocks.rsvpFind.mockResolvedValue({ status: RsvpStatus.CONFIRMED });
   });
 
   it("deletes ticket-bearing rows immediately after delivery and reuses a stable Message-ID", async () => {
@@ -78,6 +80,18 @@ describe("outbox delivery", () => {
     })]);
 
     await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 0, failed: 1 });
+    expect(mocks.deleteMany).toHaveBeenCalledWith({ where: expect.objectContaining({ id: "msg_1", status: OutboxStatus.PROCESSING }) });
+  });
+
+  it("drops a stale RSVP confirmation instead of sending an out-of-date status", async () => {
+    mocks.rsvpFind.mockResolvedValue({ status: RsvpStatus.CONFIRMED });
+    mocks.findMany.mockResolvedValue([message({
+      kind: "rsvp-confirmation",
+      payload: { to: "attendee@example.test", eventTitle: "Event", status: RsvpStatus.PENDING_APPROVAL, checkInToken: "ticket-secret" },
+    })]);
+
+    await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 0, failed: 0 });
+    expect(mocks.rsvp).not.toHaveBeenCalled();
     expect(mocks.deleteMany).toHaveBeenCalledWith({ where: expect.objectContaining({ id: "msg_1", status: OutboxStatus.PROCESSING }) });
   });
 

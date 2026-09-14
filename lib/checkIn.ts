@@ -54,7 +54,7 @@ export function gateCheckInForStatus(
       blocked: true,
     };
   }
-  if (force && (status === "WAITLISTED" || status === "PENDING_APPROVAL")) {
+  if (force && status === "WAITLISTED") {
     return { ok: true };
   }
   if (status === "WAITLISTED") {
@@ -67,8 +67,9 @@ export function gateCheckInForStatus(
   if (status === "PENDING_APPROVAL") {
     return {
       ok: false,
-      reason: "Registration is pending approval — use “Override” to admit.",
-      needsForce: true,
+      reason: "Registration is pending approval and cannot be checked in.",
+      needsForce: false,
+      blocked: true,
     };
   }
   return {
