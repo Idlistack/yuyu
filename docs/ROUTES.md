@@ -13,6 +13,7 @@ Dynamic segments are shown as `:name` for readability.
 | `/search` | Public event search UI |
 | `/:orgSlug` | Public organisation page |
 | `/:orgSlug/:eventSlug` | Public event details and RSVP |
+| `/embed/:orgSlug/:eventSlug` | Framable public event details and RSVP for a host website |
 | `/:orgSlug/:eventSlug/feedback` | Event feedback form when open |
 | `/:orgSlug/:eventSlug/check-in` | PIN-protected venue check-in station; usable by trusted on-site staff without an account |
 | `/:orgSlug/i/:instanceId` | Recurring-series instance and RSVP |

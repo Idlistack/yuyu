@@ -40,4 +40,10 @@ describe("production environment validation", () => {
     process.env.S3_ACCESS_KEY_ID = "access";
     expect(validateRuntimeEnvironment).toThrow(/S3_SECRET_ACCESS_KEY/);
   });
+  it("accepts only exact HTTPS embed origins in production", () => {
+    process.env.ALLOWED_EMBED_ORIGINS = "https://host.example.test,https://www.example.test";
+    expect(validateRuntimeEnvironment).not.toThrow();
+    process.env.ALLOWED_EMBED_ORIGINS = "https://host.example.test/path";
+    expect(validateRuntimeEnvironment).toThrow(/ALLOWED_EMBED_ORIGINS/);
+  });
 });

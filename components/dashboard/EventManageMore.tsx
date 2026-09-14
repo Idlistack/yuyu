@@ -24,6 +24,16 @@ function originFromWindow() {
   return window.location.origin;
 }
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "'": "&#39;",
+    '"': "&quot;",
+  })[character] ?? character);
+}
+
 async function copyToClipboard(text: string) {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -60,12 +70,14 @@ export function EventManageMore(props: {
   }, [organisationSlug, slug]);
 
   const embedButtonSnippet = useMemo(() => {
-    return `<a href="${publicUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 16px;border-radius:999px;background:#ffffff;color:#111111;text-decoration:none;font-family:system-ui;font-weight:600;">Register for Event</a>`;
-  }, [publicUrl]);
+    const label = `Register for ${event.title}`;
+    return `<a href="${publicUrl}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${label} (opens in a new tab)`)}" style="display:inline-block;padding:10px 16px;border-radius:999px;background:#ffffff;color:#111111;text-decoration:none;font-family:system-ui;font-weight:600;">${escapeHtml(label)}</a>`;
+  }, [event.title, publicUrl]);
 
   const embedPageSnippet = useMemo(() => {
-    return `<iframe src="${publicUrl}" title="${event.title.replace(/"/g, "&quot;")}" style="width:100%;height:720px;border:1px solid rgba(255,255,255,0.12);border-radius:16px;overflow:hidden;"></iframe>`;
-  }, [event.title, publicUrl]);
+    const embedUrl = `${originFromWindow()}/embed/${organisationSlug}/${slug}`;
+    return `<iframe src="${embedUrl}" title="${escapeHtml(`${event.title} registration`)}" style="width:100%;height:720px;border:1px solid rgba(255,255,255,0.12);border-radius:16px;overflow:hidden;"></iframe>`;
+  }, [event.title, organisationSlug, slug]);
 
   const doUpdateSlug = () => {
     startTransition(async () => {
@@ -208,7 +220,12 @@ export function EventManageMore(props: {
               spacing={1}
               sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
             >
-              <Typography variant="subtitle2">Embed as Button</Typography>
+              <Box>
+                <Typography variant="subtitle2">Add a registration button</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Shows “Register for {event.title}” and opens the event page in a new tab.
+                </Typography>
+              </Box>
               <Button
                 size="small"
                 variant="outlined"
@@ -219,7 +236,7 @@ export function EventManageMore(props: {
                   );
                 }}
               >
-                Copy snippet
+                Copy registration button
               </Button>
             </Stack>
             <Paper

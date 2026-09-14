@@ -57,6 +57,7 @@ Generate independent keys with `openssl rand -base64 32`. Rotating the Server Ac
 | `REDIS_URL` | Required | Distributed rate limiter; production requires `rediss://` |
 | `TRUSTED_PROXY_IP_HEADER` | Required | One of `cf-connecting-ip`, `x-forwarded-for`, or `x-real-ip`; the edge must overwrite it |
 | `ALLOWED_ACTION_ORIGINS` | Optional | Comma-separated trusted proxy/CDN hosts allowed to invoke Server Actions |
+| `ALLOWED_EMBED_ORIGINS` | Optional | Exact HTTPS origins permitted to frame public event embeds; blank disables cross-site framing |
 | `NEXT_DEV_ALLOWED_ORIGINS` | Development only | Comma-separated LAN hosts permitted to request development assets |
 
 Do not expose the application directly while trusting a client-controlled forwarding header.

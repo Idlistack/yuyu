@@ -59,6 +59,7 @@ export const envSchema = z.object({
   S3_FORCE_PATH_STYLE: z.enum(["0", "1"]).optional(),
   ALLOW_INSECURE_PRODUCTION_TESTS: z.enum(["0", "1"]).optional(),
   ALLOWED_ACTION_ORIGINS: z.string().optional(),
+  ALLOWED_EMBED_ORIGINS: z.string().optional(),
   TRUSTED_PROXY_IP_HEADER: z.enum(["cf-connecting-ip", "x-forwarded-for", "x-real-ip"]).optional(),
   SUPER_ADMIN_EMAIL: z.string().email().optional(),
   BACKUP_PROVIDER: z.string().max(80).optional(),
@@ -104,5 +105,16 @@ export function validateRuntimeEnvironment() {
   }
   if (!insecureCiTest && process.env.S3_ENDPOINT && new URL(process.env.S3_ENDPOINT).protocol !== "https:") {
     throw new Error("S3_ENDPOINT must use HTTPS in production.");
+  }
+  for (const value of (process.env.ALLOWED_EMBED_ORIGINS ?? "").split(",").map((origin) => origin.trim()).filter(Boolean)) {
+    let origin: URL;
+    try {
+      origin = new URL(value);
+    } catch {
+      throw new Error("ALLOWED_EMBED_ORIGINS must contain valid origins only.");
+    }
+    if (origin.origin !== value || (!insecureCiTest && origin.protocol !== "https:")) {
+      throw new Error("ALLOWED_EMBED_ORIGINS must contain exact HTTPS origins without paths.");
+    }
   }
 }

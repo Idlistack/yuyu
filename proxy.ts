@@ -19,8 +19,28 @@ function tooManyText() {
   });
 }
 
+function allowedEmbedAncestors() {
+  return Array.from(new Set(
+    (process.env.ALLOWED_EMBED_ORIGINS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .flatMap((value) => {
+        try {
+          const url = new URL(value);
+          return url.origin === value && ["https:", "http:"].includes(url.protocol) ? [value] : [];
+        } catch {
+          return [];
+        }
+      }),
+  ));
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // Only the dedicated, public embed route may be placed in another site's
+  // frame. Every normal application page remains protected from clickjacking.
+  const isEmbedPage = /^\/embed\/[^/]+\/[^/]+$/.test(pathname);
+  const embedAncestors = isEmbedPage ? allowedEmbedAncestors() : [];
 
   // Server Actions post to page URLs, not /api. Apply one distributed ceiling
   // before any action-specific subject/IP limits run in the action itself.
@@ -74,7 +94,11 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/api")) return NextResponse.next();
+  if (pathname.startsWith("/api")) {
+    const response = NextResponse.next();
+    response.headers.set("X-Frame-Options", "DENY");
+    return response;
+  }
 
   const nonce = crypto.randomBytes(16).toString("base64");
   const isDevelopment = process.env.NODE_ENV === "development";
@@ -82,7 +106,7 @@ export async function proxy(request: NextRequest) {
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${isEmbedPage && embedAncestors.length > 0 ? embedAncestors.join(" ") : "'none'"}`,
     "frame-src https://maps.google.com https://www.google.com",
     "form-action 'self'",
     "img-src 'self' data: blob: https:",
@@ -100,6 +124,7 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
+  if (!isEmbedPage) response.headers.set("X-Frame-Options", "DENY");
   return response;
 }
 

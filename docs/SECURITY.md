@@ -32,7 +32,7 @@ This page documents implemented controls and security boundaries. It is not a su
 - Zod validates public/API and action inputs.
 - Registration and feedback answers are validated against current server-owned field definitions.
 - Uploads are size/signature/pixel checked; images are decoded, rotated, resized, metadata-stripped, and re-encoded.
-- A per-request nonce protects scripts with a strict Content Security Policy.
+- A per-request nonce protects scripts with a strict Content Security Policy. Normal application pages deny framing; the public `/embed/:orgSlug/:eventSlug` route is framable only by exact HTTPS origins in `ALLOWED_EMBED_ORIGINS`. It reuses the canonical public-event access checks and must not be used for ticket, account, dashboard, or administrative content.
 - Production responses include HSTS, frame denial, MIME sniffing protection, a permissions policy, and a strict referrer policy.
 - Server Actions default to same-origin requests, with an explicit trusted-origin allowlist when required.
 
