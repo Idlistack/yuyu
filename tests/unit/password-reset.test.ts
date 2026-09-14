@@ -16,11 +16,14 @@ vi.mock("bcryptjs", () => ({ default: bcryptMock }));
 import { confirmPasswordReset, requestPasswordReset } from "@/app/actions/password-reset";
 
 const tx = {
+  $queryRaw: vi.fn(),
   verificationToken: {
     deleteMany: vi.fn(),
     create: vi.fn(),
   },
   user: { update: vi.fn() },
+  session: { deleteMany: vi.fn() },
+  auditEvent: { create: vi.fn() },
 };
 
 beforeEach(() => {
@@ -29,6 +32,7 @@ beforeEach(() => {
   rateLimitMock.mockResolvedValue(false);
   prismaMock.user.findUnique.mockResolvedValue({ id: "user_1", passwordHash: "hash" });
   prismaMock.$transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<void>) => callback(tx));
+  tx.user.update.mockResolvedValue({ id: "user_1" });
   tx.verificationToken.deleteMany.mockResolvedValue({ count: 0 });
   tx.verificationToken.create.mockResolvedValue({});
   enqueueResetMock.mockResolvedValue(undefined);
@@ -49,7 +53,8 @@ describe("confirmPasswordReset", () => {
 
     expect(tx.user.update).toHaveBeenCalledWith({
       where: { email: "person@example.com" },
-      data: { passwordHash: "new-password-hash", sessionVersion: { increment: 1 } },
+      data: { passwordHash: "new-password-hash", emailVerified: expect.any(Date), sessionVersion: { increment: 1 } },
+      select: { id: true },
     });
   });
 

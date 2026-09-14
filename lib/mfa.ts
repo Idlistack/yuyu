@@ -78,3 +78,20 @@ export async function consumeRecoveryCode(userId: string, code: string) {
   `;
   return consumed === 1;
 }
+
+/** A database uniqueness constraint rejects replay across workers and replicas. */
+export async function consumeMfaCode(secret: string, email: string, input: string) {
+  const token = input.replace(/[\s-]/g, "");
+  if (!/^\d{6}$/.test(token)) return false;
+  const now = Date.now();
+  const delta = totp(secret, email).validate({ token, window: 1, timestamp: now });
+  if (delta === null) return false;
+  const step = Math.floor(now / 30_000) + delta;
+  // Never persist the code or seed. Bind the claim to this seed and time step.
+  const digest = crypto.createHmac("sha256", encryptionKey()).update(`totp-use:${secret}:${step}`).digest("hex");
+  const claimed = await prisma.verificationToken.createMany({
+    data: { identifier: "mfa-replay", token: digest, expires: new Date((step + 2) * 30_000) },
+    skipDuplicates: true,
+  });
+  return claimed.count === 1;
+}

@@ -19,7 +19,7 @@ vi.mock("@/lib/db", () => ({ prisma: {
 } }));
 vi.mock("@/lib/mfa", () => ({
   decryptMfaSecret: mocks.decrypt,
-  verifyMfaCode: mocks.verify,
+  consumeMfaCode: mocks.verify,
 }));
 vi.mock("@/lib/superAdminMfa", () => ({
   createSuperAdminMfaProof: mocks.createProof,

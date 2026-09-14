@@ -2,6 +2,7 @@
 
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { newPasswordSchema } from "@/lib/passwordPolicy";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import type { ActionResult } from "./org";
@@ -18,7 +19,7 @@ function hashToken(token: string) {
 // ── Request password reset ──────────────────────────────────────────
 
 const requestSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address").max(254),
 });
 
 /**
@@ -65,6 +66,7 @@ export async function requestPasswordReset(
   // Persist the one-time hash and its expiring mail in one transaction. The
   // request path must never wait for SMTP or commit a token without delivery.
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "email" = ${email} FOR UPDATE`;
     await tx.verificationToken.deleteMany({
       where: { identifier: `reset:${email}` },
     });
@@ -84,12 +86,9 @@ export async function requestPasswordReset(
 // ── Confirm password reset ──────────────────────────────────────────
 
 const resetSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  token: z.string().min(1, "Reset token is required"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(128),
+  email: z.string().trim().toLowerCase().email().max(254),
+  token: z.string().regex(/^[a-f0-9]{64}$/, "Invalid reset token."),
+  password: newPasswordSchema,
 });
 
 /**
@@ -115,6 +114,7 @@ export async function confirmPasswordReset(
 
   const passwordHash = await bcrypt.hash(password, 12);
   const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "email" = ${email} FOR UPDATE`;
     // Consume the exact token before changing credentials. This makes a reset
     // link single-use even if two requests arrive at the same time.
     const consumed = await tx.verificationToken.deleteMany({
@@ -125,10 +125,14 @@ export async function confirmPasswordReset(
       },
     });
     if (consumed.count !== 1) return false;
-    await tx.user.update({
+    const user = await tx.user.update({
       where: { email },
-      data: { passwordHash, sessionVersion: { increment: 1 } },
+      data: { passwordHash, emailVerified: new Date(), sessionVersion: { increment: 1 } },
+      select: { id: true },
     });
+    await tx.session.deleteMany({ where: { userId: user.id } });
+    await tx.verificationToken.deleteMany({ where: { identifier: { in: [`mfa:${user.id}`, `email-verification:${user.id}`] } } });
+    await tx.auditEvent.create({ data: { action: "ACCOUNT_PASSWORD_RESET", actorUserId: user.id, targetType: "User", targetId: user.id } });
     await tx.verificationToken.deleteMany({ where: { identifier: `reset:${email}` } });
     return true;
   });

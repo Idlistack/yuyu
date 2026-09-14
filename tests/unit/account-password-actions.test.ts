@@ -21,7 +21,8 @@ vi.mock("bcryptjs", () => ({ default: { compare: mocks.compare, hash: mocks.hash
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const tx = {
-  user: { update: mocks.userUpdate },
+  user: { update: mocks.userUpdate, updateMany: mocks.userUpdate },
+  verificationToken: { deleteMany: vi.fn() },
   session: { deleteMany: mocks.sessionDelete },
   auditEvent: { create: mocks.auditCreate },
 };
@@ -41,6 +42,7 @@ beforeEach(() => {
   mocks.rateLimit.mockResolvedValue(false);
   mocks.compare.mockResolvedValue(true);
   mocks.hash.mockResolvedValue("new-hash");
+  mocks.userUpdate.mockResolvedValue({ count: 1 });
   mocks.userFind.mockResolvedValue({ email: "person@example.com", passwordHash: "old-hash" });
   mocks.transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
 });
@@ -65,4 +67,17 @@ describe("account password actions", () => {
     mocks.recent.mockResolvedValue(false);
     await expect(updateAccountPassword({ newPassword: "new-password", confirmPassword: "new-password" })).resolves.toEqual({ ok: false, error: "Sign in with Google again before adding a password." });
   });
+});
+
+it("does not overwrite credentials changed by a concurrent request", async () => {
+  mocks.userUpdate.mockResolvedValue({ count: 0 });
+  expect((await updateAccountPassword({ currentPassword: "current-password", newPassword: "new-password", confirmPassword: "new-password" })).ok).toBe(false);
+  expect(mocks.sessionDelete).not.toHaveBeenCalled();
+  expect(mocks.auditCreate).not.toHaveBeenCalled();
+});
+
+it("requires a fresh sign-in even when the current password is known", async () => {
+  mocks.recent.mockResolvedValue(false);
+  expect((await updateAccountPassword({ currentPassword: "current-password", newPassword: "new-password", confirmPassword: "new-password" })).ok).toBe(false);
+  expect(mocks.compare).not.toHaveBeenCalled();
 });

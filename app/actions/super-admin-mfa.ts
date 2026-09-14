@@ -4,7 +4,7 @@ import { z } from "zod";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/permissions";
-import { decryptMfaSecret, verifyMfaCode } from "@/lib/mfa";
+import { decryptMfaSecret, consumeMfaCode } from "@/lib/mfa";
 import { createSuperAdminMfaProof, SUPER_ADMIN_MFA_COOKIE, SUPER_ADMIN_MFA_MAX_AGE_SECONDS } from "@/lib/superAdminMfa";
 import { isActionRateLimited } from "@/lib/actionRateLimit";
 import type { ActionResult } from "./org";
@@ -29,7 +29,7 @@ export async function verifySuperAdminMfa(input: unknown): Promise<ActionResult>
 
   let valid = false;
   try {
-    valid = verifyMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), user.email, parsed.data.code);
+    valid = await consumeMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), user.email, parsed.data.code);
   } catch {
     return { ok: false, error: "Could not verify the authenticator code. Start again or contact an administrator." };
   }

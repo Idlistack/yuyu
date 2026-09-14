@@ -21,6 +21,7 @@ function verificationUrl(token: string) {
 }
 
 export async function issueEmailVerification(user: { id: string; email: string }, client: Prisma.TransactionClient = prisma) {
+  await client.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
   const rawToken = crypto.randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + TOKEN_EXPIRY_MS);
   await client.verificationToken.deleteMany({ where: { identifier: identifierFor(user.id) } });
@@ -44,6 +45,7 @@ export async function verifyEmail(token: string) {
     if (!verification || !verification.identifier.startsWith("email-verification:") || verification.expires <= new Date()) return false;
 
     const userId = verification.identifier.slice("email-verification:".length);
+    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
     const consumed = await tx.verificationToken.deleteMany({
       where: { identifier: verification.identifier, token: tokenHash, expires: { gt: new Date() } },
     });

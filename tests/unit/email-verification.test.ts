@@ -9,6 +9,7 @@ vi.mock("@/lib/outbox", () => ({ enqueueEmailVerification: enqueueMock }));
 import { issueEmailVerification, verifyEmail } from "@/lib/emailVerification";
 
 const tx = {
+  $queryRaw: vi.fn(),
   verificationToken: {
     deleteMany: vi.fn(),
     create: vi.fn(),

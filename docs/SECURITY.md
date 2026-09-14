@@ -6,15 +6,15 @@ This page documents implemented controls and security boundaries. It is not a su
 
 ## Authentication
 
-- Passwords are bcrypt hashes and are never stored or logged in plaintext.
+- Passwords are bcrypt hashes and are never stored or logged in plaintext. New passwords require at least 12 characters and must fit bcrypt’s 72-byte UTF-8 limit; existing passwords remain usable for sign-in.
 - Auth.js sessions include a user `sessionVersion`; incrementing it invalidates issued sessions.
 - Password reset uses expiring verification tokens and the transactional outbox.
 - Password accounts require a one-time, expiring inbox-verification link before sign-in or event creation. Tokens are stored only as hashes and consumed once.
-- Credential users can enable TOTP MFA and receive one-use recovery codes.
+- Credential users can enable TOTP MFA and receive one-use recovery codes. TOTP use is claimed atomically in PostgreSQL, so a code cannot be replayed across replicas or between login and super-admin step-up. Wait for the next authenticator code when completing consecutive challenges. MFA enrollment is single-use, bound to the account session version, and cannot replace an active authenticator.
 - TOTP seeds are encrypted with AES-256-GCM using `MFA_ENCRYPTION_KEY`; recovery codes are stored as keyed hashes. Super-admin SMTP and Google client secrets are separately domain-encrypted from that key and never rendered back to the browser.
-- Sensitive account operations revoke existing sessions and write audit events.
+- Sensitive account operations require recent authentication, revoke existing sessions, invalidate pending MFA setup, and write audit events. Password changes also invalidate outstanding reset links. A completed inbox password reset verifies that email while preserving any enabled MFA. Revoked JWTs return an anonymous session and are cleared by Auth.js.
 - The super-admin panel requires a second, fresh TOTP step-up verification even after a normal authenticated session. Its signed, HttpOnly proof lasts 10 minutes and is bound to the user/session version.
-- Google OAuth security, including MFA, is governed by the linked Google account.
+- Google OAuth security, including MFA, is governed by the linked Google account. Linking to a password account requires that account’s email to be verified first; an unverified account must use inbox password recovery before linking. New Google links retain only provider identity fields, not reusable access/refresh/ID tokens. Previously stored provider tokens are not retroactively purged.
 - Super-admins with a fresh TOTP proof can disable new password and Google account creation; existing users can continue to sign in.
 - External applications use high-entropy, tenant-bound API credentials under `/api/v1`; raw secrets are displayed once and only SHA-256 digests are stored.
 
@@ -46,6 +46,7 @@ This page documents implemented controls and security boundaries. It is not a su
 
 ## Abuse protection
 
+- Password login applies account and IP limits inside the credential verifier, in addition to proxy limits. Missing and OAuth-only identities perform dummy bcrypt work; signup returns the same response for existing and newly created accounts. Auth.js errors are logged without exception payloads.
 - Redis-backed limits cover APIs, authentication mutations, RSVP, feedback, search/discovery, uploads, Server Actions, object creation, and invitations.
 - Machine API traffic has an additional per-client limit so credential rotation cannot multiply request capacity.
 - Security-sensitive production traffic fails closed when Redis is unavailable.

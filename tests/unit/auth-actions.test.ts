@@ -40,8 +40,18 @@ describe("password account creation", () => {
   it("does not attach a password to an existing OAuth identity", async () => {
     mocks.userFind.mockResolvedValue({ id: "oauth_user", passwordHash: null });
     const result = await signUpWithPassword({ name: "Attacker", email: "person@example.test", password: "new-password" });
-    expect(result).toEqual({ ok: false, error: "We couldn't create an account with those credentials. Try signing in or resetting your password." });
-    expect(mocks.hash).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, data: { email: "person@example.test" } });
+    expect(mocks.hash).toHaveBeenCalledOnce();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("does not mislabel a retried account creation as rate-limited", async () => {
+    mocks.userFind.mockResolvedValue({ id: "new_user", passwordHash: "hash" });
+    mocks.rateLimit.mockResolvedValue(true);
+
+    await expect(signUpWithPassword({ name: "Person", email: "person@example.test", password: "new-password" }))
+      .resolves.toEqual({ ok: true, data: { email: "person@example.test" } });
+    expect(mocks.rateLimit).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
@@ -65,5 +75,10 @@ describe("password account creation", () => {
     await expect(resendEmailVerification({ email: "missing@example.test" }))
       .resolves.toEqual({ ok: true, data: { sent: true } });
     expect(mocks.issueVerification).not.toHaveBeenCalled();
+  });
+
+  it("uses a verification-specific rate limit for resend requests", async () => {
+    await resendEmailVerification({ email: "missing@example.test" });
+    expect(mocks.rateLimit).toHaveBeenCalledWith("emailVerification", "missing@example.test");
   });
 });

@@ -12,5 +12,6 @@ const SENSITIVE_ACTION_MAX_AGE_MS = 10 * 60_000;
 export async function hasRecentAuthentication() {
   const session = await auth();
   const authenticatedAt = (session as (typeof session & { authenticatedAt?: number }) | null)?.authenticatedAt;
-  return typeof authenticatedAt === "number" && Date.now() - authenticatedAt <= SENSITIVE_ACTION_MAX_AGE_MS;
+  const age = typeof authenticatedAt === "number" ? Date.now() - authenticatedAt : NaN;
+  return Boolean(session?.user?.id) && Number.isFinite(age) && age >= 0 && age <= SENSITIVE_ACTION_MAX_AGE_MS;
 }

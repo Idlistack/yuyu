@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import { newPasswordSchema } from "@/lib/passwordPolicy";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/permissions";
@@ -29,10 +30,7 @@ const updateProfileSchema = z.object({
 const updatePasswordSchema = z
   .object({
     currentPassword: z.string().max(128).optional(),
-    newPassword: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .max(128, "Password must be at most 128 characters"),
+    newPassword: newPasswordSchema,
     confirmPassword: z.string().max(128),
   })
   .refine((input) => input.newPassword === input.confirmPassword, {
@@ -99,7 +97,7 @@ export async function updateAccountPassword(
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { email: true, passwordHash: true },
+    select: { email: true, passwordHash: true, sessionVersion: true },
   });
   if (!user?.email)
     return {
@@ -108,6 +106,7 @@ export async function updateAccountPassword(
     };
 
   if (user.passwordHash) {
+    if (!(await hasRecentAuthentication())) return { ok: false, error: "Sign in again before changing your password." };
     if (!parsed.data.currentPassword)
       return { ok: false, error: "Enter your current password." };
     if (
@@ -123,11 +122,13 @@ export async function updateAccountPassword(
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: session.user.id },
+  const changed = await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.updateMany({
+      where: { id: session.user.id, passwordHash: user.passwordHash, sessionVersion: user.sessionVersion },
       data: { passwordHash, sessionVersion: { increment: 1 } },
     });
+    if (updated.count !== 1) return false;
+    await tx.verificationToken.deleteMany({ where: { identifier: { in: [`reset:${user.email}`, `mfa:${session.user.id}`] } } });
     await tx.session.deleteMany({ where: { userId: session.user.id } });
     await tx.auditEvent.create({
       data: {
@@ -139,7 +140,9 @@ export async function updateAccountPassword(
         targetId: session.user.id,
       },
     });
+    return true;
   });
+  if (!changed) return { ok: false, error: "Account security changed. Sign in again and retry." };
   revalidatePath("/account/security");
 
   return { ok: true, data: { passwordSet: true } };

@@ -1,18 +1,21 @@
+import "server-only";
+
 import NextAuth, { CredentialsSignin } from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import { authAdapter } from "@/lib/authAdapter";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { isActionRateLimited } from "@/lib/actionRateLimit";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { hasVerifiedGoogleEmail } from "@/lib/googleAuth";
-import { consumeRecoveryCode, decryptMfaSecret, verifyMfaCode } from "@/lib/mfa";
+import { consumeRecoveryCode, decryptMfaSecret, consumeMfaCode } from "@/lib/mfa";
 import { isNewUserRegistrationEnabled } from "@/lib/instanceSettings";
 import { getGoogleSsoSettings } from "@/lib/instanceSettings";
 
 const credentialsSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(1),
+  email: z.string().trim().toLowerCase().email().max(254),
+  password: z.string().min(1).max(128),
   totp: z.string().trim().max(32).optional(),
 });
 
@@ -32,7 +35,7 @@ class EmailVerificationRequiredError extends CredentialsSignin {
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   const google = await getGoogleSsoSettings();
   return {
-  adapter: PrismaAdapter(prisma),
+  adapter: authAdapter,
   // Credentials requires JWT sessions; OAuth accounts are still persisted
   // via the adapter's `linkAccount` hook.
   session: { strategy: "jwt" },
@@ -43,6 +46,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     sessionToken: { name: "yuyu.session-token.v2" },
   },
   trustHost: true,
+  logger: {
+    // Auth.js error causes can contain provider responses and credentials.
+    error() { console.error("[auth] Authentication failed"); },
+  },
   pages: {
     signIn: "/login",
     error: "/login",
@@ -70,6 +77,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         const parsed = credentialsSchema.safeParse(raw);
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
+        if (await isActionRateLimited("auth", email)) return null;
 
         const user = await prisma.user.findUnique({
           where: { email },
@@ -79,21 +87,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             email: true,
             image: true,
             passwordHash: true,
+            sessionVersion: true,
             emailVerified: true,
             mfaSecretEncrypted: true,
           },
         });
-        if (!user?.passwordHash) return null;
-
-        const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) return null;
+        // Equal bcrypt work for missing and OAuth-only accounts prevents the
+        // obvious timing oracle. This is a fixed non-secret dummy hash.
+        const ok = await bcrypt.compare(password, user?.passwordHash ?? "$2b$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW");
+        if (!user?.passwordHash || !ok) return null;
         if (!user.emailVerified) throw new EmailVerificationRequiredError();
 
         if (user.mfaSecretEncrypted) {
           const code = parsed.data.totp ?? "";
           if (!user.email) return null;
           if (!code) throw new MfaRequiredError();
-          const validTotp = verifyMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), user.email, code);
+          const validTotp = await consumeMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), user.email, code);
           if (!validTotp && !(await consumeRecoveryCode(user.id, code))) return null;
         }
 
@@ -102,6 +111,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           name: user.name,
           email: user.email,
           image: user.image,
+          sessionVersion: user.sessionVersion,
         };
       },
     }),
@@ -110,41 +120,53 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     async signIn({ user, account, profile }) {
       if (account?.provider !== "google") return true;
       if (!hasVerifiedGoogleEmail(profile)) return false;
+      const email = user.email?.trim().toLowerCase();
+      if (!email) return false;
+      user.email = email;
+      const existing = await prisma.user.findUnique({
+        where: { email }, select: { passwordHash: true, emailVerified: true },
+      });
+      // A pre-registered, unverified password must never survive linking to
+      // the real inbox owner's Google identity.
+      if (existing?.passwordHash && !existing.emailVerified) return false;
+
+      const existingAccount = await prisma.account.findUnique({
+        where: { provider_providerAccountId: { provider: account.provider, providerAccountId: account.providerAccountId } },
+        select: { id: true },
+      });
+      if (existingAccount || existing) return true;
+
+      // Google is a sign-in/linking method, not a registration path. Returning
+      // a same-origin URL stops Auth.js before its adapter can create a user
+      // and gives the person a clear path to make an account first.
       if (!(await isNewUserRegistrationEnabled())) {
-        const existingAccount = await prisma.account.findUnique({
-          where: { provider_providerAccountId: { provider: account.provider, providerAccountId: account.providerAccountId } },
-          select: { id: true },
-        });
-        if (!existingAccount) {
-          const email = typeof user.email === "string" ? user.email.trim().toLowerCase() : "";
-          const existingUser = email ? await prisma.user.findUnique({ where: { email }, select: { id: true } }) : null;
-          // Existing password users may still link their verified Google identity.
-          if (!existingUser) return false;
-        }
+        return "/login?error=account_creation_disabled";
       }
-      return true;
+      return "/login?error=google_account_required";
     },
     async jwt({ token, user }) {
       const userId = user?.id ?? token.sub;
-      if (!userId) return token;
+      if (!userId) return null;
 
       const currentUser = await prisma.user.findUnique({
         where: { id: userId },
         select: { sessionVersion: true },
       });
-      if (!currentUser) {
-        (token as typeof token & { sessionRevoked?: boolean }).sessionRevoked = true;
-        return token;
-      }
+      if (!currentUser) return null;
 
       const sessionToken = token as typeof token & { authenticatedAt?: number; sessionVersion?: number; sessionRevoked?: boolean };
       if (user) {
+        // Bind credentials to the version checked with the password. A reset
+        // racing token issuance must not mint a fresh session from old proof.
+        const verifiedVersion = (user as typeof user & { sessionVersion?: number }).sessionVersion;
+        if (verifiedVersion !== undefined && verifiedVersion !== currentUser.sessionVersion) return null;
         token.sub = user.id;
         sessionToken.authenticatedAt = Date.now();
         sessionToken.sessionVersion = currentUser.sessionVersion;
         sessionToken.sessionRevoked = false;
-      } else if (sessionToken.sessionVersion !== currentUser.sessionVersion) {
-        sessionToken.sessionRevoked = true;
+      } else if (sessionToken.sessionRevoked || sessionToken.sessionVersion !== currentUser.sessionVersion) {
+        // Auth.js clears the cookie and returns a genuinely anonymous session.
+        return null;
       }
       return token;
     },
