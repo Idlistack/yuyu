@@ -37,7 +37,8 @@ export function AccountSecurityClient(props: { mfaEnabled: boolean }) {
     startTransition(async () => {
       setError(null);
       setMessage(null);
-      await task();
+      try { await task(); }
+      catch { setError("Security settings are temporarily unavailable. Please try again."); }
     });
 
   return (

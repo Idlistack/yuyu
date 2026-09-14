@@ -18,7 +18,7 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
   const [pending, startTransition] = useTransition();
 
   const title = hasPassword ? "Change password" : "Add a password";
-  const passwordTooShort = newPassword.length > 0 && newPassword.length < 8;
+  const passwordTooShort = newPassword.length > 0 && newPassword.length < 12;
   const passwordsDoNotMatch =
     confirmPassword.length > 0 && newPassword !== confirmPassword;
 
@@ -33,8 +33,8 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
         onSubmit={(event) => {
           event.preventDefault();
           setError(null);
-          if (newPassword.length < 8) {
-            setError("New password must be at least 8 characters.");
+          if (newPassword.length < 12) {
+            setError("New password must be at least 12 characters.");
             return;
           }
           if (newPassword !== confirmPassword) {
@@ -42,15 +42,19 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
             return;
           }
           startTransition(async () => {
-            const result = await updateAccountPassword({
+            let result;
+            try { result = await updateAccountPassword({
               currentPassword,
               newPassword,
               confirmPassword,
-            });
+            }); } catch { setError("Password updates are temporarily unavailable. Please try again."); return; }
             if (!result.ok) {
-              setError(result.error);
+              setError(result.fieldErrors?.newPassword?.[0] ?? result.error);
               return;
             }
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
             await signOut({ callbackUrl: "/login" });
           });
         }}
@@ -81,9 +85,9 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
           autoComplete="new-password"
-          helperText="At least 8 characters."
+          helperText="At least 12 characters."
           error={passwordTooShort}
-          slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }}
+          slotProps={{ htmlInput: { minLength: 12, maxLength: 128 } }}
           required
           fullWidth
         />

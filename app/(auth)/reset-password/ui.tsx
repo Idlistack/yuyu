@@ -18,16 +18,16 @@ import {
 } from "@/app/actions/password-reset";
 
 const inputSx = {
-  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.65)" },
+  "& .MuiInputLabel-root": { color: "text.secondary" },
   "& .MuiInputLabel-root.Mui-focused": {
-    color: "rgba(255,255,255,0.85)",
+    color: "text.primary",
   },
   "& .MuiOutlinedInput-root": {
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    color: "rgba(255,255,255,0.92)",
-    "& fieldset": { borderColor: "rgba(255,255,255,0.16)" },
-    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.26)" },
+    backgroundColor: "action.hover",
+    color: "text.primary",
+    "& fieldset": { borderColor: "divider" },
+    "&:hover fieldset": { borderColor: "text.secondary" },
     "&.Mui-focused fieldset": {
       borderColor: "rgba(124, 245, 182, 0.65)",
     },
@@ -68,7 +68,9 @@ export function ResetPasswordForm(props: { token: string; email: string }) {
     setSuccess(null);
     setFieldErrors({});
     startTransition(async () => {
-      const res = await requestPasswordReset({ email });
+      let res;
+      try { res = await requestPasswordReset({ email }); }
+      catch { setError("Password reset is temporarily unavailable. Please try again."); return; }
       if (!res.ok) {
         setError(res.error);
         setFieldErrors(res.fieldErrors ?? {});
@@ -86,18 +88,20 @@ export function ResetPasswordForm(props: { token: string; email: string }) {
     setSuccess(null);
     setFieldErrors({});
     startTransition(async () => {
-      const res = await confirmPasswordReset({
+      let res;
+      try { res = await confirmPasswordReset({
         email: initialEmail,
         token,
         password,
-      });
+      }); } catch { setError("Password reset is temporarily unavailable. Please try again."); return; }
       if (!res.ok) {
         setError(res.error);
         setFieldErrors(res.fieldErrors ?? {});
         return;
       }
+      setPassword("");
       setSuccess("Password reset successfully! Redirecting to sign in…");
-      setTimeout(() => router.push("/login"), 2000);
+      setTimeout(() => router.replace("/login"), 2000);
     });
   }
 
@@ -139,7 +143,7 @@ export function ResetPasswordForm(props: { token: string; email: string }) {
                 variant="overline"
                 sx={{
                   letterSpacing: 1.4,
-                  color: "rgba(255,255,255,0.78)",
+                  color: "text.secondary",
                 }}
               >
                 YUYU
@@ -147,13 +151,13 @@ export function ResetPasswordForm(props: { token: string; email: string }) {
               <Typography
                 variant="h4"
                 component="h1"
-                sx={{ fontWeight: 700, color: "common.white" }}
+                sx={{ fontWeight: 700, color: "text.primary" }}
               >
                 {hasToken ? "Set new password" : "Reset password"}
               </Typography>
               <Typography
                 variant="body2"
-                sx={{ color: "rgba(255,255,255,0.70)", mt: 0.75 }}
+                sx={{ color: "text.secondary", mt: 0.75 }}
               >
                 {hasToken
                   ? "Enter your new password below."
@@ -187,10 +191,10 @@ export function ResetPasswordForm(props: { token: string; email: string }) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="new-password"
-                    slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }}
+                    slotProps={{ htmlInput: { minLength: 12, maxLength: 128 } }}
                     error={!!fieldErrors.password}
                     helperText={
-                      fieldErrors.password?.[0] ?? "At least 8 characters."
+                      fieldErrors.password?.[0] ?? "At least 12 characters."
                     }
                     sx={inputSx}
                   />
@@ -243,9 +247,9 @@ export function ResetPasswordForm(props: { token: string; email: string }) {
                 href="/login"
                 underline="hover"
                 sx={{
-                  color: "rgba(255,255,255,0.7)",
+                  color: "text.secondary",
                   fontSize: "0.875rem",
-                  "&:hover": { color: "rgba(255,255,255,0.95)" },
+                  "&:hover": { color: "text.primary" },
                 }}
               >
                 Back to sign in

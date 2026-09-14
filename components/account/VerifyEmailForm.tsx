@@ -25,7 +25,9 @@ export function VerifyEmailForm({ token }: { token: string }) {
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            const result = await confirmEmailVerification({ token });
+            let result;
+            try { result = await confirmEmailVerification({ token }); }
+            catch { setError("Email verification is temporarily unavailable. Please try again."); return; }
             if (!result.ok) {
               setError(result.error);
               return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Stack from "@mui/material/Stack";
@@ -13,6 +13,7 @@ import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
+import { safeAuthRedirect } from "@/lib/authRedirect";
 import { resendEmailVerification, signUpWithPassword } from "@/app/actions/auth";
 
 function GoogleMark(props: { size?: number }) {
@@ -61,10 +62,12 @@ const inputSx = {
     "&.Mui-focused fieldset": {
       borderColor: "var(--login-field-border-focus)",
     },
-    "& input:-webkit-autofill": {
+    "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus": {
       WebkitTextFillColor: "var(--login-field-text)",
-      WebkitBoxShadow: "0 0 0 100px var(--login-field-background) inset",
+      WebkitBoxShadow: "0 0 0 1000px var(--login-field-background) inset",
       caretColor: "var(--login-field-text)",
+      backgroundClip: "content-box",
+      transition: "background-color 9999s ease-out 0s",
     },
   },
 };
@@ -90,11 +93,12 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
   const router = useRouter();
   const sp = useSearchParams();
   const callbackUrl = useMemo(() => {
-    const c = sp.get("callbackUrl")?.trim();
-    return c && c.startsWith("/") && !c.startsWith("//") ? c : "/dashboard";
+    return safeAuthRedirect(sp.get("callbackUrl"));
   }, [sp]);
 
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(() =>
+    accountCreationEnabled && sp.get("error") === "google_account_required" ? "signup" : "signin",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState("");
@@ -103,10 +107,41 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
   const [message, setMessage] = useState<string | null>(() =>
     sp.get("verified") === "1" ? "Email verified. You can now sign in." : null,
   );
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    const errorCode = sp.get("error");
+    if (errorCode === "google_account_required") return "Create an account with your email and password before continuing with Google.";
+    if (errorCode === "account_creation_disabled") return "New account creation is currently unavailable. Ask an administrator for access or sign in with an existing account.";
+    return errorCode ? "Sign-in could not be completed. Try again, or use your password and verify your email first." : null;
+  });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState<string | null>(null);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
+  const currentCredentials = useCallback(() => {
+    const currentEmail = emailInputRef.current?.value ?? email;
+    const currentPassword = passwordInputRef.current?.value ?? password;
+    if (currentEmail !== email) setEmail(currentEmail);
+    if (currentPassword !== password) setPassword(currentPassword);
+    return { email: currentEmail, password: currentPassword };
+  }, [email, password]);
+
+  useEffect(() => {
+    // Browser and password-manager autofill can populate inputs without
+    // dispatching an input/change event. Synchronise those DOM values so the
+    // visible fields and the credentials submitted by this controlled form
+    // never diverge.
+    const syncAutofill = () => { currentCredentials(); };
+    const animationFrame = window.requestAnimationFrame(syncAutofill);
+    const timeout = window.setTimeout(syncAutofill, 250);
+    window.addEventListener("pageshow", syncAutofill);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(timeout);
+      window.removeEventListener("pageshow", syncAutofill);
+    };
+  }, [currentCredentials]);
 
   function resetStatus() {
     setError(null);
@@ -123,11 +158,12 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
     e.preventDefault();
     resetStatus();
     setLoading("credentials");
+    const credentials = currentCredentials();
     let r;
     try {
       r = await signIn("credentials", {
-        email,
-        password,
+        email: credentials.email,
+        password: credentials.password,
         totp,
         redirect: false,
       });
@@ -162,7 +198,14 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
     e.preventDefault();
     resetStatus();
     setLoading("signup");
-    const res = await signUpWithPassword({ name, email, password });
+    let res;
+    try {
+      res = await signUpWithPassword({ name, email, password });
+    } catch {
+      setLoading(null);
+      setError("Account creation is temporarily unavailable. Please try again.");
+      return;
+    }
     if (!res.ok) {
       setError(res.error);
       setFieldErrors(res.fieldErrors ?? {});
@@ -171,7 +214,7 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
     }
     setLoading(null);
     setNeedsEmailVerification(true);
-    setMessage("Check your inbox for a link to verify your email and activate your account.");
+    setMessage("If this email can be registered, check your inbox for a verification link. Otherwise, sign in or reset your password.");
     setMode("signin");
     setPassword("");
   }
@@ -179,7 +222,14 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
   async function handleResendVerification() {
     resetStatus();
     setLoading("resend-verification");
-    const result = await resendEmailVerification({ email });
+    let result;
+    try {
+      result = await resendEmailVerification({ email });
+    } catch {
+      setLoading(null);
+      setError("Email delivery is temporarily unavailable. Please try again.");
+      return;
+    }
     setLoading(null);
     if (!result.ok) {
       setError(result.error);
@@ -305,7 +355,10 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
           onClick={() => {
             resetStatus();
             setLoading("google");
-            void signIn("google", { callbackUrl });
+            void signIn("google", { callbackUrl }).catch(() => {
+              setLoading(null);
+              setError("Google sign-in is temporarily unavailable. Please try again.");
+            });
           }}
         >
           <GoogleMark />
@@ -356,6 +409,7 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
             resetMfaChallenge();
           }}
           autoComplete="email"
+          inputRef={emailInputRef}
           error={!!fieldErrors.email}
           helperText={fieldErrors.email?.[0]}
           sx={inputSx}
@@ -371,11 +425,12 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
             resetMfaChallenge();
           }}
           autoComplete={isSignUp ? "new-password" : "current-password"}
-          slotProps={{ htmlInput: { minLength: isSignUp ? 8 : undefined, maxLength: 128 } }}
+          inputRef={passwordInputRef}
+          slotProps={{ htmlInput: { minLength: isSignUp ? 12 : undefined, maxLength: 128 } }}
           error={!!fieldErrors.password}
           helperText={
             fieldErrors.password?.[0] ??
-            (isSignUp ? "At least 8 characters." : undefined)
+            (isSignUp ? "At least 12 characters." : undefined)
           }
           sx={inputSx}
         />
