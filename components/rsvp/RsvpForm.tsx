@@ -15,24 +15,39 @@ import RadioGroup from "@mui/material/RadioGroup";
 import FormLabel from "@mui/material/FormLabel";
 import FormControl from "@mui/material/FormControl";
 import Stack from "@mui/material/Stack";
-import InputAdornment from "@mui/material/InputAdornment";
-import Select from "@mui/material/Select";
+import Autocomplete from "@mui/material/Autocomplete";
 import Link from "next/link";
 import type { RsvpStatus } from "@prisma/client";
 import type { RegistrationFieldDefinition } from "@/components/rsvp/registrationTypes";
 
 const phoneCountries = [
-  { id: "IN", label: "India", dial: "+91" },
-  { id: "US", label: "United States", dial: "+1" },
-  { id: "GB", label: "United Kingdom", dial: "+44" },
-  { id: "AU", label: "Australia", dial: "+61" },
-] as const;
+  ["AF", "Afghanistan", "+93"], ["AL", "Albania", "+355"], ["AR", "Argentina", "+54"], ["AU", "Australia", "+61"], ["AT", "Austria", "+43"], ["BD", "Bangladesh", "+880"], ["BE", "Belgium", "+32"], ["BR", "Brazil", "+55"], ["CA", "Canada", "+1"], ["CL", "Chile", "+56"], ["CN", "China", "+86"], ["CO", "Colombia", "+57"], ["DK", "Denmark", "+45"], ["EG", "Egypt", "+20"], ["FI", "Finland", "+358"], ["FR", "France", "+33"], ["DE", "Germany", "+49"], ["GR", "Greece", "+30"], ["HK", "Hong Kong", "+852"], ["HU", "Hungary", "+36"], ["IN", "India", "+91"], ["ID", "Indonesia", "+62"], ["IE", "Ireland", "+353"], ["IL", "Israel", "+972"], ["IT", "Italy", "+39"], ["JP", "Japan", "+81"], ["KE", "Kenya", "+254"], ["MY", "Malaysia", "+60"], ["MX", "Mexico", "+52"], ["NL", "Netherlands", "+31"], ["NZ", "New Zealand", "+64"], ["NG", "Nigeria", "+234"], ["NO", "Norway", "+47"], ["PK", "Pakistan", "+92"], ["PH", "Philippines", "+63"], ["PL", "Poland", "+48"], ["PT", "Portugal", "+351"], ["QA", "Qatar", "+974"], ["RO", "Romania", "+40"], ["RU", "Russia", "+7"], ["SA", "Saudi Arabia", "+966"], ["SG", "Singapore", "+65"], ["ZA", "South Africa", "+27"], ["KR", "South Korea", "+82"], ["ES", "Spain", "+34"], ["SE", "Sweden", "+46"], ["CH", "Switzerland", "+41"], ["TW", "Taiwan", "+886"], ["TH", "Thailand", "+66"], ["TR", "Turkey", "+90"], ["AE", "United Arab Emirates", "+971"], ["GB", "United Kingdom", "+44"], ["US", "United States", "+1"], ["VN", "Vietnam", "+84"],
+] .map(([id, label, dial]) => ({ id, label, dial }));
+
+type PhoneCountry = (typeof phoneCountries)[number];
 
 function getPhoneParts(raw: unknown) {
-  const s = typeof raw === "string" ? raw.trim() : "";
-  const dial = phoneCountries.find((c) => s.startsWith(c.dial))?.dial ?? "+91";
+  const s = normalizePhoneInput(typeof raw === "string" ? raw : "");
+  const knownDial = [...phoneCountries]
+    .sort((a, b) => b.dial.length - a.dial.length)
+    .find((c) => s.startsWith(c.dial))?.dial;
+  // Calling codes are at most three digits. Retaining an unlisted prefix lets
+  // attendees use every E.164 country code, not only the convenience list.
+  const dial = knownDial ?? s.match(/^\+\d{1,3}/)?.[0] ?? "+91";
   const number = s.startsWith(dial) ? s.slice(dial.length) : s;
   return { dial, number: number.replace(/[^\d]/g, "") };
+}
+
+function normalizePhoneInput(value: string) {
+  const trimmed = value.trim();
+  const withInternationalPrefix = trimmed.startsWith("00") ? `+${trimmed.slice(2)}` : trimmed;
+  const digits = withInternationalPrefix.replace(/[^\d]/g, "");
+  return withInternationalPrefix.startsWith("+") ? `+${digits.slice(0, 15)}` : digits.slice(0, 15);
+}
+
+function normalizeDial(value: string) {
+  const digits = value.replace(/[^\d]/g, "").slice(0, 3);
+  return digits ? `+${digits}` : "+";
 }
 
 function setPhoneValue(
@@ -40,9 +55,72 @@ function setPhoneValue(
   next: { dial?: string; number?: string },
 ): string {
   const parts = getPhoneParts(current);
-  const dial = next.dial ?? parts.dial;
-  const number = (next.number ?? parts.number).replace(/[^\d]/g, "");
+  const dial = next.dial ? normalizeDial(next.dial) : parts.dial;
+  const number = (next.number ?? parts.number).replace(/[^\d]/g, "").slice(0, Math.max(0, 15 - (dial.length - 1)));
   return number ? `${dial}${number}` : "";
+}
+
+function PhoneField(props: {
+  field: RegistrationFieldDefinition;
+  value: unknown;
+  onChange: (value: string) => void;
+}) {
+  const { field, value, onChange } = props;
+  const parts = getPhoneParts(value);
+  const selectedCountry = phoneCountries.find((country) => country.dial === parts.dial) ?? null;
+  const maxLength = parts.dial === "+91" ? 10 : Math.max(1, 15 - (parts.dial.length - 1));
+
+  return (
+    <Stack key={field.key} direction={{ xs: "column", sm: "row" }} spacing={1}>
+      <Autocomplete<PhoneCountry, false, false, true>
+        freeSolo
+        autoHighlight
+        options={phoneCountries}
+        value={selectedCountry ?? parts.dial}
+        getOptionLabel={(option) => typeof option === "string" ? option : option.dial}
+        isOptionEqualToValue={(option, selected) => typeof selected !== "string" && option.id === selected.id}
+        filterOptions={(options, state) => {
+          const query = state.inputValue.trim().toLowerCase();
+          if (!query) return options;
+          return options.filter((option) =>
+            [option.id, option.label, option.dial].some((value) => value.toLowerCase().includes(query)),
+          );
+        }}
+        onChange={(_, option) => onChange(setPhoneValue(value, { dial: typeof option === "string" ? option : option?.dial ?? "" }))}
+        renderOption={(optionProps, option) => (
+          <li {...optionProps}>
+            {option.label} ({option.dial})
+          </li>
+        )}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Country code"
+            required={field.required}
+            inputMode="tel"
+            helperText="Search a country or enter a + calling code."
+          />
+        )}
+        sx={{ width: { xs: "100%", sm: 120 }, flexShrink: 0 }}
+      />
+      <TextField
+        label={field.label}
+        required={field.required}
+        fullWidth
+        value={parts.number}
+        onChange={(event) => {
+          const next = event.target.value;
+          onChange(next.trimStart().startsWith("+") || next.trimStart().startsWith("00")
+            ? normalizePhoneInput(next)
+            : setPhoneValue(value, { number: next }));
+        }}
+        inputMode="tel"
+        placeholder="Phone number"
+        slotProps={{ htmlInput: { inputMode: "tel", pattern: "[0-9]*", maxLength } }}
+        helperText={parts.dial === "+91" ? "Indian mobile numbers must be 10 digits and start with 6–9." : "You can also paste a complete international number here."}
+      />
+    </Stack>
+  );
 }
 
 async function postRsvp(body: unknown) {
@@ -112,8 +190,10 @@ export function RsvpForm(props: {
   eventSlug?: string;
   eventInstanceId?: string;
   registrationFields?: RegistrationFieldDefinition[];
+  /** Lets a containing event page update immediately after this tab saves an RSVP. */
+  onRsvpSaved?: (rsvp: { ticketToken: string; status: RsvpStatus | null }) => void;
 }) {
-  const { orgSlug, eventSlug, eventInstanceId, registrationFields } = props;
+  const { orgSlug, eventSlug, eventInstanceId, registrationFields, onRsvpSaved } = props;
   const { data: session, status } = useSession();
   const lsKey = storageKey({ orgSlug, eventSlug, eventInstanceId });
   const [guestEmail, setGuestEmail] = useState("");
@@ -140,6 +220,28 @@ export function RsvpForm(props: {
 
   function setAnswer(key: string, value: unknown) {
     setAnswers((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function saveSuccessfulRsvp(rsvp: { ticketToken: string; status: RsvpStatus | null }) {
+    setTicketToken(rsvp.ticketToken);
+    setRsvpStatus(rsvp.status);
+    if (rsvp.ticketToken) {
+      try {
+        window.localStorage.setItem(
+          lsKey,
+          JSON.stringify({
+            ticketToken: rsvp.ticketToken,
+            status: rsvp.status,
+            registeredAt: new Date().toISOString(),
+          }),
+        );
+      } catch {
+        // The confirmed server state remains usable in this open page even if
+        // this browser has disabled local storage.
+      }
+    }
+    onRsvpSaved?.(rsvp);
+    setDone(true);
   }
 
   if (status === "loading") {
@@ -228,60 +330,8 @@ export function RsvpForm(props: {
                     helperText="We’ll validate basic email format."
                   />
                 );
-              case "PHONE": {
-                const parts = getPhoneParts(answers[f.key]);
-                return (
-                  <TextField
-                    key={f.key}
-                    label={f.label}
-                    required={f.required}
-                    fullWidth
-                    value={parts.number}
-                    onChange={(e) =>
-                      setAnswer(
-                        f.key,
-                        setPhoneValue(answers[f.key], { number: e.target.value }),
-                      )
-                    }
-                    inputMode="tel"
-                    placeholder="Phone number"
-                    slotProps={{
-                      htmlInput: { inputMode: "numeric", pattern: "[0-9]*", maxLength: parts.dial === "+91" ? 10 : 14 },
-                      input: {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Select
-                              value={parts.dial}
-                              onChange={(e) =>
-                                setAnswer(
-                                  f.key,
-                                  setPhoneValue(answers[f.key], {
-                                    dial: String(e.target.value),
-                                  }),
-                                )
-                              }
-                              size="small"
-                              variant="standard"
-                              disableUnderline
-                              sx={{
-                                minWidth: 70,
-                                "& .MuiSelect-select": { pr: 2 },
-                              }}
-                            >
-                              {phoneCountries.map((c) => (
-                                <MenuItem key={c.id} value={c.dial}>
-                                  {c.dial} {c.id}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                    helperText={parts.dial === "+91" ? "Indian mobile numbers must be 10 digits and start with 6–9." : "Include country code."}
-                  />
-                );
-              }
+              case "PHONE":
+                return <PhoneField key={f.key} field={f} value={answers[f.key]} onChange={(value) => setAnswer(f.key, value)} />;
               case "TEXTAREA":
                 return (
                   <TextField
@@ -424,18 +474,7 @@ export function RsvpForm(props: {
               });
               if (!res.ok) setError(res.error);
               else {
-                setTicketToken(res.ticketToken ?? "");
-                setRsvpStatus(res.status);
-                if (typeof window !== "undefined" && res.ticketToken) {
-                  window.localStorage.setItem(
-                    lsKey,
-                    JSON.stringify({
-                      ticketToken: res.ticketToken,
-                      registeredAt: new Date().toISOString(),
-                    }),
-                  );
-                }
-                setDone(true);
+                saveSuccessfulRsvp({ ticketToken: res.ticketToken, status: res.status });
               }
             });
           }}
@@ -464,18 +503,7 @@ export function RsvpForm(props: {
           });
           if (!res.ok) setError(res.error);
           else {
-            setTicketToken(res.ticketToken ?? "");
-            setRsvpStatus(res.status);
-            if (typeof window !== "undefined" && res.ticketToken) {
-              window.localStorage.setItem(
-                lsKey,
-                JSON.stringify({
-                  ticketToken: res.ticketToken,
-                  registeredAt: new Date().toISOString(),
-                }),
-              );
-            }
-            setDone(true);
+            saveSuccessfulRsvp({ ticketToken: res.ticketToken, status: res.status });
           }
         });
       }}
@@ -537,60 +565,8 @@ export function RsvpForm(props: {
                     helperText="We’ll validate basic email format."
                   />
                 );
-              case "PHONE": {
-                const parts = getPhoneParts(answers[f.key]);
-                return (
-                  <TextField
-                    key={f.key}
-                    label={f.label}
-                    required={f.required}
-                    fullWidth
-                    value={parts.number}
-                    onChange={(e) =>
-                      setAnswer(
-                        f.key,
-                        setPhoneValue(answers[f.key], { number: e.target.value }),
-                      )
-                    }
-                    inputMode="tel"
-                    placeholder="Phone number"
-                    slotProps={{
-                      htmlInput: { inputMode: "numeric", pattern: "[0-9]*", maxLength: parts.dial === "+91" ? 10 : 14 },
-                      input: {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Select
-                              value={parts.dial}
-                              onChange={(e) =>
-                                setAnswer(
-                                  f.key,
-                                  setPhoneValue(answers[f.key], {
-                                    dial: String(e.target.value),
-                                  }),
-                                )
-                              }
-                              size="small"
-                              variant="standard"
-                              disableUnderline
-                              sx={{
-                                minWidth: 70,
-                                "& .MuiSelect-select": { pr: 2 },
-                              }}
-                            >
-                              {phoneCountries.map((c) => (
-                                <MenuItem key={c.id} value={c.dial}>
-                                  {c.dial} {c.id}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                    helperText={parts.dial === "+91" ? "Indian mobile numbers must be 10 digits and start with 6–9." : "Include country code."}
-                  />
-                );
-              }
+              case "PHONE":
+                return <PhoneField key={f.key} field={f} value={answers[f.key]} onChange={(value) => setAnswer(f.key, value)} />;
               case "TEXTAREA":
                 return (
                   <TextField

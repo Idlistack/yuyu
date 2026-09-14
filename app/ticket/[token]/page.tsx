@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { TicketQrPanel } from "@/components/ticket/TicketQrPanel";
 import { CancelRsvpButton } from "@/components/ticket/CancelRsvpButton";
 import { TicketDownloadButton } from "@/components/ticket/TicketDownloadButton";
+import { TicketStatusStorageSync } from "@/components/ticket/TicketStatusStorageSync";
 import { safeTimeZone } from "@/lib/timeZone";
 
 type Props = {
@@ -153,15 +154,17 @@ export default async function TicketPage({ params }: Props) {
   const isCheckedIn = Boolean(rsvp.checkedInAt);
 
   return (
-    <Stack
-      spacing={3}
-      sx={{
-        maxWidth: 440,
-        mx: "auto",
-        py: { xs: 3, sm: 5 },
-        px: 2,
-      }}
-    >
+    <>
+      <TicketStatusStorageSync checkInToken={rsvp.checkInToken} status={rsvp.status} />
+      <Stack
+        spacing={3}
+        sx={{
+          maxWidth: 440,
+          mx: "auto",
+          py: { xs: 3, sm: 5 },
+          px: 2,
+        }}
+      >
       <Typography variant="overline" color="text.secondary">
         {orgName}
       </Typography>
@@ -201,6 +204,7 @@ export default async function TicketPage({ params }: Props) {
           eventPageHref={eventSlug ? `/${orgSlug}/${eventSlug}` : `/${orgSlug}`}
         />
       ) : null}
-    </Stack>
+      </Stack>
+    </>
   );
 }

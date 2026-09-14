@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { RsvpStatus } from "@prisma/client";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -125,6 +126,34 @@ function mapSearchQuery(location: string, mapLinkUrl: string | null) {
 export function EventWebsiteShell(p: Props) {
   const [open, setOpen] = useState(false);
   const [shared, setShared] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [localTicketToken, setLocalTicketToken] = useState("");
+  const [localRsvpStatus, setLocalRsvpStatus] = useState<RsvpStatus | null>(null);
+  const rsvpStorageKey = `yuyu:rsvp:${p.orgSlug}:e:${p.event.slug}`;
+
+  useEffect(() => {
+    const readSavedRsvp = () => {
+      setMounted(true);
+      try {
+        const saved = window.localStorage.getItem(rsvpStorageKey);
+        const parsed = saved
+          ? (JSON.parse(saved) as { ticketToken?: string; status?: RsvpStatus })
+          : null;
+        setLocalTicketToken(parsed?.ticketToken ?? "");
+        setLocalRsvpStatus(parsed?.status ?? null);
+      } catch {
+        setLocalTicketToken("");
+        setLocalRsvpStatus(null);
+      }
+    };
+    const timer = window.setTimeout(readSavedRsvp, 0);
+    window.addEventListener("pageshow", readSavedRsvp);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pageshow", readSavedRsvp);
+    };
+  }, [rsvpStorageKey]);
+
   const { mode } = useAppColorMode();
   const isDark = mode === "dark";
   const ink = isDark ? "#f7f9fb" : "#17191b";
@@ -182,6 +211,13 @@ export function EventWebsiteShell(p: Props) {
       /* sharing cancelled */
     }
   };
+  const registrationButtonLabel = localRsvpStatus === "CONFIRMED" || !localRsvpStatus
+    ? "View your ticket"
+    : localRsvpStatus === "WAITLISTED"
+      ? "View waitlist status"
+      : localRsvpStatus === "PENDING_APPROVAL"
+        ? "View approval status"
+        : "View registration";
   return (
     <Box
       sx={{
@@ -380,17 +416,19 @@ export function EventWebsiteShell(p: Props) {
                       <Alert severity="info">Registration is closed.</Alert>
                     ) : (
                       <Button
+                        {...(mounted && localTicketToken
+                          ? { component: Link, href: `/ticket/${localTicketToken}` }
+                          : { onClick: () => setOpen(true) })}
                         variant="contained"
                         size="large"
                         fullWidth
-                        onClick={() => setOpen(true)}
                         sx={{
                           bgcolor: "#7CF5B6",
                           color: "#061814",
                           "&:hover": { bgcolor: "#90ffd0" },
                         }}
                       >
-                        Register now
+                        {mounted && localTicketToken ? registrationButtonLabel : "Register now"}
                       </Button>
                     )}
                     {p.confirmedCount != null ? (
@@ -471,6 +509,11 @@ export function EventWebsiteShell(p: Props) {
               orgSlug={p.orgSlug}
               eventSlug={p.event.slug}
               registrationFields={p.registrationFields}
+              onRsvpSaved={({ ticketToken, status }) => {
+                setLocalTicketToken(ticketToken);
+                setLocalRsvpStatus(status);
+                setOpen(false);
+              }}
             />
           </Box>
         </DialogContent>

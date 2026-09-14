@@ -534,6 +534,10 @@ export function EventPublicShell(props: Props) {
                       <CancelRsvpButton
                         checkInToken={localTicketToken}
                         eventPageHref={`/${orgSlug}/${event.slug}`}
+                        onCancelled={() => {
+                          setLocalTicketToken("");
+                          setFeedbackOpen(false);
+                        }}
                       />
                     </Stack>
                   ) : (
@@ -600,6 +604,11 @@ export function EventPublicShell(props: Props) {
                         orgSlug={orgSlug}
                         eventSlug={event.slug}
                         registrationFields={registrationFields}
+                        onRsvpSaved={({ ticketToken }) => {
+                          setLocalTicketToken(ticketToken);
+                          setFeedbackOpen(isPast && Boolean(ticketToken));
+                          setRegisterOpen(false);
+                        }}
                       />
                     </Stack>
                   </DialogContent>

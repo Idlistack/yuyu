@@ -14,8 +14,10 @@ import { cancelRsvp } from "@/app/actions/rsvp-cancel";
 export function CancelRsvpButton(props: {
   checkInToken: string;
   eventPageHref: string;
+  /** Keeps a containing event page in sync when this tab removes its RSVP. */
+  onCancelled?: () => void;
 }) {
-  const { checkInToken, eventPageHref } = props;
+  const { checkInToken, eventPageHref, onCancelled } = props;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +51,7 @@ export function CancelRsvpButton(props: {
         // localStorage not available
       }
       setOpen(false);
+      onCancelled?.();
       router.push(eventPageHref);
       router.refresh();
     });
