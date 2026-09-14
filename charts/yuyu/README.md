@@ -11,7 +11,7 @@ Publish two images from the same commit and use immutable tags:
 ```bash
 docker build --target migrator -t registry.example.com/yuyu-migrator:VERSION .
 docker build --target runner \
-  --build-arg NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" \
+  --secret id=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY --build-arg NEXT_PUBLIC_BASE_URL="$NEXT_PUBLIC_BASE_URL" \
   -t registry.example.com/yuyu:VERSION .
 ```
 

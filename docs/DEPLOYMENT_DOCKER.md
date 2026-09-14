@@ -31,6 +31,10 @@ port private and expose it only through the trusted proxy.
 
 ## Build immutable images
 
+For automated builds and Docker Hub publishing after successful GitHub Actions
+checks, follow [Build and publish to Docker Hub](DOCKERHUB_ACTIONS.md).
+The commands below are the manual alternative.
+
 Build the application and migration targets from the same reviewed commit and
 give both the same immutable release version:
 
@@ -44,12 +48,16 @@ docker build \
 
 docker build \
   --target runner \
-  --build-arg NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" \
+  --secret id=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY --build-arg NEXT_PUBLIC_BASE_URL="$NEXT_PUBLIC_BASE_URL" \
   --tag registry.example.com/yuyu:${YUYU_VERSION} \
   .
 ```
 
-The Server Actions key is required only by the application build. Supply the
+Export `NEXT_PUBLIC_BASE_URL` with the production HTTPS origin before building.
+It is compiled into the image and must match the runtime canonical URL.
+
+The Server Actions key is passed through a BuildKit secret mount and is required
+only by the application build. Supply the
 same stable value to the running application. Build it in trusted CI without
 printing it, and do not publish or reuse the key between independent Yuyu
 instances. Rotating it invalidates outstanding Server Action forms.

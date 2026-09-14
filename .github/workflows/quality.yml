@@ -60,7 +60,7 @@ jobs:
       - run: npm run test:integration
       - run: npm run production:check
       - run: npm run build
-      - run: docker build --build-arg NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" -t yuyu:ci .
+      - run: docker build --secret id=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY --build-arg NEXT_PUBLIC_BASE_URL="$NEXT_PUBLIC_BASE_URL" -t yuyu:ci .
       - name: Smoke-test standalone container
         run: |
           docker run -d --name yuyu-ci --network host \

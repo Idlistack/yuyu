@@ -1,14 +1,13 @@
+# syntax=docker/dockerfile:1
 # Stage 1: Install dependencies
 FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 # `npm ci` runs the Prisma postinstall hook, which needs the schema available.
 COPY prisma/schema.prisma ./prisma/schema.prisma
-# Temporary workaround for npm nested-lockfile inconsistencies (for example
-# magicast, picomatch, and yaml). Restore `npm ci` once that issue is resolved.
-RUN npm install
+RUN npm ci
 
 # A small, purpose-built target for CI/CD or Helm pre-upgrade migration Jobs.
 # Build and publish this target separately from the application runtime image.
@@ -20,7 +19,8 @@ CMD ["npx", "prisma", "migrate", "deploy"]
 # Stage 2: Rebuild the source code
 FROM node:22-alpine AS builder
 WORKDIR /app
-ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+ARG NEXT_PUBLIC_BASE_URL
+ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -29,8 +29,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npx prisma generate
 # The key is consumed by Next.js while compiling Server Actions. Every image
 # replica must be built with one stable key and receive that same key at runtime.
-RUN test -n "$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" && \
-    NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" npm run build
+RUN --mount=type=secret,id=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,required=true \
+    test -n "$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" && npm run build
 
 # Stage 3: Production runner
 FROM node:22-alpine AS runner

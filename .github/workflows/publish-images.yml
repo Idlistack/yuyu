@@ -1,0 +1,107 @@
+name: Publish Docker Hub images
+
+on:
+  workflow_run:
+    workflows: [Quality gate]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhub-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Never expose publishing credentials to a PR or fork workflow.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+      DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+      NEXT_PUBLIC_BASE_URL: ${{ vars.NEXT_PUBLIC_BASE_URL }}
+      IMAGE_TAG: sha-${{ github.event.workflow_run.head_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Validate publishing settings
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
+        run: |
+          node <<'NODE'
+          for (const key of ['DOCKERHUB_USERNAME', 'DOCKERHUB_NAMESPACE', 'DOCKERHUB_TOKEN', 'NEXT_PUBLIC_BASE_URL', 'NEXT_SERVER_ACTIONS_ENCRYPTION_KEY']) {
+            if (!process.env[key]?.trim()) throw new Error(`Missing GitHub Actions setting: ${key}`);
+          }
+          if (!/^[a-z0-9][a-z0-9_-]*$/.test(process.env.DOCKERHUB_NAMESPACE)) {
+            throw new Error('DOCKERHUB_NAMESPACE must be a lowercase Docker Hub user or organisation name.');
+          }
+          const url = new URL(process.env.NEXT_PUBLIC_BASE_URL);
+          if (url.protocol !== 'https:' || url.origin !== process.env.NEXT_PUBLIC_BASE_URL) {
+            throw new Error('NEXT_PUBLIC_BASE_URL must be an HTTPS origin without a trailing slash or path.');
+          }
+          const key = process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY;
+          const decoded = Buffer.from(key, 'base64');
+          if (![16, 24, 32].includes(decoded.length) || decoded.toString('base64').replace(/=+$/, '') !== key.replace(/=+$/, '')) {
+            throw new Error('NEXT_SERVER_ACTIONS_ENCRYPTION_KEY must be a valid base64 AES key.');
+          }
+          NODE
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push migration image
+        id: migrator
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: migrator
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.DOCKERHUB_NAMESPACE }}/yuyu-migrator:${{ env.IMAGE_TAG }}
+
+      - name: Build and push application image
+        id: app
+        uses: docker/build-push-action@v7
+        env:
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
+        with:
+          context: .
+          target: runner
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.DOCKERHUB_NAMESPACE }}/yuyu:${{ env.IMAGE_TAG }}
+          build-args: |
+            NEXT_PUBLIC_BASE_URL=${{ env.NEXT_PUBLIC_BASE_URL }}
+          secret-envs: |
+            NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+          # Secret changes do not invalidate Docker's build cache.
+          no-cache-filters: builder
+
+      - name: Record published images
+        env:
+          APP_DIGEST: ${{ steps.app.outputs.digest }}
+          MIGRATOR_DIGEST: ${{ steps.migrator.outputs.digest }}
+        run: |
+          {
+            printf 'Published release `%s` (linux/amd64 and linux/arm64).\n\n' "$IMAGE_TAG"
+            printf 'Application: `%s/yuyu:%s`\n\n' "$DOCKERHUB_NAMESPACE" "$IMAGE_TAG"
+            printf 'Migration: `%s/yuyu-migrator:%s`\n\n' "$DOCKERHUB_NAMESPACE" "$IMAGE_TAG"
+            printf 'Pinned application: `%s/yuyu@%s`\n\n' "$DOCKERHUB_NAMESPACE" "$APP_DIGEST"
+            printf 'Pinned migration: `%s/yuyu-migrator@%s`\n' "$DOCKERHUB_NAMESPACE" "$MIGRATOR_DIGEST"
+          } >> "$GITHUB_STEP_SUMMARY"

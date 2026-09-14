@@ -7,6 +7,7 @@
 .github
 .next
 node_modules
+backups/
 coverage
 playwright-report
 test-results

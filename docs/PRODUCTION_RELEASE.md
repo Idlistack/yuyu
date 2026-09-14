@@ -21,7 +21,7 @@ Yuyu must not be released until every item below is complete and recorded in the
 3. Review and approve the Prisma migration; take a backup before applying it. The secure-token migration rotates existing ticket and certificate links.
 4. Run `npm ci`, `npm run production:check`, `npm run db:deploy`, `npm run db:verify`, `npm run storage:migrate`, `npm run lint`, `npx tsc --noEmit`, `npm run test:coverage`, and `npm run build` in staging.
 5. Exercise auth, organisation permissions, RSVP capacity, duplicate RSVP, upload rejection, email delivery, and offline-check-in sync in staging.
-6. Build an immutable image with `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` supplied as a build argument, inject that same value at runtime, run the authenticated `/api/health/db` readiness probe, and verify the outbox scheduler.
+6. Build an immutable image with `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` supplied as a BuildKit secret, inject that same value at runtime, run the authenticated `/api/health/db` readiness probe, and verify the outbox scheduler.
 7. Confirm alert delivery and record the release, backup point, migration version, and rollback owner.
 
 ## Domain changes
