@@ -44,7 +44,7 @@
     "framer-motion": "^13.1.0",
     "html5-qrcode": "^2.3.8",
     "ioredis": "^6.0.0",
-    "next": "^16.3.1",
+    "next": "^16.3.5",
     "next-auth": "^5.0.0-beta.32",
     "nodemailer": "^8.0.11",
     "otpauth": "^9.5.1",
@@ -55,7 +55,7 @@
     "react-qr-code": "^2.0.18",
     "rrule": "^2.8.1",
     "sanitize-html": "^2.17.7",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "zod": "^4.3.6"
   },
   "overrides": {
@@ -72,7 +72,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9",
-    "eslint-config-next": "^16.3.1",
+    "eslint-config-next": "^16.3.5",
     "prisma": "6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5",
