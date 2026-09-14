@@ -487,8 +487,7 @@ export function EventProgramScheduleManager({
                         }}
                       />
                       <Typography variant="caption" color="text.secondary">
-                        Affects this session and{" "}
-                        {Math.max(sessions.length - index - 1, 0)} following
+                        Affects {Math.max(sessions.length - index - 1, 0)} following
                         session{sessions.length - index - 1 === 1 ? "" : "s"}.
                       </Typography>
                     </Stack>

@@ -18,12 +18,12 @@ describe("effectiveEventProgram", () => {
     expect(first.effectiveStartDateTime.toISOString()).toBe("2030-01-01T10:00:00.000Z");
   });
 
-  it("cascades a delay to the selected session and all following sessions", () => {
+  it("cascades a delay only to sessions following the selected session", () => {
     const result = effectiveEventProgram([
       session("one", "2030-01-01T10:00:00Z", "2030-01-01T11:00:00Z", 1, 15),
       session("two", "2030-01-01T11:00:00Z", "2030-01-01T12:00:00Z", 2, 0),
     ]);
-    expect(result.map((item) => item.effectiveStartDateTime.toISOString())).toEqual(["2030-01-01T10:15:00.000Z", "2030-01-01T11:15:00.000Z"]);
+    expect(result.map((item) => item.effectiveStartDateTime.toISOString())).toEqual(["2030-01-01T10:00:00.000Z", "2030-01-01T11:15:00.000Z"]);
   });
 
   it("accumulates multiple delays in stable chronological order", () => {
@@ -33,6 +33,6 @@ describe("effectiveEventProgram", () => {
       session("same-time", "2030-01-01T11:00:00Z", "2030-01-01T12:00:00Z", 3, 0),
     ]);
     expect(result.map((item) => item.id)).toEqual(["first", "later", "same-time"]);
-    expect(result.map((item) => item.cumulativeDelayMinutes)).toEqual([5, 15, 15]);
+    expect(result.map((item) => item.cumulativeDelayMinutes)).toEqual([0, 5, 15]);
   });
 });

@@ -7,6 +7,7 @@ describe("effectiveSchedule", () => {
       { id: "one", title: "One", description: "", startDateTime: new Date("2030-01-01T10:00:00Z"), endDateTime: new Date("2030-01-01T11:00:00Z"), sortOrder: 1, delayMinutes: 15 },
       { id: "two", title: "Two", description: "", startDateTime: new Date("2030-01-01T11:00:00Z"), endDateTime: new Date("2030-01-01T12:00:00Z"), sortOrder: 2, delayMinutes: 0 },
     ]);
+    expect(rows[0]?.effectiveStart.toISOString()).toBe("2030-01-01T10:00:00.000Z");
     expect(rows[1]?.effectiveStart.toISOString()).toBe("2030-01-01T11:15:00.000Z");
   });
 });
