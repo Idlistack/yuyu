@@ -12,6 +12,7 @@ import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import IconButton from "@mui/material/IconButton";
 import ButtonBase from "@mui/material/ButtonBase";
+import { useTheme } from "@mui/material/styles";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import GridViewIcon from "@mui/icons-material/GridView";
@@ -51,6 +52,45 @@ type OrgEventsContainerProps = {
 };
 
 export function OrgEventsContainer({ orgSlug, organisationName, initialNow, items }: OrgEventsContainerProps) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const calendarColors = isDark
+    ? {
+        surface: "rgba(255,255,255,0.01)",
+        border: "rgba(255,255,255,0.08)",
+        gridBorder: "rgba(255,255,255,0.06)",
+        gridBackground: "rgba(0,0,0,0.15)",
+        headerBackground: "rgba(255,255,255,0.02)",
+        headerText: "rgba(255,255,255,0.62)",
+        quietText: "rgba(255,255,255,0.6)",
+        selectedBackground: "rgba(124, 245, 182, 0.05)",
+        eventDayBackground: "rgba(255,255,255,0.02)",
+        eventText: "#7CF5B6",
+        eventBackground: "rgba(124, 245, 182, 0.08)",
+        eventBorder: "rgba(124, 245, 182, 0.15)",
+        instanceText: "#B9AEFF",
+        instanceBackground: "rgba(185, 174, 255, 0.08)",
+        instanceBorder: "rgba(185, 174, 255, 0.15)",
+        todayBackground: "rgba(124, 245, 182, 0.15)",
+      }
+    : {
+        surface: "#ffffff",
+        border: "rgba(21, 45, 32, 0.18)",
+        gridBorder: "rgba(21, 45, 32, 0.14)",
+        gridBackground: "#f8faf8",
+        headerBackground: "#f1f5f2",
+        headerText: "#4b5a51",
+        quietText: "#526258",
+        selectedBackground: "rgba(15, 118, 82, 0.09)",
+        eventDayBackground: "rgba(15, 118, 82, 0.045)",
+        eventText: "#087a55",
+        eventBackground: "rgba(15, 118, 82, 0.09)",
+        eventBorder: "rgba(15, 118, 82, 0.28)",
+        instanceText: "#5b4fa3",
+        instanceBackground: "rgba(91, 79, 163, 0.09)",
+        instanceBorder: "rgba(91, 79, 163, 0.28)",
+        todayBackground: "rgba(15, 118, 82, 0.14)",
+      };
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
 
@@ -141,7 +181,7 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
         sx={{
           justifyContent: "space-between",
           alignItems: { xs: "stretch", sm: "center" },
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          borderBottom: `1px solid ${calendarColors.border}`,
           pb: 1,
         }}
       >
@@ -191,8 +231,8 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                 p: 5,
                 borderRadius: 4,
                 textAlign: "center",
-                backgroundColor: "rgba(255,255,255,0.01)",
-                borderColor: "rgba(255,255,255,0.06)",
+                backgroundColor: calendarColors.surface,
+                borderColor: calendarColors.border,
               }}
             >
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
@@ -241,8 +281,8 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
             sx={{
               p: 3,
               borderRadius: 4,
-              backgroundColor: "rgba(255, 255, 255, 0.01)",
-              borderColor: "rgba(255,255,255,0.08)",
+              backgroundColor: calendarColors.surface,
+              borderColor: calendarColors.border,
             }}
           >
             {/* Month & Navigation Header */}
@@ -255,10 +295,10 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                 {monthName} {currentYear}
               </Typography>
               <Stack direction="row" spacing={1}>
-                <IconButton aria-label="Previous month" onClick={prevMonth} size="small" sx={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+                <IconButton aria-label="Previous month" onClick={prevMonth} size="small" sx={{ border: `1px solid ${calendarColors.border}` }}>
                   <ChevronLeftIcon />
                 </IconButton>
-                <IconButton aria-label="Next month" onClick={nextMonth} size="small" sx={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+                <IconButton aria-label="Next month" onClick={nextMonth} size="small" sx={{ border: `1px solid ${calendarColors.border}` }}>
                   <ChevronRightIcon />
                 </IconButton>
               </Stack>
@@ -270,10 +310,10 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                 display: "grid",
                 gridTemplateColumns: "repeat(7, 1fr)",
                 gap: 1,
-                border: "1px solid rgba(255,255,255,0.06)",
+                border: `1px solid ${calendarColors.gridBorder}`,
                 borderRadius: 2,
                 overflow: "hidden",
-                backgroundColor: "rgba(0,0,0,0.15)",
+                backgroundColor: calendarColors.gridBackground,
               }}
             >
               {/* Day header cells */}
@@ -284,10 +324,10 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                     textAlign: "center",
                     fontWeight: 700,
                     fontSize: "0.75rem",
-                    color: "rgba(255,255,255,0.4)",
+                    color: calendarColors.headerText,
                     py: 1,
-                    backgroundColor: "rgba(255,255,255,0.02)",
-                    borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    backgroundColor: calendarColors.headerBackground,
+                    borderBottom: `1px solid ${calendarColors.gridBorder}`,
                   }}
                 >
                   {dayName}
@@ -323,12 +363,12 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                       minHeight: { xs: "50px", md: "110px" },
                       p: 1,
                       border: isSelected
-                        ? "1px solid #7CF5B6"
-                        : "1px solid rgba(255, 255, 255, 0.04)",
+                        ? `1px solid ${calendarColors.eventText}`
+                        : `1px solid ${calendarColors.gridBorder}`,
                       backgroundColor: isSelected
-                        ? "rgba(124, 245, 182, 0.05)"
+                        ? calendarColors.selectedBackground
                         : hasEvents
-                        ? "rgba(255, 255, 255, 0.02)"
+                        ? calendarColors.eventDayBackground
                         : "transparent",
                       transition: "all 0.15s ease",
                       position: "relative",
@@ -349,11 +389,11 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                         fontSize: "0.8rem",
                         fontWeight: isToday || hasEvents ? 700 : 500,
                         color: isToday
-                          ? "#7CF5B6"
+                          ? calendarColors.eventText
                           : hasEvents
-                          ? "#ffffff"
-                          : "rgba(255,255,255,0.6)",
-                        backgroundColor: isToday ? "rgba(124, 245, 182, 0.15)" : "transparent",
+                          ? theme.palette.text.primary
+                          : calendarColors.quietText,
+                        backgroundColor: isToday ? calendarColors.todayBackground : "transparent",
                         mb: 1,
                         "&:focus-visible": { outline: "2px solid #7CF5B6", outlineOffset: 2 },
                       }}
@@ -378,15 +418,12 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                             lineHeight: 1.2,
                             p: 0.5,
                             borderRadius: 1,
-                            backgroundColor:
-                              item.kind === "event"
-                                ? "rgba(124, 245, 182, 0.08)"
-                                : "rgba(185, 174, 255, 0.08)",
-                            color: item.kind === "event" ? "#7CF5B6" : "#B9AEFF",
+                          backgroundColor: item.kind === "event" ? calendarColors.eventBackground : calendarColors.instanceBackground,
+                            color: item.kind === "event" ? calendarColors.eventText : calendarColors.instanceText,
                             border: `1px solid ${
                               item.kind === "event"
-                                ? "rgba(124, 245, 182, 0.15)"
-                                : "rgba(185, 174, 255, 0.15)"
+                                ? calendarColors.eventBorder
+                                : calendarColors.instanceBorder
                             }`,
                             whiteSpace: "nowrap",
                             overflow: "hidden",
@@ -396,8 +433,8 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                             "&:hover": {
                               backgroundColor:
                                 item.kind === "event"
-                                  ? "rgba(124, 245, 182, 0.18)"
-                                  : "rgba(185, 174, 255, 0.18)",
+                                  ? calendarColors.eventDayBackground
+                                  : calendarColors.instanceBackground,
                             },
                           }}
                         >
@@ -425,7 +462,7 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
                               width: 5,
                               height: 5,
                               borderRadius: "50%",
-                              backgroundColor: item.kind === "event" ? "#7CF5B6" : "#B9AEFF",
+                              backgroundColor: item.kind === "event" ? calendarColors.eventText : calendarColors.instanceText,
                             }}
                           />
                         ))}
@@ -443,8 +480,8 @@ export function OrgEventsContainer({ orgSlug, organisationName, initialNow, item
               sx={{
                 p: 3,
                 borderRadius: 4,
-                backgroundColor: "rgba(255, 255, 255, 0.015)",
-                borderColor: "rgba(255,255,255,0.06)",
+                backgroundColor: calendarColors.surface,
+                borderColor: calendarColors.border,
               }}
             >
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
