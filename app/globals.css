@@ -31,6 +31,59 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* The sign-in screen has an illustrated treatment, so its colours must change
+ * together with the application colour mode rather than relying on dark-only
+ * component overrides. */
+[data-login-page] {
+  --login-page-background: radial-gradient(1000px 600px at 18% 18%, rgba(124, 245, 182, 0.18), transparent 55%), radial-gradient(900px 600px at 88% 22%, rgba(185, 174, 255, 0.12), transparent 55%), linear-gradient(135deg, #06120e 0%, #081a14 55%, #0a1e18 100%);
+  --login-surface-border: rgba(255, 255, 255, 0.10);
+  --login-surface-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+  --login-form-background: rgba(255, 255, 255, 0.04);
+  --login-form-border: rgba(255, 255, 255, 0.10);
+  --login-heading-text: rgba(255, 255, 255, 0.96);
+  --login-muted-text: rgba(255, 255, 255, 0.70);
+  --login-field-background: rgba(255, 255, 255, 0.04);
+  --login-field-text: rgba(255, 255, 255, 0.92);
+  --login-field-label: rgba(255, 255, 255, 0.65);
+  --login-field-label-focused: rgba(255, 255, 255, 0.85);
+  --login-field-border: rgba(255, 255, 255, 0.16);
+  --login-field-border-hover: rgba(255, 255, 255, 0.26);
+  --login-field-border-focus: rgba(124, 245, 182, 0.65);
+  --login-tab-text: rgba(255, 255, 255, 0.60);
+  --login-tab-selected-text: rgba(255, 255, 255, 0.95);
+  --login-divider-text: rgba(255, 255, 255, 0.55);
+  --login-divider-border: rgba(255, 255, 255, 0.12);
+  --login-link-text: rgba(255, 255, 255, 0.70);
+  --login-link-hover-text: rgba(255, 255, 255, 0.95);
+  --login-hero-background: rgba(255, 255, 255, 0.04);
+  --login-hero-overlay: linear-gradient(90deg, rgba(10, 24, 18, 0.92) 0%, rgba(10, 24, 18, 0.34) 44%, rgba(10, 24, 18, 0.12) 100%);
+}
+
+:root[data-color-mode="light"] [data-login-page] {
+  --login-page-background: radial-gradient(1000px 600px at 18% 18%, rgba(52, 199, 89, 0.16), transparent 55%), radial-gradient(900px 600px at 88% 22%, rgba(0, 122, 255, 0.10), transparent 55%), linear-gradient(135deg, #f7fbf8 0%, #f2f2f7 55%, #eef5f5 100%);
+  --login-surface-border: rgba(60, 60, 67, 0.16);
+  --login-surface-shadow: 0 30px 90px rgba(28, 28, 30, 0.16);
+  --login-form-background: rgba(60, 60, 67, 0.045);
+  --login-form-border: rgba(60, 60, 67, 0.14);
+  --login-heading-text: #1c1c1e;
+  --login-muted-text: #515158;
+  --login-field-background: #ffffff;
+  --login-field-text: #1c1c1e;
+  --login-field-label: #515158;
+  --login-field-label-focused: #007aff;
+  --login-field-border: rgba(60, 60, 67, 0.28);
+  --login-field-border-hover: rgba(60, 60, 67, 0.52);
+  --login-field-border-focus: #007aff;
+  --login-tab-text: #515158;
+  --login-tab-selected-text: #1c1c1e;
+  --login-divider-text: #515158;
+  --login-divider-border: rgba(60, 60, 67, 0.20);
+  --login-link-text: #0066cc;
+  --login-link-hover-text: #004f9e;
+  --login-hero-background: #e9f1ed;
+  --login-hero-overlay: linear-gradient(90deg, rgba(239, 247, 242, 0.92) 0%, rgba(239, 247, 242, 0.34) 44%, rgba(239, 247, 242, 0.12) 100%);
+}
+
 .skip-link {
   position: fixed;
   left: 12px;

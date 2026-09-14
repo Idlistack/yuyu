@@ -48,23 +48,23 @@ function GoogleMark(props: { size?: number }) {
 }
 
 const inputSx = {
-  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.65)" },
+  "& .MuiInputLabel-root": { color: "var(--login-field-label)" },
   "& .MuiInputLabel-root.Mui-focused": {
-    color: "rgba(255,255,255,0.85)",
+    color: "var(--login-field-label-focused)",
   },
   "& .MuiOutlinedInput-root": {
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    color: "rgba(255,255,255,0.92)",
-    "& fieldset": { borderColor: "rgba(255,255,255,0.16)" },
-    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.26)" },
+    backgroundColor: "var(--login-field-background)",
+    color: "var(--login-field-text)",
+    "& fieldset": { borderColor: "var(--login-field-border)" },
+    "&:hover fieldset": { borderColor: "var(--login-field-border-hover)" },
     "&.Mui-focused fieldset": {
-      borderColor: "rgba(124, 245, 182, 0.65)",
+      borderColor: "var(--login-field-border-focus)",
     },
     "& input:-webkit-autofill": {
-      WebkitTextFillColor: "rgba(255,255,255,0.92)",
-      WebkitBoxShadow: "0 0 0 100px #1c1c1e inset",
-      caretColor: "rgba(255,255,255,0.92)",
+      WebkitTextFillColor: "var(--login-field-text)",
+      WebkitBoxShadow: "0 0 0 100px var(--login-field-background) inset",
+      caretColor: "var(--login-field-text)",
     },
   },
 };
@@ -194,10 +194,10 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
     return (
       <Stack component="form" spacing={2.5} onSubmit={handleSignIn}>
         <Stack spacing={0.5}>
-          <Typography variant="h5" component="h2" sx={{ color: "common.white", fontWeight: 700 }}>
+          <Typography variant="h5" component="h2" sx={{ color: "var(--login-heading-text)", fontWeight: 700 }}>
             Verify it&apos;s you
           </Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.70)" }}>
+          <Typography variant="body2" sx={{ color: "var(--login-muted-text)" }}>
             Enter the code from your authenticator app for {email}.
           </Typography>
         </Stack>
@@ -235,7 +235,7 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
             resetMfaChallenge();
             resetStatus();
           }}
-          sx={{ alignSelf: "center", color: "rgba(255,255,255,0.7)", textTransform: "none" }}
+          sx={{ alignSelf: "center", color: "var(--login-muted-text)", textTransform: "none" }}
         >
           Use a different account
         </Button>
@@ -263,9 +263,9 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
           "& .MuiTab-root": {
             minHeight: 40,
             textTransform: "none",
-            color: "rgba(255,255,255,0.6)",
+            color: "var(--login-tab-text)",
             fontWeight: 500,
-            "&.Mui-selected": { color: "rgba(255,255,255,0.95)" },
+            "&.Mui-selected": { color: "var(--login-tab-selected-text)" },
           },
         }}
       >
@@ -277,7 +277,7 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
       {message ? <Alert severity="success">{message}</Alert> : null}
 
       {needsEmailVerification ? (
-        <Button variant="outlined" disabled={!!loading || !email} onClick={handleResendVerification} sx={{ textTransform: "none", alignSelf: "flex-start", color: "rgba(255,255,255,0.9)", borderColor: "rgba(255,255,255,0.35)" }}>
+        <Button variant="outlined" disabled={!!loading || !email} onClick={handleResendVerification} sx={{ textTransform: "none", alignSelf: "flex-start", color: "var(--login-heading-text)", borderColor: "var(--login-field-border)" }}>
           {loading === "resend-verification" ? "Sending…" : "Resend verification email"}
         </Button>
       ) : null}
@@ -319,9 +319,9 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
 
       <Divider
         sx={{
-          color: "rgba(255,255,255,0.55)",
-          borderColor: "rgba(255,255,255,0.12)",
-          "&::before, &::after": { borderColor: "rgba(255,255,255,0.12)" },
+          color: "var(--login-divider-text)",
+          borderColor: "var(--login-divider-border)",
+          "&::before, &::after": { borderColor: "var(--login-divider-border)" },
         }}
       >
         or
@@ -404,9 +404,9 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
             href="/reset-password"
             underline="hover"
             sx={{
-              color: "rgba(255,255,255,0.6)",
+              color: "var(--login-link-text)",
               fontSize: "0.8125rem",
-              "&:hover": { color: "rgba(255,255,255,0.9)" },
+              "&:hover": { color: "var(--login-link-hover-text)" },
             }}
           >
             Forgot password?
@@ -426,9 +426,9 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
             setNeedsEmailVerification(false);
           }}
           sx={{
-            color: "rgba(255,255,255,0.7)",
+            color: "var(--login-link-text)",
             fontSize: "0.875rem",
-            "&:hover": { color: "rgba(255,255,255,0.95)" },
+            "&:hover": { color: "var(--login-link-hover-text)" },
           }}
         >
           {isSignUp

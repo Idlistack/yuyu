@@ -21,6 +21,7 @@ export default async function LoginPage() {
   ]);
   return (
     <Box
+      data-login-page
       sx={{
         position: "fixed",
         inset: 0,
@@ -31,7 +32,7 @@ export default async function LoginPage() {
         justifyContent: "center",
         p: { xs: 2, sm: 3, md: 4 },
         overflow: "auto",
-        background: "radial-gradient(1000px 600px at 18% 18%, rgba(124, 245, 182, 0.18), transparent 55%), radial-gradient(900px 600px at 88% 22%, rgba(185, 174, 255, 0.12), transparent 55%), linear-gradient(135deg, rgba(6,18,14,1) 0%, rgba(8,26,20,1) 55%, rgba(10,30,24,1) 120%)",
+        background: "var(--login-page-background)",
       }}
     >
       <Paper
@@ -42,10 +43,10 @@ export default async function LoginPage() {
           overflow: "hidden",
           borderRadius: 3,
           border: "1px solid",
-          borderColor: "rgba(255,255,255,0.10)",
+          borderColor: "var(--login-surface-border)",
           backgroundColor: "background.paper",
           backdropFilter: "blur(10px)",
-          boxShadow: "0 30px 90px rgba(0,0,0,0.45)",
+          boxShadow: "var(--login-surface-shadow)",
         }}
       >
         <Grid container>
@@ -57,7 +58,7 @@ export default async function LoginPage() {
                     variant="overline"
                     sx={{
                       letterSpacing: 1.4,
-                      color: "rgba(255,255,255,0.78)",
+                      color: "var(--login-muted-text)",
                     }}
                   >
                     YUYU
@@ -65,13 +66,13 @@ export default async function LoginPage() {
                   <Typography
                     variant="h4"
                     component="h1"
-                    sx={{ fontWeight: 700, color: "common.white" }}
+                    sx={{ fontWeight: 700, color: "var(--login-heading-text)" }}
                   >
                     Get started now
                   </Typography>
                   <Typography
                     variant="body2"
-                    sx={{ color: "rgba(255,255,255,0.70)", mt: 0.75 }}
+                    sx={{ color: "var(--login-muted-text)", mt: 0.75 }}
                   >
                     Sign in with Google or your email and password. New here?
                     Create an account in seconds.
@@ -82,8 +83,8 @@ export default async function LoginPage() {
                   sx={{
                     borderRadius: 2,
                     border: "1px solid",
-                    borderColor: "rgba(255,255,255,0.10)",
-                    backgroundColor: "action.hover",
+                    borderColor: "var(--login-form-border)",
+                    backgroundColor: "var(--login-form-background)",
                     p: { xs: 2.25, sm: 2.75 },
                   }}
                 >
@@ -103,7 +104,7 @@ export default async function LoginPage() {
               sx={{
                 height: "100%",
                 minHeight: 640,
-                backgroundColor: "rgba(255,255,255,0.04)",
+                backgroundColor: "var(--login-hero-background)",
                 position: "relative",
               }}
             >
@@ -123,7 +124,7 @@ export default async function LoginPage() {
                 sx={{
                   position: "absolute",
                   inset: 0,
-                  background: "linear-gradient(90deg, rgba(10, 24, 18, 0.92) 0%, rgba(10, 24, 18, 0.34) 44%, rgba(10, 24, 18, 0.12) 100%)",
+                  background: "var(--login-hero-overlay)",
                 }}
               />
             </Box>
