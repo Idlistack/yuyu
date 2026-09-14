@@ -24,6 +24,9 @@ import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOu
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import StarsIcon from "@mui/icons-material/Stars";
+import GitHubIcon from "@mui/icons-material/GitHub";
+
+const GITHUB_REPOSITORY_URL = "https://github.com/twilighty-abhi/yuyu";
 
 // Animation Variants
 const fadeInUp: Variants = {
@@ -139,7 +142,7 @@ export function LandingPageClient(props: { getStartedHref: string }) {
                 >
                   <StarsIcon sx={{ fontSize: 16, color: "#7CF5B6" }} />
                   <Typography variant="caption" sx={{ color: "#7CF5B6", fontWeight: 700, letterSpacing: 0.5 }}>
-                    OPEN SOURCE & SELF-HOSTABLE
+                    SELF-HOSTED & SOURCE AVAILABLE
                   </Typography>
                 </Box>
               </motion.div>
@@ -646,34 +649,57 @@ export function LandingPageClient(props: { getStartedHref: string }) {
                 Ready to run your next mixer?
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 500, lineHeight: 1.6 }}>
-                Deploy Yuyu on your own server, retain 100% data ownership, and manage meetups with absolute control. Open source under MIT.
+                Deploy Yuyu on your own server, retain control of your event data, and manage meetups with confidence.
               </Typography>
-              <Link href={getStartedHref} style={{ textDecoration: "none" }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <Link href={getStartedHref} style={{ textDecoration: "none" }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    component="span"
+                    endIcon={<KeyboardArrowRightIcon />}
+                    sx={{
+                      px: 5,
+                      py: 1.75,
+                      borderRadius: 999,
+                      fontWeight: 700,
+                      fontSize: "0.95rem",
+                      boxShadow: "0 8px 25px rgba(124, 245, 182, 0.25)",
+                      background: "linear-gradient(135deg, #7CF5B6 0%, #B9AEFF 100%)",
+                      color: "#061814",
+                      transition: "all 0.2s ease-in-out",
+                      "&:hover": {
+                        transform: "translateY(-2px)",
+                        boxShadow: "0 12px 30px rgba(124, 245, 182, 0.4)",
+                        background: "linear-gradient(135deg, #90ffd0 0%, #cac0ff 100%)",
+                      },
+                    }}
+                  >
+                    Get started now
+                  </Button>
+                </Link>
                 <Button
-                  variant="contained"
+                  component="a"
+                  href={GITHUB_REPOSITORY_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="outlined"
                   size="large"
-                  component="span"
-                  endIcon={<KeyboardArrowRightIcon />}
+                  startIcon={<GitHubIcon />}
                   sx={{
-                    px: 5,
+                    px: 4,
                     py: 1.75,
                     borderRadius: 999,
                     fontWeight: 700,
                     fontSize: "0.95rem",
-                    boxShadow: "0 8px 25px rgba(124, 245, 182, 0.25)",
-                    background: "linear-gradient(135deg, #7CF5B6 0%, #B9AEFF 100%)",
-                    color: "#061814",
-                    transition: "all 0.2s ease-in-out",
-                    "&:hover": {
-                      transform: "translateY(-2px)",
-                      boxShadow: "0 12px 30px rgba(124, 245, 182, 0.4)",
-                      background: "linear-gradient(135deg, #90ffd0 0%, #cac0ff 100%)",
-                    },
+                    borderColor,
+                    color: "text.primary",
+                    "&:hover": { borderColor: isDark ? "rgba(255,255,255,0.35)" : "rgba(60,60,67,0.32)", backgroundColor: subtleSurface },
                   }}
                 >
-                  Get started now
+                  View on GitHub
                 </Button>
-              </Link>
+              </Stack>
             </Stack>
           </Paper>
         </motion.div>
