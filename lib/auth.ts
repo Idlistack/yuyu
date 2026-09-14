@@ -136,13 +136,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       });
       if (existingAccount || existing) return true;
 
-      // Google is a sign-in/linking method, not a registration path. Returning
-      // a same-origin URL stops Auth.js before its adapter can create a user
-      // and gives the person a clear path to make an account first.
+      // A verified Google identity may create an account only while the
+      // instance-wide account-creation policy permits it. Returning true lets
+      // Auth.js create the adapter user after this callback.
       if (!(await isNewUserRegistrationEnabled())) {
         return "/login?error=account_creation_disabled";
       }
-      return "/login?error=google_account_required";
+      return true;
     },
     async jwt({ token, user }) {
       const userId = user?.id ?? token.sub;

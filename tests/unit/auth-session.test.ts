@@ -70,14 +70,14 @@ describe("authentication boundary", () => {
     expect(await callback({ user: { email: "person@example.test" }, account: { provider: "google" }, profile: { email_verified: true } } as Parameters<typeof callback>[0])).toBe(false);
   });
 
-  it("requires a pre-existing account before Google sign-in", async () => {
+  it("creates an account for a verified new Google identity when registration is enabled", async () => {
     mocks.find.mockResolvedValue(null);
     const callback = config.callbacks!.signIn!;
     await expect(callback({
       user: { email: "new-person@example.test" },
       account: { provider: "google", providerAccountId: "google-user" },
       profile: { email_verified: true },
-    } as Parameters<typeof callback>[0])).resolves.toBe("/login?error=google_account_required");
+    } as Parameters<typeof callback>[0])).resolves.toBe(true);
   });
 
   it("does not send a new Google identity to signup when account creation is disabled", async () => {
