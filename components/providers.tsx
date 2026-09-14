@@ -7,13 +7,12 @@ import type { Session } from "next-auth";
 import { createAppTheme } from "@/lib/theme";
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ToastProvider } from "@/components/feedback/ToastProvider";
-
-type ColorMode = "light" | "dark";
+import { COLOR_MODE_COOKIE, type ColorMode } from "@/lib/colorMode";
 
 function getBrowserColorMode(): ColorMode {
   const saved = window.localStorage.getItem("yuyu:color-mode");
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "light";
 }
 
 function subscribeToColorMode(onStoreChange: () => void) {
@@ -23,11 +22,6 @@ function subscribeToColorMode(onStoreChange: () => void) {
     window.removeEventListener("storage", onStoreChange);
     window.removeEventListener("yuyu:color-mode-change", onStoreChange);
   };
-}
-
-function getServerColorMode(): ColorMode {
-  // This exact snapshot is used for SSR and the first hydration render.
-  return "dark";
 }
 
 const ColorModeContext = createContext<{
@@ -44,19 +38,22 @@ export function useAppColorMode() {
 export function Providers({
   children,
   session,
+  initialColorMode = "light",
 }: {
   children: React.ReactNode;
   session?: Session | null;
+  initialColorMode?: ColorMode;
 }) {
   const mode = useSyncExternalStore(
     subscribeToColorMode,
     getBrowserColorMode,
-    getServerColorMode,
+    () => initialColorMode,
   );
 
   useEffect(() => {
     document.documentElement.dataset.colorMode = mode;
     document.documentElement.style.colorScheme = mode;
+    window.localStorage.setItem("yuyu:color-mode", mode);
   }, [mode]);
 
   const theme = useMemo(() => createAppTheme(mode), [mode]);
@@ -66,6 +63,7 @@ export function Providers({
       toggleColorMode: () => {
         const next = mode === "dark" ? "light" : "dark";
         window.localStorage.setItem("yuyu:color-mode", next);
+        document.cookie = `${COLOR_MODE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax${window.location.protocol === "https:" ? "; Secure" : ""}`;
         window.dispatchEvent(new Event("yuyu:color-mode-change"));
       },
     }),

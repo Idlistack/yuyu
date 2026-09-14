@@ -7,6 +7,8 @@ import { AppFooter } from "@/components/nav/AppFooter";
 import Container from "@mui/material/Container";
 import Box from "@mui/material/Box";
 import { connection } from "next/server";
+import { cookies } from "next/headers";
+import { COLOR_MODE_COOKIE, isColorMode } from "@/lib/colorMode";
 
 export const metadata: Metadata = {
   title: {
@@ -24,12 +26,14 @@ export default async function RootLayout({
   // A per-request CSP nonce is injected by proxy.ts. Waiting for the incoming
   // request lets Next.js attach that nonce to every framework script.
   await connection();
+  const savedColorMode = (await cookies()).get(COLOR_MODE_COOKIE)?.value;
+  const initialColorMode = isColorMode(savedColorMode) ? savedColorMode : "light";
 
   return (
-    <html lang="en">
+    <html lang="en" data-color-mode={initialColorMode}>
       <body style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
         <AppRouterCacheProvider options={{ key: "mui" }}>
-          <Providers>
+          <Providers initialColorMode={initialColorMode}>
             <a className="skip-link" href="#main-content">Skip to main content</a>
             <AppBarNav />
             <Box component="main" id="main-content" tabIndex={-1} sx={{ flex: 1, py: 3 }}>
