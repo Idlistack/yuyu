@@ -521,7 +521,7 @@ export async function saveVenue(input: unknown): Promise<ActionResult> {
       update: venueData,
     });
     await tx.eventVenueRoom.deleteMany({
-      where: { venueId: venue.id, sessions: { none: {} } },
+      where: { venueId: venue.id, name: { notIn: parsed.data.rooms } },
     });
     for (const [sortOrder, name] of parsed.data.rooms.entries())
       await tx.eventVenueRoom.upsert({
@@ -541,7 +541,112 @@ export async function saveVenue(input: unknown): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function saveSession(input: unknown): Promise<ActionResult> {
+const scheduleTrackSchema = target
+  .extend({
+    id: z.string().min(1).optional(),
+    name: z.string().trim().min(1).max(120),
+  })
+  .strict();
+
+export async function saveScheduleTrack(input: unknown): Promise<ActionResult> {
+  const parsed = scheduleTrackSchema.safeParse(input);
+  if (!parsed.success) return fail("Enter a track name.");
+  const c = await context(parsed.data, EventPermission.PUBLISH_AND_SCHEDULE);
+  if (!c) return fail("You do not have permission to manage programme tracks.");
+  try {
+    if (parsed.data.id) {
+      const updated = await prisma.eventScheduleTrack.updateMany({
+        where: { id: parsed.data.id, eventId: c.event.id },
+        data: { name: parsed.data.name },
+      });
+      if (!updated.count) return fail("Track not found.");
+    } else {
+      const lastTrack = await prisma.eventScheduleTrack.findFirst({
+        where: { eventId: c.event.id },
+        orderBy: { sortOrder: "desc" },
+        select: { sortOrder: true },
+      });
+      await prisma.eventScheduleTrack.create({
+        data: {
+          eventId: c.event.id,
+          name: parsed.data.name,
+          sortOrder: (lastTrack?.sortOrder ?? -1) + 1,
+        },
+      });
+    }
+  } catch {
+    return fail("A track with that name already exists.");
+  }
+  await recordAuditEvent({
+    action: parsed.data.id ? "EVENT_SCHEDULE_TRACK_UPDATED" : "EVENT_SCHEDULE_TRACK_CREATED",
+    actorUserId: c.session.user.id,
+    organisationId: c.org.id,
+    targetType: "EventScheduleTrack",
+    targetId: parsed.data.id ?? c.event.id,
+  });
+  paths(c.org.slug, c.event);
+  return { ok: true };
+}
+
+export async function deleteScheduleTrack(input: unknown): Promise<ActionResult> {
+  const parsed = target.extend({ trackId: z.string().min(1) }).strict().safeParse(input);
+  if (!parsed.success) return fail("Invalid programme track.");
+  const c = await context(parsed.data, EventPermission.PUBLISH_AND_SCHEDULE);
+  if (!c) return fail("You do not have permission to manage programme tracks.");
+  const track = await prisma.eventScheduleTrack.findFirst({
+    where: { id: parsed.data.trackId, eventId: c.event.id },
+    select: { id: true, _count: { select: { sessions: true } } },
+  });
+  if (!track) return fail("Track not found.");
+  if (track._count.sessions) return fail("Move or remove this track's sessions before deleting it.");
+  await prisma.eventScheduleTrack.delete({ where: { id: track.id } });
+  await recordAuditEvent({
+    action: "EVENT_SCHEDULE_TRACK_DELETED",
+    actorUserId: c.session.user.id,
+    organisationId: c.org.id,
+    targetType: "EventScheduleTrack",
+    targetId: track.id,
+  });
+  paths(c.org.slug, c.event);
+  return { ok: true };
+}
+
+export async function reorderScheduleTracks(input: unknown): Promise<ActionResult> {
+  const parsed = target
+    .extend({ trackIds: z.array(z.string().min(1)).min(1).max(60) })
+    .strict()
+    .safeParse(input);
+  if (!parsed.success || new Set(parsed.data.trackIds).size !== parsed.data.trackIds.length)
+    return fail("Invalid programme track order.");
+  const c = await context(parsed.data, EventPermission.PUBLISH_AND_SCHEDULE);
+  if (!c) return fail("You do not have permission to manage programme tracks.");
+  const tracks = await prisma.eventScheduleTrack.findMany({
+    where: { eventId: c.event.id, id: { in: parsed.data.trackIds } },
+    select: { id: true },
+  });
+  if (tracks.length !== parsed.data.trackIds.length)
+    return fail("One or more tracks do not belong to this event.");
+  await prisma.$transaction(
+    parsed.data.trackIds.map((id, sortOrder) =>
+      prisma.eventScheduleTrack.update({ where: { id }, data: { sortOrder } }),
+    ),
+  );
+  await recordAuditEvent({
+    action: "EVENT_SCHEDULE_TRACKS_REORDERED",
+    actorUserId: c.session.user.id,
+    organisationId: c.org.id,
+    targetType: "Event",
+    targetId: c.event.id,
+  });
+  paths(c.org.slug, c.event);
+  return { ok: true };
+}
+
+const sessionFail = (error: string): ActionResult<{ conflictingSessions: Array<{ id: string; title: string }> }> => ({ ok: false, error });
+
+export async function saveSession(
+  input: unknown,
+): Promise<ActionResult<{ conflictingSessions: Array<{ id: string; title: string }> }>> {
   const parsed = target
     .extend({
       id: z.string().min(1).optional(),
@@ -550,7 +655,7 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
       startDateTime: z.coerce.date(),
       endDateTime: z.coerce.date(),
       type: z.string().trim().min(1).max(60),
-      location: z.string().trim().max(120).default(""),
+      trackId: z.string().min(1),
       speakerIds: z.array(z.string().min(1)).max(50).default([]),
       visibility,
       sortOrder: z.number().int().min(0).max(10000).default(0),
@@ -559,14 +664,19 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
       message: "End must be after start.",
     })
     .safeParse(input);
-  if (!parsed.success) return fail("Invalid session.");
+  if (!parsed.success) return sessionFail("Invalid session.");
   const c = await context(parsed.data, EventPermission.PUBLISH_AND_SCHEDULE);
-  if (!c) return fail("You do not have permission to manage the program.");
+  if (!c) return sessionFail("You do not have permission to manage the program.");
+  const track = await prisma.eventScheduleTrack.findFirst({
+    where: { id: parsed.data.trackId, eventId: c.event.id },
+    select: { id: true },
+  });
+  if (!track) return sessionFail("Choose a track belonging to this event.");
   const speakerCount = await prisma.eventSpeaker.count({
     where: { id: { in: parsed.data.speakerIds }, eventId: c.event.id },
   });
   if (speakerCount !== parsed.data.speakerIds.length)
-    return fail("One or more speakers do not belong to this event.");
+    return sessionFail("One or more speakers do not belong to this event.");
   const base = slugifyTitle(parsed.data.title);
   let slug = base;
   let n = 0;
@@ -588,7 +698,7 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
     startDateTime: parsed.data.startDateTime,
     endDateTime: parsed.data.endDateTime,
     type: parsed.data.type,
-    location: parsed.data.location || null,
+    trackId: track.id,
     visibility: parsed.data.visibility,
     sortOrder: parsed.data.sortOrder,
   };
@@ -599,8 +709,8 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
       select: { id: true },
     }))
   )
-    return fail("Session not found.");
-  await prisma.$transaction(async (tx) => {
+    return sessionFail("Session not found.");
+  const savedSession = await prisma.$transaction(async (tx) => {
     const session = parsed.data.id
       ? await tx.eventSession.update({ where: { id: parsed.data.id }, data })
       : await tx.eventSession.create({
@@ -615,8 +725,19 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
           eventSessionId: session.id,
           speakerId,
           sortOrder,
-        })),
-      });
+      })),
+    });
+    return session;
+  });
+  const conflicts = await prisma.eventSession.findMany({
+    where: {
+      eventId: c.event.id,
+      trackId: track.id,
+      id: { not: savedSession.id },
+      startDateTime: { lt: parsed.data.endDateTime },
+      endDateTime: { gt: parsed.data.startDateTime },
+    },
+    select: { id: true, title: true },
   });
   await recordAuditEvent({
     action: parsed.data.id ? "EVENT_SESSION_UPDATED" : "EVENT_SESSION_CREATED",
@@ -626,7 +747,7 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
     targetId: parsed.data.id ?? c.event.id,
   });
   paths(c.org.slug, c.event);
-  return { ok: true };
+  return { ok: true, data: { conflictingSessions: conflicts } };
 }
 
 export async function setEventSessionDelay(

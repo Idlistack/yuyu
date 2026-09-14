@@ -56,7 +56,9 @@ type Props = {
     title: string;
     start: string;
     type: string;
-    location: string | null;
+    trackId: string;
+    trackName: string;
+    trackSortOrder: number;
     speakers: Array<{ slug: string; name: string }>;
   }>;
   speakers: Array<{
@@ -177,6 +179,21 @@ export function EventWebsiteShell(p: Props) {
   const renderedSectionTypes = sectionContent
     .filter(([type, hasContent]) => shown.has(type) && hasContent)
     .map(([type]) => type);
+  const sessionsByTrack = Array.from(
+    p.sessions.reduce((tracks, session) => {
+      const current = tracks.get(session.trackId) ?? {
+        id: session.trackId,
+        name: session.trackName,
+        sortOrder: session.trackSortOrder,
+        sessions: [],
+      };
+      current.sessions.push(session);
+      tracks.set(session.trackId, current);
+      return tracks;
+    }, new Map<string, { id: string; name: string; sortOrder: number; sessions: Props["sessions"] }>()),
+  )
+    .map(([, track]) => track)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
   const section = (type: string, child: React.ReactNode) => {
     if (!child || !renderedSectionTypes.includes(type)) return null;
 
@@ -581,29 +598,24 @@ export function EventWebsiteShell(p: Props) {
               <Typography variant="h3" sx={titleSx}>
                 Programme
               </Typography>
-              <Stack spacing={1.25}>
-                {p.sessions.map((x) => (
-                  <Box
-                    key={x.id}
-                    sx={{
-                      py: { xs: 1.5, sm: 2 },
-                      borderBottom: `1px solid ${divider}`,
-                      color: ink,
-                    }}
-                  >
-                    <Typography sx={{ fontWeight: 750 }}>{x.title}</Typography>
-                    <Typography variant="body2" sx={{ mt: 0.5, color: muted }}>
-                      {fmt(x.start, p.event.timezone)} · {x.location || "Location TBA"}{" "}
-                      · {x.type}
-                    </Typography>
-                    {x.speakers.length ? (
-                      <Typography variant="body2" sx={{ mt: 0.5, color: muted }}>
-                        Speakers: {x.speakers.map((speaker) => speaker.name).join(", ")}
-                      </Typography>
-                    ) : null}
-                  </Box>
+              <Grid container spacing={2}>
+                {sessionsByTrack.map((track) => (
+                  <Grid key={track.id} size={{ xs: 12, md: 6 }}>
+                    <Paper variant="outlined" sx={{ ...surfaceSx, p: 2, height: "100%" }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 750, mb: 0.5 }}>{track.name}</Typography>
+                      <Stack spacing={1.25}>
+                        {track.sessions.map((x) => (
+                          <Box key={x.id} sx={{ pt: 1.25, borderTop: `1px solid ${divider}`, color: ink }}>
+                            <Typography sx={{ fontWeight: 750 }}>{x.title}</Typography>
+                            <Typography variant="body2" sx={{ mt: 0.5, color: muted }}>{fmt(x.start, p.event.timezone)} · {x.type}</Typography>
+                            {x.speakers.length ? <Typography variant="body2" sx={{ mt: 0.5, color: muted }}>Speakers: {x.speakers.map((speaker) => speaker.name).join(", ")}</Typography> : null}
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Grid>
                 ))}
-              </Stack>
+              </Grid>
             </>
           ) : null,
         )}

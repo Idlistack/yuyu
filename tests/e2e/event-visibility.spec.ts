@@ -25,10 +25,11 @@ test.beforeAll(async () => {
       status: EventStatus.PUBLISHED,
       page: { create: { isPublished: false } },
       speakers: { create: { name: "Private speaker", slug: "private-speaker", visibility: ContentVisibility.PUBLISHED } },
-      sessions: { create: { title: "Private session", slug: "private-session", startDateTime: new Date("2035-01-01T10:00:00.000Z"), endDateTime: new Date("2035-01-01T11:00:00.000Z"), visibility: ContentVisibility.PUBLISHED } },
     },
   });
   eventId = event.id;
+  const track = await prisma.eventScheduleTrack.create({ data: { eventId, name: "General programme", sortOrder: 0 } });
+  await prisma.eventSession.create({ data: { eventId, trackId: track.id, title: "Private session", slug: "private-session", startDateTime: new Date("2035-01-01T10:00:00.000Z"), endDateTime: new Date("2035-01-01T11:00:00.000Z"), visibility: ContentVisibility.PUBLISHED } });
 });
 
 test.afterAll(async () => {

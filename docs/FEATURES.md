@@ -29,6 +29,7 @@ Google OAuth users rely on the Google account's MFA policy; the application TOTP
 - Title, description, tags, timezone, dates, location, online status, capacity, and cover image.
 - Public, hidden-link, approval-required, and invite-only privacy modes.
 - Optional display of confirmed registration counts.
+- Parallel programme tracks for rooms, stages, and streams; live delays cascade only within the affected track, while same-track time overlaps remain visible as organiser warnings.
 - Event cloning, publishing, slug changes, and deletion.
 - Verified email ownership is required before creating events, recurring series, clones, or event cover images.
 - Private event and series email allowlists.

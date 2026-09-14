@@ -105,7 +105,7 @@ export default async function EventPage({ params }: Props) {
     prisma.eventSession.findMany({
       where: { eventId: event.id, ...published },
       include: {
-        room: true,
+        track: true,
         speakers: {
           where: { speaker: { visibility: ContentVisibility.PUBLISHED } },
           include: { speaker: true },
@@ -179,7 +179,9 @@ export default async function EventPage({ params }: Props) {
         title: session.title,
         start: session.effectiveStartDateTime.toISOString(),
         type: session.type,
-        location: session.location,
+        trackId: session.trackId,
+        trackName: session.track.name,
+        trackSortOrder: session.track.sortOrder,
         speakers: session.speakers.map((speaker) => ({
           slug: speaker.speaker.slug,
           name: speaker.speaker.name,

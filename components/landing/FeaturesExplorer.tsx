@@ -48,7 +48,7 @@ const featureGroups = [
       "RRULE-based recurring event series with timezone-aware schedules.",
       "Materialized instances, each with its own RSVP list and attendance state.",
       "Series-level capacity, privacy, status, and invite management.",
-      "Event programme sessions, tracks, rooms, speakers, resources, and cascading live schedule delays.",
+      "Parallel programme tracks for rooms, stages, and streams, with independent cascading live delays.",
       "Public programme, session, and speaker pages for released event websites.",
     ],
   },
