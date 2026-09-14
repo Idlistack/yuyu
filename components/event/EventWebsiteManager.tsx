@@ -704,15 +704,6 @@ export function EventWebsiteManager(props: Props) {
               </Stack>
             ))}
           </Stack>
-          <Button
-            type="submit"
-            variant="contained"
-            size="large"
-            disabled={pending}
-            sx={{ alignSelf: "flex-start" }}
-          >
-            {pending ? "Saving all changes…" : "Save all event-page changes"}
-          </Button>
         </Stack>
       </Paper>
       <ContentCollection
