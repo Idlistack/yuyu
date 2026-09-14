@@ -30,8 +30,7 @@ export type ProgramScheduleRow = {
   effectiveStartDateTime: string;
   effectiveEndDateTime: string;
   type: string;
-  track: string | null;
-  roomId: string | null;
+  location: string | null;
   visibility: string;
   sortOrder: number;
   speakerIds: string[];
@@ -114,7 +113,6 @@ export function EventProgramScheduleManager({
   timeZone,
   sessions,
   speakers,
-  rooms,
 }: {
   organisationSlug: string;
   eventId: string;
@@ -122,7 +120,6 @@ export function EventProgramScheduleManager({
   timeZone: string;
   sessions: ProgramScheduleRow[];
   speakers: Array<{ id: string; name: string }>;
-  rooms: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -169,8 +166,7 @@ export function EventProgramScheduleManager({
           startDateTime,
           endDateTime,
           type: String(form.get("type") ?? "TALK"),
-          track: String(form.get("track") ?? ""),
-          roomId: String(form.get("roomId") ?? ""),
+          location: String(form.get("location") ?? ""),
           visibility: String(form.get("visibility") ?? "PUBLISHED"),
           sortOrder: Number(form.get("sortOrder") ?? sessions.length),
         }),
@@ -234,20 +230,12 @@ export function EventProgramScheduleManager({
           fullWidth
         />
         <TextField
-          name="roomId"
-          label="Room"
-          select
-          defaultValue={session?.roomId ?? ""}
+          name="location"
+          label="Location"
+          defaultValue={session?.location ?? ""}
+          helperText="Optional — for example, Main Hall, Online, or Stage A."
           fullWidth
-          helperText={rooms.length ? undefined : "No rooms have been configured for this event yet."}
-        >
-          <MenuItem value="">No room</MenuItem>
-          {rooms.map((room) => (
-            <MenuItem key={room.id} value={room.id}>
-              {room.name}
-            </MenuItem>
-          ))}
-        </TextField>
+        />
         <TextField
           name="end"
           label="Planned end"
@@ -261,24 +249,20 @@ export function EventProgramScheduleManager({
         />
       </Stack>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-        <TextField
-          name="type"
-          label="Type"
-          select
-          defaultValue={session?.type ?? "TALK"}
+        <Autocomplete
+          freeSolo
+          options={types}
+          defaultValue={session?.type ?? "Talk"}
           fullWidth
-        >
-          {types.map((type) => (
-            <MenuItem key={type} value={type}>
-              {type.replaceAll("_", " ")}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          name="track"
-          label="Track"
-          defaultValue={session?.track ?? ""}
-          fullWidth
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              name="type"
+              label="Type"
+              required
+              helperText="Choose a common type or type your own."
+            />
+          )}
         />
       </Stack>
       <Autocomplete

@@ -179,8 +179,7 @@ export default async function EventPage({ params }: Props) {
         title: session.title,
         start: session.effectiveStartDateTime.toISOString(),
         type: session.type,
-        room: session.room?.name ?? null,
-        track: session.track,
+        location: session.location,
         speakers: session.speakers.map((speaker) => ({
           slug: speaker.speaker.slug,
           name: speaker.speaker.name,

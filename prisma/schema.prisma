@@ -46,17 +46,6 @@ enum ContentVisibility {
   HIDDEN
 }
 
-enum EventSessionType {
-  KEYNOTE
-  TALK
-  PANEL
-  WORKSHOP
-  FIRESIDE_CHAT
-  NETWORKING
-  BREAK
-  OTHER
-}
-
 enum SponsorTier {
   PLATINUM
   GOLD
@@ -501,8 +490,8 @@ model EventSession {
   descriptionHtml String           @default("")
   startDateTime DateTime
   endDateTime   DateTime
-  type          EventSessionType  @default(TALK)
-  track         String?
+  type          String            @default("Talk")
+  location      String?
   roomId        String?
   visibility    ContentVisibility @default(DRAFT)
   sortOrder     Int               @default(0)

@@ -4,7 +4,6 @@ import {
   ContentVisibility,
   EventPageSectionType,
   EventPermission,
-  EventSessionType,
   SponsorTier,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -550,9 +549,8 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
       descriptionHtml: z.string().max(50_000).default(""),
       startDateTime: z.coerce.date(),
       endDateTime: z.coerce.date(),
-      type: z.nativeEnum(EventSessionType),
-      track: z.string().trim().max(100).default(""),
-      roomId: z.string().min(1).optional().or(z.literal("")),
+      type: z.string().trim().min(1).max(60),
+      location: z.string().trim().max(120).default(""),
       speakerIds: z.array(z.string().min(1)).max(50).default([]),
       visibility,
       sortOrder: z.number().int().min(0).max(10000).default(0),
@@ -564,14 +562,6 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return fail("Invalid session.");
   const c = await context(parsed.data, EventPermission.PUBLISH_AND_SCHEDULE);
   if (!c) return fail("You do not have permission to manage the program.");
-  if (
-    parsed.data.roomId &&
-    !(await prisma.eventVenueRoom.findFirst({
-      where: { id: parsed.data.roomId, venue: { eventId: c.event.id } },
-      select: { id: true },
-    }))
-  )
-    return fail("Room not found.");
   const speakerCount = await prisma.eventSpeaker.count({
     where: { id: { in: parsed.data.speakerIds }, eventId: c.event.id },
   });
@@ -598,8 +588,7 @@ export async function saveSession(input: unknown): Promise<ActionResult> {
     startDateTime: parsed.data.startDateTime,
     endDateTime: parsed.data.endDateTime,
     type: parsed.data.type,
-    track: parsed.data.track || null,
-    roomId: parsed.data.roomId || null,
+    location: parsed.data.location || null,
     visibility: parsed.data.visibility,
     sortOrder: parsed.data.sortOrder,
   };
