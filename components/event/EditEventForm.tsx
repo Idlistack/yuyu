@@ -32,6 +32,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
+import { zonedDatetimeLocalValue, zonedInputToIso } from "@/lib/timeZone";
 
 const timezones = [
   "UTC",
@@ -45,45 +46,23 @@ const timezones = [
 ];
 
 function toDatetimeLocalValue(d: Date) {
+  if (Number.isNaN(d.getTime())) return "";
   const t = new Date(d);
   const off = t.getTimezoneOffset() * 60000;
   return new Date(t.getTime() - off).toISOString().slice(0, 16);
 }
 
-function zonedDatetimeLocalValue(date: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const get = (type: string) =>
-    parts.find((part) => part.type === type)?.value ?? "00";
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
-}
-
-function zonedInputToIso(value: string, timeZone: string) {
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+function zonedDateToPickerValue(date: Date, timeZone: string) {
+  if (Number.isNaN(date.getTime())) return null;
+  const match = zonedDatetimeLocalValue(date, timeZone).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
   if (!match) return null;
   const [, year, month, day, hour, minute] = match;
-  const guess = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(guess));
-  const get = (type: string) =>
-    Number(parts.find((part) => part.type === type)?.value ?? 0);
-  const offset = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute")) - guess;
-  const iso = new Date(guess - offset).toISOString();
-  return zonedDatetimeLocalValue(new Date(iso), timeZone) === value ? iso : null;
+  const pickerValue = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+  return Number.isNaN(pickerValue.getTime()) ? null : pickerValue;
+}
+
+function isValidPickerDate(value: Date | null): value is Date {
+  return value instanceof Date && !Number.isNaN(value.getTime());
 }
 
 export function EditEventForm(props: {
@@ -119,15 +98,22 @@ export function EditEventForm(props: {
   );
   const [showRegistrationCountPreview, setShowRegistrationCountPreview] =
     useState(event.showRegistrationCount ?? true);
+  const [timezone, setTimezone] = useState(event.timezone);
   const [start, setStart] = useState<Date | null>(
-    event.startDateTime instanceof Date
-      ? event.startDateTime
-      : new Date(event.startDateTime),
+    zonedDateToPickerValue(
+      event.startDateTime instanceof Date
+        ? event.startDateTime
+        : new Date(event.startDateTime),
+      event.timezone,
+    ),
   );
   const [end, setEnd] = useState<Date | null>(
-    event.endDateTime instanceof Date
-      ? event.endDateTime
-      : new Date(event.endDateTime),
+    zonedDateToPickerValue(
+      event.endDateTime instanceof Date
+        ? event.endDateTime
+        : new Date(event.endDateTime),
+      event.timezone,
+    ),
   );
 
   const [status, setStatus] = useState<EventStatus>(event.status);
@@ -138,18 +124,27 @@ export function EditEventForm(props: {
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    if (!start || start < new Date()) {
+    const startDateTime = start ? zonedInputToIso(toDatetimeLocalValue(start), timezone) : null;
+    const endDateTime = end ? zonedInputToIso(toDatetimeLocalValue(end), timezone) : null;
+    if (!startDateTime) {
+      setError("Choose a valid start time in the event timezone.");
+      return;
+    }
+    if (new Date(startDateTime) < new Date()) {
       setError("Start time must be now or in the future.");
       return;
     }
-    if (!end || end <= start) {
+    if (!endDateTime) {
+      setError("Choose a valid end time in the event timezone.");
+      return;
+    }
+    if (new Date(endDateTime) <= new Date(startDateTime)) {
       setError("End time must be after start time.");
       return;
     }
     const form = e.currentTarget;
     const fd = new FormData(form);
     const capacityRaw = String(fd.get("capacity") ?? "").trim();
-    const timezone = String(fd.get("timezone") ?? "UTC");
     const registrationClosesAtRaw = String(fd.get("registrationClosesAt") ?? "").trim();
     const registrationClosesAt = registrationClosesAtRaw
       ? zonedInputToIso(registrationClosesAtRaw, timezone)
@@ -198,8 +193,8 @@ export function EditEventForm(props: {
         tags: String(fd.get("tags") ?? ""),
         coverImageUrl,
         showRegistrationCount: fd.get("showRegistrationCount") === "on",
-        startDateTime: String(fd.get("startDateTime") ?? ""),
-        endDateTime: String(fd.get("endDateTime") ?? ""),
+        startDateTime,
+        endDateTime,
         timezone,
         location: String(fd.get("location") ?? ""),
         mapLinkUrl: String(fd.get("mapLinkUrl") ?? ""),
@@ -432,7 +427,7 @@ export function EditEventForm(props: {
                     <DateTimePicker
                       label="Start"
                       value={start}
-                      onChange={(v) => setStart(v)}
+                      onChange={(v) => setStart(isValidPickerDate(v) ? v : null)}
                       minDateTime={new Date()}
                       slotProps={{
                         textField: {
@@ -446,7 +441,7 @@ export function EditEventForm(props: {
                     <DateTimePicker
                       label="End"
                       value={end}
-                      onChange={(v) => setEnd(v)}
+                      onChange={(v) => setEnd(isValidPickerDate(v) ? v : null)}
                       minDateTime={start ?? undefined}
                       slotProps={{
                         textField: {
@@ -463,7 +458,8 @@ export function EditEventForm(props: {
                       select
                       required
                       fullWidth
-                      defaultValue={event.timezone}
+                      value={timezone}
+                      onChange={(event) => setTimezone(event.target.value)}
                     >
                       {timezones.map((tz) => (
                         <MenuItem key={tz} value={tz}>
@@ -474,16 +470,6 @@ export function EditEventForm(props: {
                   </Grid>
                 </Grid>
               </LocalizationProvider>
-              <input
-                type="hidden"
-                name="startDateTime"
-                value={start ? toDatetimeLocalValue(start) : ""}
-              />
-              <input
-                type="hidden"
-                name="endDateTime"
-                value={end ? toDatetimeLocalValue(end) : ""}
-              />
             </Stack>
           </Paper>
 
