@@ -71,6 +71,8 @@ Only eligible confirmed attendees receive a scannable ticket by default. Organis
 - When certificates are disabled, feedback is anonymous: no email or RSVP identity is collected, and repeat responses are allowed.
 - When certificates are enabled, the submitted email must match a confirmed RSVP. Repeat submissions from the same email are allowed.
 - Successful eligible submissions can download a generated JPEG certificate using an opaque token.
+- Certificate designer: upload JPEG/PNG/WebP artwork (up to 5 MB), drag/resize the attendee-name area, choose from three fonts, and set size, color, bold, and alignment. Numeric placement controls support keyboard use. An exact server-generated preview checks font rendering and long-name fitting before saving feedback settings.
+- Certificate layouts are snapshotted when feedback is submitted; subsequent layout edits affect new submissions only. Without custom artwork, the standard certificate is used.
 - Feedback links are shared manually; opening a form does not automatically email attendees.
 
 ## Discovery and public pages

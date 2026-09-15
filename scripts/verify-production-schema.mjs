@@ -3,7 +3,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 try {
-  const [feedbackAnswerColumns, userColumns, feedbackColumns, assetColumns, apiCredentialColumns, featureTables, eventColumns, eventPageColumns, eventSessionColumns, constraints, indexes, triggers] = await Promise.all([
+  const [certificateFormColumns, feedbackAnswerColumns, userColumns, feedbackColumns, assetColumns, apiCredentialColumns, featureTables, eventColumns, eventPageColumns, eventSessionColumns, constraints, indexes, triggers] = await Promise.all([
+    prisma.$queryRaw`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'EventFeedbackForm'`,
     prisma.$queryRaw`
       SELECT column_name, is_nullable
       FROM information_schema.columns
@@ -107,9 +108,10 @@ try {
   const indexNames = new Set(indexes.map((row) => row.indexname));
   const triggerNames = new Set(triggers.map((row) => row.trigger_name));
   const missing = [
+    ...(certificateFormColumns.some((row) => row.column_name === "certificateTemplate") ? [] : ["EventFeedbackForm.certificateTemplate"]),
     ...["fileData", "key"].filter((column) => !columnNames.has(column)),
     ...["mfaSecretEncrypted", "mfaEnabledAt", "recoveryCodeHashes"].filter((column) => !userColumnNames.has(column)),
-    ...["rsvpId", "certificateToken"].filter((column) => !nullableFeedbackColumns.has(column)),
+    ...["rsvpId", "certificateToken", "certificateTemplate"].filter((column) => !nullableFeedbackColumns.has(column)),
     ...["fieldKey", "fieldLabel", "fieldType"].filter((column) => !feedbackAnswerColumnNames.has(column)),
     ...["fieldId"].filter((column) => !nullableFeedbackAnswerColumns.has(column)),
     ...["secretHash", "revokedAt", "expiresAt", "lastUsedAt"].filter((column) => !apiCredentialColumnNames.has(column)),

@@ -37,6 +37,13 @@ beforeEach(() => {
 });
 
 describe("feedback privacy and validation", () => {
+  it("snapshots the certificate design in the locked submission transaction", async () => {
+    const certificateTemplate = { backgroundKey: "organisations/org/certificate-backgrounds/example.webp", font: "serif" };
+    mocks.formFind.mockResolvedValue({ id: "form_1", isOpen: true, certificateEnabled: true, certificateTemplate, fields: [commentField] });
+    mocks.rsvpFind.mockResolvedValue({ id: "rsvp_1" });
+    await submitFeedback({ orgSlug: "org", eventSlug: "event", email: "person@example.test", answers: { comment: "Useful" } });
+    expect(mocks.responseCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ certificateTemplate }) }));
+  });
   it("uses the privacy mode read under the form lock and ignores identity in anonymous mode", async () => {
     const result = await submitFeedback({ orgSlug: "org", eventSlug: "event", email: "person@example.test", answers: { comment: "Useful" } });
     expect(result).toEqual({ ok: true, data: { certificateToken: null } });

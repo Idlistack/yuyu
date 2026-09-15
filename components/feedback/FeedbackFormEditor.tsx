@@ -26,19 +26,24 @@ import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
 import { feedbackTemplates, type FeedbackTemplate } from "@/lib/feedbackTemplates";
 
+import { CertificateBuilder } from "./CertificateBuilder";
+import { parseCertificateTemplate } from "@/lib/certificateTemplate";
+
 type Field = { id: string; key: string; label: string; type: RegistrationFieldType; required: boolean; options: string[] };
 
 export function FeedbackFormEditor(props: {
   organisationSlug: string;
   eventId: string;
   feedbackUrl: string;
-  form: { isOpen: boolean; title: string; thankYouMessage: string; certificateEnabled: boolean } | null;
+  form: { isOpen: boolean; title: string; thankYouMessage: string; certificateEnabled: boolean; certificateTemplate?: unknown } | null;
   fields: Field[];
 }) {
   const [isOpen, setIsOpen] = useState(props.form?.isOpen ?? false);
   const [title, setTitle] = useState(props.form?.title ?? "Event feedback");
   const [thankYouMessage, setThankYouMessage] = useState(props.form?.thankYouMessage ?? "Thanks for sharing your feedback.");
   const [certificateEnabled, setCertificateEnabled] = useState(props.form?.certificateEnabled ?? false);
+  const [certificateTemplate, setCertificateTemplate] = useState(() => parseCertificateTemplate(props.form?.certificateTemplate));
+  const [certificateBusy, setCertificateBusy] = useState(false);
   const [fields, setFields] = useState(props.fields);
   const [dialog, setDialog] = useState(false);
   const [editingField, setEditingField] = useState<Field | null>(null);
@@ -52,7 +57,7 @@ export function FeedbackFormEditor(props: {
   const [dirty, setDirty] = useState(false);
   const [deleteField, setDeleteField] = useState<Field | null>(null);
   const [pending, startTransition] = useTransition();
-  useUnsavedChangesGuard(dirty && !pending);
+  useUnsavedChangesGuard((dirty || certificateBusy) && !pending);
 
   const saveSettings = () => startTransition(async () => {
     const result = await saveFeedbackSettings({
@@ -62,6 +67,7 @@ export function FeedbackFormEditor(props: {
       title,
       thankYouMessage,
       certificateEnabled,
+      certificateTemplate,
     });
     setMessageIsError(!result.ok);
     setMessage(result.ok ? "Feedback settings saved." : result.error);
@@ -161,7 +167,8 @@ export function FeedbackFormEditor(props: {
           <TextField label="Thank-you message" value={thankYouMessage} onChange={(event) => { setThankYouMessage(event.target.value); markDirty(); }} fullWidth />
           <FormControlLabel control={<Checkbox checked={isOpen} onChange={(_, checked) => { setIsOpen(checked); markDirty(); }} />} label="Open this feedback link" />
           <FormControlLabel control={<Checkbox checked={certificateEnabled} onChange={(_, checked) => { setCertificateEnabled(checked); markDirty(); }} />} label="Offer a JPEG certificate after submission" />
-          <Button variant="contained" onClick={saveSettings} disabled={pending || !dirty}>{pending ? "Saving…" : "Save settings"}</Button>
+          {certificateEnabled && <CertificateBuilder organisationSlug={props.organisationSlug} eventId={props.eventId} value={certificateTemplate} onChange={(value) => { setCertificateTemplate(value); markDirty(); }} disabled={pending} onBusyChange={setCertificateBusy} />}
+          <Button variant="contained" onClick={saveSettings} disabled={pending || certificateBusy || !dirty}>{pending ? "Saving…" : "Save settings"}</Button>
         </Stack>
       </Paper>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>

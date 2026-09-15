@@ -163,7 +163,7 @@ export default async function EventManagePage({ params }: Props) {
     include: { fields: { orderBy: { sortOrder: "asc" } } },
   });
   const feedbackForm = feedbackFormRecord
-    ? { isOpen: feedbackFormRecord.isOpen, title: feedbackFormRecord.title, thankYouMessage: feedbackFormRecord.thankYouMessage, certificateEnabled: feedbackFormRecord.certificateEnabled }
+    ? { isOpen: feedbackFormRecord.isOpen, title: feedbackFormRecord.title, thankYouMessage: feedbackFormRecord.thankYouMessage, certificateEnabled: feedbackFormRecord.certificateEnabled, certificateTemplate: feedbackFormRecord.certificateTemplate }
     : null;
   const feedbackFields = (feedbackFormRecord?.fields ?? []).map((field) => ({
     id: field.id, key: field.key, label: field.label, type: field.type, required: field.required, sortOrder: field.sortOrder,
