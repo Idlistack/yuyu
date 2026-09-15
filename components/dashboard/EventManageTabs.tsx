@@ -158,7 +158,7 @@ export function EventManageTabs(props: {
       {tab === 7 ? (
         <Stack spacing={3}>
           <FeedbackFormEditor organisationSlug={organisationSlug} eventId={event.id} feedbackUrl={feedbackUrl} form={feedbackForm} fields={feedbackFields} />
-          {canEditDetails ? <FeedbackResponsesPanel responses={feedbackResponses} truncated={feedbackResponsesTruncated} /> : <Typography color="text.secondary">You do not have permission to view feedback responses.</Typography>}
+          {canEditDetails ? <FeedbackResponsesPanel responses={feedbackResponses} truncated={feedbackResponsesTruncated} exportHref={feedbackForm ? `/api/exports/events/${event.id}/feedback` : undefined} /> : <Typography color="text.secondary">You do not have permission to view feedback responses.</Typography>}
         </Stack>
       ) : null}
       {tab === 8 ? (

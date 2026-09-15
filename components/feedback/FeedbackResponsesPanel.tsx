@@ -4,6 +4,7 @@ import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
 import AccordionSummary from "@mui/material/AccordionSummary";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -18,8 +19,9 @@ export type FeedbackResponseRow = {
 export function FeedbackResponsesPanel(props: {
   responses: FeedbackResponseRow[];
   truncated: boolean;
+  exportHref?: string;
 }) {
-  const { responses, truncated } = props;
+  const { responses, truncated, exportHref } = props;
   return (
     <Stack spacing={1.5}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
@@ -29,7 +31,10 @@ export function FeedbackResponsesPanel(props: {
             Responses are shown without attendee identity or certificate information.
           </Typography>
         </Box>
-        <Chip label={`${responses.length}${truncated ? "+" : ""} responses`} size="small" />
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          {exportHref ? <Button component="a" href={exportHref} variant="outlined" size="small">Download full CSV</Button> : null}
+          <Chip label={`${responses.length}${truncated ? "+" : ""} responses`} size="small" />
+        </Stack>
       </Stack>
       {responses.length === 0 ? (
         <Typography color="text.secondary">No feedback responses yet.</Typography>
