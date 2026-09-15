@@ -301,7 +301,6 @@ export default async function OrgDashboardPage({
             <Stack direction="row" spacing={1.25} sx={{ flexWrap: "wrap" }}>
               <CreateEventDialog
                 organisationSlug={organisation.slug}
-                canPublish={manage}
                 variant="button"
               />
               <CreateSeriesDialog
@@ -590,7 +589,6 @@ export default async function OrgDashboardPage({
         <Box sx={{ position: "fixed", right: 24, bottom: 24, zIndex: 10 }}>
           <CreateEventDialog
             organisationSlug={organisation.slug}
-            canPublish={manage}
             variant="fab"
           />
         </Box>

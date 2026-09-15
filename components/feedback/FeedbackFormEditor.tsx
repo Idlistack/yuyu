@@ -19,6 +19,7 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { applyFeedbackTemplate, deleteFeedbackField, saveFeedbackField, saveFeedbackSettings } from "@/app/actions/feedback-form";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
@@ -40,6 +41,7 @@ export function FeedbackFormEditor(props: {
   const [certificateEnabled, setCertificateEnabled] = useState(props.form?.certificateEnabled ?? false);
   const [fields, setFields] = useState(props.fields);
   const [dialog, setDialog] = useState(false);
+  const [editingField, setEditingField] = useState<Field | null>(null);
   const [templateDialog, setTemplateDialog] = useState(false);
   const [label, setLabel] = useState("");
   const [type, setType] = useState<RegistrationFieldType>("TEXTAREA");
@@ -66,22 +68,35 @@ export function FeedbackFormEditor(props: {
     if (result.ok) setDirty(false);
   });
 
-  const addField = () => {
+  const openFieldDialog = (field?: Field) => {
+    setEditingField(field ?? null);
+    setLabel(field?.label ?? "");
+    setType(field?.type ?? "TEXTAREA");
+    setRequired(field?.required ?? false);
+    setOptions(field?.options.join(", ") ?? "");
+    setDialog(true);
+  };
+
+  const saveField = () => {
     const values = options.split(",").map((value) => value.trim()).filter(Boolean);
-    const key = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64) || "feedback";
+    const key = editingField?.key ?? (label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64) || "feedback");
     startTransition(async () => {
-      const result = await saveFeedbackField({ organisationSlug: props.organisationSlug, eventId: props.eventId, key, label, type, required, options: values });
+      const result = await saveFeedbackField({ organisationSlug: props.organisationSlug, eventId: props.eventId, fieldId: editingField?.id, key, label, type, required, options: values });
       if (!result.ok) {
         setMessageIsError(true);
         setMessage(result.error);
         return;
       }
-      setFields((current) => [...current, { id: result.data!.fieldId, key, label, type, required, options: values }]);
+      const savedField = { id: result.data!.fieldId, key, label, type, required, options: values };
+      setFields((current) => editingField
+        ? current.map((field) => field.id === editingField.id ? savedField : field)
+        : [...current, savedField]);
       setDialog(false);
+      setEditingField(null);
       setLabel("");
       setOptions("");
       setMessageIsError(false);
-      setMessage("Feedback question added.");
+      setMessage(editingField ? "Feedback question updated." : "Feedback question added.");
     });
   };
 
@@ -151,7 +166,7 @@ export function FeedbackFormEditor(props: {
       </Paper>
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
         <Typography variant="h6">Questions</Typography>
-        <Button variant="contained" onClick={() => setDialog(true)}>Add question</Button>
+        <Button variant="contained" onClick={() => openFieldDialog()} disabled={pending}>Add question</Button>
       </Stack>
       {fields.length === 0 ? <Typography color="text.secondary">Add at least one question before opening the form.</Typography> : fields.map((field) => (
         <Paper key={field.id} variant="outlined" sx={{ p: 2 }}>
@@ -160,12 +175,15 @@ export function FeedbackFormEditor(props: {
               <Typography>{field.label}{field.required ? " *" : ""}</Typography>
               <Typography variant="caption" color="text.secondary">{field.type}{field.options.length ? ` · ${field.options.join(", ")}` : ""}</Typography>
             </Box>
-            <IconButton aria-label={`Delete ${field.label}`} disabled={pending} onClick={() => setDeleteField(field)}><DeleteOutlineIcon /></IconButton>
+            <Stack direction="row" spacing={0.5}>
+              <IconButton aria-label={`Edit ${field.label}`} disabled={pending} onClick={() => openFieldDialog(field)}><EditOutlinedIcon /></IconButton>
+              <IconButton aria-label={`Delete ${field.label}`} disabled={pending} onClick={() => setDeleteField(field)}><DeleteOutlineIcon /></IconButton>
+            </Stack>
           </Stack>
         </Paper>
       ))}
-      <Dialog open={dialog} onClose={() => setDialog(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Add feedback question</DialogTitle>
+      <Dialog open={dialog} onClose={() => !pending && setDialog(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editingField ? "Edit feedback question" : "Add feedback question"}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Question" value={label} onChange={(event) => setLabel(event.target.value)} autoFocus fullWidth />
@@ -176,7 +194,7 @@ export function FeedbackFormEditor(props: {
             <FormControlLabel control={<Checkbox checked={required} onChange={(_, checked) => setRequired(checked)} />} label="Required" />
           </Stack>
         </DialogContent>
-        <DialogActions><Button onClick={() => setDialog(false)}>Cancel</Button><Button onClick={addField} disabled={pending || !label.trim()} variant="contained">Add question</Button></DialogActions>
+        <DialogActions><Button onClick={() => setDialog(false)} disabled={pending}>Cancel</Button><Button onClick={saveField} disabled={pending || !label.trim()} variant="contained">{editingField ? "Save question" : "Add question"}</Button></DialogActions>
       </Dialog>
       <Dialog open={templateDialog} onClose={() => !pending && setTemplateDialog(false)} fullWidth maxWidth="md">
         <DialogTitle>Choose a feedback template</DialogTitle>

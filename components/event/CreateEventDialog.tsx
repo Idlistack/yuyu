@@ -18,8 +18,7 @@ import Alert from "@mui/material/Alert";
 import Stack from "@mui/material/Stack";
 import Fab from "@mui/material/Fab";
 import AddIcon from "@mui/icons-material/Add";
-import { createEvent, uploadEventCoverImage } from "@/app/actions/event";
-import { CoverImagePicker } from "@/components/event/CoverImagePicker";
+import { createEvent } from "@/app/actions/event";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -43,12 +42,15 @@ function toDatetimeLocalValue(d: Date) {
   return new Date(t.getTime() - off).toISOString().slice(0, 16);
 }
 
+function isRichTextEmpty(html: string) {
+  return !new DOMParser().parseFromString(html, "text/html").body.textContent?.trim();
+}
+
 export function CreateEventDialog(props: {
   organisationSlug: string;
-  canPublish: boolean;
   variant?: "button" | "fab";
 }) {
-  const { organisationSlug, canPublish, variant = "button" } = props;
+  const { organisationSlug, variant = "button" } = props;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,19 +59,33 @@ export function CreateEventDialog(props: {
   const [end, setEnd] = useState<Date | null>(null);
   const [tagsPreview, setTagsPreview] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [formKey, setFormKey] = useState(0);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   // Wizard States
   const [activeStep, setActiveStep] = useState(0);
   const [isOnline, setIsOnline] = useState(false);
 
+  const resetDraft = () => {
+    setActiveStep(0);
+    setError(null);
+    setStart(null);
+    setEnd(null);
+    setTagsPreview([]);
+    setTagInput("");
+    setIsOnline(false);
+    setFormKey((current) => current + 1);
+  };
+
+  const closeDialog = () => {
+    if (pending) return;
+    setOpen(false);
+    resetDraft();
+  };
+
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // The wizard uses one form for all four steps. Pressing Enter in a map-link
-    // field can otherwise submit the form before staff reach the final Create
-    // step, making the cover-image settings flash just before navigation.
-    if (activeStep !== 3) return;
+    if (activeStep !== 2) return;
     setError(null);
     if (!start || start < new Date()) {
       setError("Start time must be now or in the future.");
@@ -83,56 +99,28 @@ export function CreateEventDialog(props: {
     }
     const form = e.currentTarget;
     const fd = new FormData(form);
-    const capacityRaw = String(fd.get("capacity") ?? "").trim();
-    let status: EventStatus = EventStatus.DRAFT;
-    if (canPublish) {
-      const raw = String(fd.get("status") ?? "");
-      if (raw === EventStatus.PUBLISHED) status = EventStatus.PUBLISHED;
-    }
-    const privacyType = String(
-      fd.get("privacyType") ?? EventPrivacyType.PUBLIC,
-    ) as EventPrivacyType;
-
     startTransition(async () => {
-      let coverImageUrl = "";
-      if (coverImageFile) {
-        const uploadData = new FormData();
-        uploadData.set("organisationSlug", organisationSlug);
-        uploadData.set("file", coverImageFile);
-        const upload = await uploadEventCoverImage(uploadData);
-        if (!upload.ok) {
-          setError(upload.error);
-          return;
-        }
-        coverImageUrl = upload.data!.url;
-      }
       const res = await createEvent({
         organisationSlug,
         title: String(fd.get("title") ?? ""),
         aboutHtml: String(fd.get("aboutHtml") ?? ""),
         tags: String(fd.get("tags") ?? ""),
-        coverImageUrl,
+        coverImageUrl: "",
         startDateTime: String(fd.get("startDateTime") ?? ""),
         endDateTime: String(fd.get("endDateTime") ?? ""),
         timezone: String(fd.get("timezone") ?? "Asia/Kolkata"),
         location: String(fd.get("location") ?? ""),
         mapLinkUrl: String(fd.get("mapLinkUrl") ?? ""),
         isOnline: isOnline,
-        capacity: capacityRaw,
-        status,
-        privacyType,
+        capacity: "",
+        status: EventStatus.DRAFT,
+        privacyType: EventPrivacyType.PUBLIC,
       });
       if (!res.ok) {
         setError(res.error);
         return;
       }
-      setOpen(false);
-      form.reset();
-      setActiveStep(0);
-      setTagsPreview([]);
-      setTagInput("");
-      setIsOnline(false);
-      setCoverImageFile(null);
+      closeDialog();
       if (res.data?.id) {
         router.push(`/dashboard/${organisationSlug}/event/${res.data.id}`);
       } else {
@@ -142,6 +130,7 @@ export function CreateEventDialog(props: {
   }
 
   const handleOpen = () => {
+    resetDraft();
     const now = new Date();
     const base = new Date(now);
     base.setMinutes(0, 0, 0);
@@ -150,10 +139,6 @@ export function CreateEventDialog(props: {
     const e = new Date(base);
     e.setHours(e.getHours() + 1);
     setEnd(e);
-    setActiveStep(0);
-    setError(null);
-    setIsOnline(false);
-    setCoverImageFile(null);
     setOpen(true);
   };
 
@@ -170,16 +155,24 @@ export function CreateEventDialog(props: {
       )}
       <Dialog
         open={open}
-        onClose={() => !pending && setOpen(false)}
+        onClose={closeDialog}
         fullWidth
         maxWidth="sm"
       >
-        <form ref={formRef} onSubmit={onSubmit}>
+        <form
+          key={formKey}
+          ref={formRef}
+          onSubmit={onSubmit}
+          onKeyDown={(event) => {
+            if (activeStep === 2 && event.key === "Enter" && event.target instanceof HTMLInputElement) {
+              event.preventDefault();
+            }
+          }}
+        >
           <DialogTitle sx={{ pb: 1 }}>
             {activeStep === 0 && "Create Event: Basics"}
             {activeStep === 1 && "Create Event: Schedule"}
             {activeStep === 2 && "Create Event: Location"}
-            {activeStep === 3 && "Create Event: Settings"}
           </DialogTitle>
           <DialogContent>
             {/* Step Progress Indicators */}
@@ -199,18 +192,17 @@ export function CreateEventDialog(props: {
                 {activeStep === 0 && "BASICS"}
                 {activeStep === 1 && "SCHEDULE"}
                 {activeStep === 2 && "LOCATION & PLATFORM"}
-                {activeStep === 3 && "ADDITIONAL SETTINGS"}
               </Typography>
               <Typography
                 variant="caption"
                 color="text.secondary"
                 sx={{ fontWeight: 600 }}
               >
-                Step {activeStep + 1} of 4
+                Step {activeStep + 1} of 3
               </Typography>
             </Box>
             <Box sx={{ display: "flex", gap: 0.75, mb: 3 }}>
-              {[0, 1, 2, 3].map((stepIndex) => (
+              {[0, 1, 2].map((stepIndex) => (
                 <Box
                   key={stepIndex}
                   sx={{
@@ -440,67 +432,6 @@ export function CreateEventDialog(props: {
                 )}
               </Box>
 
-              {/* Step 4: Settings */}
-              <Box
-                sx={{
-                  display: activeStep === 3 ? "flex" : "none",
-                  flexDirection: "column",
-                  gap: 2,
-                }}
-              >
-                <CoverImagePicker
-                  disabled={pending}
-                  onChange={(file) => setCoverImageFile(file)}
-                />
-                <TextField
-                  name="capacity"
-                  label="Capacity (optional)"
-                  type="number"
-                  fullWidth
-                  slotProps={{ htmlInput: { min: 1 } }}
-                />
-                {canPublish ? (
-                  <>
-                    <TextField
-                      name="status"
-                      label="Status"
-                      select
-                      fullWidth
-                      defaultValue={EventStatus.DRAFT}
-                    >
-                      <MenuItem value={EventStatus.DRAFT}>Draft</MenuItem>
-                      <MenuItem value={EventStatus.PUBLISHED}>
-                        Published
-                      </MenuItem>
-                    </TextField>
-                    <TextField
-                      name="privacyType"
-                      label="Audience"
-                      select
-                      fullWidth
-                      defaultValue={EventPrivacyType.PUBLIC}
-                    >
-                      <MenuItem value={EventPrivacyType.PUBLIC}>
-                        Public (discoverable)
-                      </MenuItem>
-                      <MenuItem value={EventPrivacyType.HIDDEN_LINK}>
-                        Hidden link
-                      </MenuItem>
-                      <MenuItem value={EventPrivacyType.APPROVAL_REQUIRED}>
-                        Approval required
-                      </MenuItem>
-                      <MenuItem value={EventPrivacyType.INVITE_ONLY}>
-                        Invite only
-                      </MenuItem>
-                    </TextField>
-                  </>
-                ) : (
-                  <Alert severity="info">
-                    Events you create stay as drafts until an owner or admin
-                    publishes them.
-                  </Alert>
-                )}
-              </Box>
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2, justifyContent: "space-between" }}>
@@ -521,12 +452,12 @@ export function CreateEventDialog(props: {
             <Stack direction="row" spacing={1}>
               <Button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={closeDialog}
                 disabled={pending}
               >
                 Cancel
               </Button>
-              {activeStep < 3 ? (
+              {activeStep < 2 ? (
                 <Button
                   type="button"
                   variant="contained"
@@ -539,6 +470,13 @@ export function CreateEventDialog(props: {
                       if (!titleInput?.value.trim()) {
                         titleInput?.focus();
                         titleInput?.reportValidity();
+                        return;
+                      }
+                      const aboutInput = formRef.current?.elements.namedItem(
+                        "aboutHtml",
+                      ) as HTMLInputElement | null;
+                      if (isRichTextEmpty(aboutInput?.value ?? "")) {
+                        setError("Add a short description for your event.");
                         return;
                       }
                     }

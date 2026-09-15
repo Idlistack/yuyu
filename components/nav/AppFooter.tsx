@@ -95,7 +95,15 @@ export function AppFooter() {
             color="text.secondary"
             sx={{ textAlign: { xs: "center", sm: "right" } }}
           >
-            Self-hosted event management
+            Build by{" "}
+            <MuiLink href="https://abhiramnj.com" target="_blank" rel="noopener noreferrer" color="inherit" underline="hover">
+              Abhiram
+            </MuiLink>
+            {" and Hosted on "}
+            <MuiLink href="https://idlistack.com" target="_blank" rel="noopener noreferrer" color="inherit" underline="hover">
+              Idlistack
+            </MuiLink>
+            .
           </Typography>
         </Stack>
       </Container>

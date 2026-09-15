@@ -118,6 +118,45 @@ export function AppBarNav() {
           >
             About
           </Button>
+          <Button
+            component="a"
+            href="https://idlistack.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="small"
+            aria-label="Powered by idlistack (opens in a new tab)"
+            sx={{
+              alignSelf: "center",
+              display: "inline-flex",
+              gap: 0.25,
+              minHeight: 30,
+              px: 1.25,
+              py: 0.25,
+              border: "1px solid",
+              borderColor: "#ed4690",
+              borderRadius: 999,
+              color: "#ed4690",
+              fontSize: "0.6875rem",
+              fontWeight: 700,
+              letterSpacing: "0.02em",
+              lineHeight: 1,
+              textTransform: "none",
+              "&:hover": {
+                borderColor: "#d63d82",
+                bgcolor: "#ed4690",
+                color: "#fff",
+              },
+            }}
+          >
+            Powered by
+            <Box
+              component="img"
+              src={theme.palette.mode === "dark" ? "/brand/idlistack-logo-white.png" : "/brand/idlistack-logo-black.png"}
+              alt=""
+              aria-hidden
+              sx={{ width: 96, height: 26, objectFit: "cover", objectPosition: "center" }}
+            />
+          </Button>
         </Box>
         <Box sx={{ flexGrow: { xs: 1, sm: 0 } }} />
         <Box sx={{ display: "flex", gap: { xs: 0.5, sm: 1 }, alignItems: "center" }}>
