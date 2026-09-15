@@ -1,0 +1,64 @@
+{{- if .Values.outbox.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "yuyu.fullname" . }}-outbox
+  labels:
+    {{- include "yuyu.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.outbox.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 45
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 55
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ include "yuyu.name" . }}-outbox
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/component: outbox
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: outbox
+              image: "{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - node
+                - -e
+                - >-
+                  fetch("http://{{ include "yuyu.fullname" . }}:{{ .Values.service.port }}/api/internal/outbox", { method: "POST", headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` }, signal: AbortSignal.timeout(45000) }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.existingSecret }}
+                      key: CRON_SECRET
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+{{- end }}

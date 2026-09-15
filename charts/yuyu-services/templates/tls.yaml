@@ -1,0 +1,53 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: yuyu-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: yuyu-service-ca
+spec:
+  isCA: true
+  commonName: Yuyu service CA
+  subject:
+    organizations: [Yuyu]
+  secretName: yuyu-service-ca-keypair
+  duration: 87600h
+  renewBefore: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Never
+  issuerRef:
+    name: yuyu-selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: yuyu-service-ca
+spec:
+  ca:
+    secretName: yuyu-service-ca-keypair
+{{- range $service := list "postgres" "redis" "garage" }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: yuyu-{{ $service }}
+spec:
+  secretName: yuyu-{{ $service }}-tls
+  duration: 2160h
+  renewBefore: 720h
+  privateKey:
+    rotationPolicy: Always
+  dnsNames:
+    - yuyu-{{ $service }}
+    - yuyu-{{ $service }}.{{ $.Release.Namespace }}.svc
+    - yuyu-{{ $service }}.{{ $.Release.Namespace }}.svc.cluster.local
+    - localhost
+  issuerRef:
+    name: yuyu-service-ca
+{{- end }}

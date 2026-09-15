@@ -1,0 +1,10 @@
+{{- if and .Values.ingress.enabled .Values.ingress.allowedSourceRanges }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "yuyu.fullname" . }}-sources
+spec:
+  ipAllowList:
+    sourceRange:
+      {{- toYaml .Values.ingress.allowedSourceRanges | nindent 6 }}
+{{- end }}

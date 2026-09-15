@@ -1,0 +1,127 @@
+stack:
+  fullnameOverride: yuyu-monitoring
+  defaultRules:
+    create: false
+  alertmanager:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeProxy:
+    enabled: false
+  kubelet:
+    serviceMonitor:
+      cAdvisorInterval: 30s
+      probes: false
+      tlsConfig:
+        insecureSkipVerify: false
+  grafana:
+    fullnameOverride: yuyu-grafana
+    defaultDashboardsEnabled: false
+    admin:
+      existingSecret: yuyu-grafana-admin
+      userKey: admin-user
+      passwordKey: admin-password
+    persistence:
+      enabled: true
+      storageClassName: local-path
+      size: 1Gi
+    service:
+      type: ClusterIP
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      hosts:
+        - grafana.yuyu.idliapps.com
+      path: /
+      tls:
+        - secretName: grafana-yuyu-idliapps-com-tls
+          hosts:
+            - grafana.yuyu.idliapps.com
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {cpu: 500m, memory: 512Mi}
+    sidecar:
+      dashboards:
+        enabled: false
+      datasources:
+        enabled: false
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: yuyu
+            orgId: 1
+            folder: ''
+            type: file
+            disableDeletion: false
+            editable: false
+            options:
+              path: /var/lib/grafana/dashboards/default
+    dashboardsConfigMaps:
+      default: yuyu-resource-dashboard
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            uid: prometheus
+            type: prometheus
+            access: proxy
+            url: http://yuyu-monitoring-prometheus:9090
+            isDefault: true
+            editable: false
+    grafana.ini:
+      server:
+        domain: grafana.yuyu.idliapps.com
+        root_url: https://grafana.yuyu.idliapps.com
+      security:
+        cookie_secure: true
+      users:
+        allow_sign_up: false
+      auth.anonymous:
+        enabled: false
+      analytics:
+        reporting_enabled: false
+        check_for_updates: false
+  prometheus:
+    prometheusSpec:
+      retention: 90d
+      retentionSize: 20GB
+      scrapeInterval: 30s
+      evaluationInterval: 30s
+      resources:
+        requests: {cpu: 200m, memory: 512Mi}
+        limits: {cpu: '2', memory: 2Gi}
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: local-path
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                # Existing local-path PVC: nominal allocation, not a disk quota.
+                # Retained unchanged to preserve history; the backing disk has room
+                # for 20 GB of blocks plus WAL/head data. For quota-enforced storage,
+                # provision at least 25 GiB before using this retention limit.
+                storage: 10Gi
+  prometheusOperator:
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: 500m, memory: 512Mi}
+  kube-state-metrics:
+    namespaces: yuyu,monitoring
+    resources:
+      requests: {cpu: 30m, memory: 64Mi}
+      limits: {cpu: 200m, memory: 256Mi}
+  prometheus-node-exporter:
+    hostNetwork: false
+    resources:
+      requests: {cpu: 30m, memory: 32Mi}
+      limits: {cpu: 200m, memory: 128Mi}

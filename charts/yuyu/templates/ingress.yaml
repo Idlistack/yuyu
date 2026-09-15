@@ -5,7 +5,16 @@ metadata:
   name: {{ include "yuyu.fullname" . }}
   labels:
     {{- include "yuyu.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- $annotations := deepCopy .Values.ingress.annotations }}
+  {{- if .Values.ingress.allowedSourceRanges }}
+  {{- $key := "traefik.ingress.kubernetes.io/router.middlewares" }}
+  {{- $middleware := printf "%s-%s-sources@kubernetescrd" .Release.Namespace (include "yuyu.fullname" .) }}
+  {{- if get $annotations $key }}
+  {{- $middleware = printf "%s,%s" $middleware (get $annotations $key) }}
+  {{- end }}
+  {{- $_ := set $annotations $key $middleware }}
+  {{- end }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}

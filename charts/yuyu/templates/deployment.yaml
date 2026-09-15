@@ -19,6 +19,7 @@ spec:
       labels:
         {{- include "yuyu.selectorLabels" . | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
@@ -44,6 +45,14 @@ spec:
               value: "3000"
             - name: HOSTNAME
               value: 0.0.0.0
+            {{- if .Values.extraCaConfigMap }}
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/yuyu-ca/ca.crt
+          volumeMounts:
+            - name: service-ca
+              mountPath: /etc/yuyu-ca
+              readOnly: true
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ required "existingSecret is required" .Values.existingSecret }}
@@ -76,6 +85,12 @@ spec:
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
+      {{- if .Values.extraCaConfigMap }}
+      volumes:
+        - name: service-ca
+          configMap:
+            name: {{ .Values.extraCaConfigMap }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

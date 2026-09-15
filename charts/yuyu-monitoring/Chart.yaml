@@ -1,0 +1,10 @@
+apiVersion: v2
+name: yuyu-monitoring
+description: Private persistent resource monitoring for Yuyu on k3s
+type: application
+version: 0.1.0
+dependencies:
+  - name: kube-prometheus-stack
+    alias: stack
+    version: 91.4.0
+    repository: https://prometheus-community.github.io/helm-charts

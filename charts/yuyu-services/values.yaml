@@ -1,0 +1,14 @@
+storageClass: local-path
+postgres:
+  image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+  existingSecret: yuyu-postgres
+  storage: 20Gi
+redis:
+  image: redis:8-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+  existingSecret: yuyu-redis
+  storage: 2Gi
+garage:
+  image: dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690
+  existingSecret: yuyu-garage
+  storage: 20Gi
+  proxyImage: nginx:stable-alpine@sha256:dc5069ad14f19660b141b21236140b91656bf89bbc3e2417c70ae650cd66104c

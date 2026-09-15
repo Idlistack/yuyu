@@ -17,6 +17,7 @@ spec:
       labels:
         {{- include "yuyu.selectorLabels" . | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
@@ -35,7 +36,7 @@ spec:
           command: ["npx", "prisma", "migrate", "deploy"]
           envFrom:
             - secretRef:
-                name: {{ required "existingSecret is required" .Values.existingSecret }}
+                name: {{ default .Values.existingSecret .Values.migration.existingSecret }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

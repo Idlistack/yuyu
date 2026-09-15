@@ -13,12 +13,23 @@ fullnameOverride: ""
 # It must contain every production runtime variable in .env.example.
 existingSecret: yuyu-runtime
 
+# Optional ConfigMap containing ca.crt for private service TLS.
+extraCaConfigMap: ""
+
+outbox:
+  enabled: true
+  schedule: "* * * * *"
+
 service:
   type: ClusterIP
   port: 80
 
 ingress:
   enabled: false
+  # Requires Traefik CRDs; leave disabled for other ingress controllers.
+  redirectToHttps: false
+  # Requires Traefik and preserved source IPs. Empty permits any source.
+  allowedSourceRanges: []
   className: ""
   annotations: {}
   hosts:
@@ -27,6 +38,12 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
+
+networkPolicy:
+  enabled: false
+  ingressNamespace: kube-system
+  ingressPodLabels:
+    app.kubernetes.io/name: traefik
 
 resources:
   requests:
@@ -48,6 +65,8 @@ podDisruptionBudget:
   minAvailable: 1
 
 migration:
+  # Use a separate database owner credential for schema changes.
+  existingSecret: ""
   # Enable for production releases after publishing the Docker `migrator` target.
   enabled: true
   image:

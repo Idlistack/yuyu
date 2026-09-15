@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yuyu-garage-proxy
+data:
+  nginx.conf: |
+    pid /tmp/nginx.pid;
+    events { worker_connections 256; }
+    http {
+      access_log off;
+      client_body_temp_path /tmp/client;
+      proxy_temp_path /tmp/proxy;
+      fastcgi_temp_path /tmp/fastcgi;
+      uwsgi_temp_path /tmp/uwsgi;
+      scgi_temp_path /tmp/scgi;
+      server {
+        listen 8443 ssl;
+        ssl_certificate /tls/tls.crt;
+        ssl_certificate_key /tls/tls.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        client_max_body_size 16m;
+        location / {
+          proxy_pass http://127.0.0.1:3900;
+          proxy_set_header Host $http_host;
+          proxy_request_buffering off;
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yuyu-garage
+spec:
+  selector: { app: yuyu-garage }
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: yuyu-garage
+spec:
+  serviceName: yuyu-garage
+  replicas: 1
+  selector:
+    matchLabels: { app: yuyu-garage }
+  template:
+    metadata:
+      labels: { app: yuyu-garage }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: garage
+          image: {{ .Values.garage.image | quote }}
+          command: [/garage]
+          args: [server]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/garage
+            - name: config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+              readOnly: true
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
+        - name: tls-proxy
+          image: {{ .Values.garage.proxyImage | quote }}
+          command: [nginx, -g, "daemon off;"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          ports:
+            - containerPort: 8443
+          readinessProbe:
+            tcpSocket: { port: 8443 }
+          volumeMounts:
+            - name: proxy-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 200m, memory: 64Mi }
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ .Values.garage.existingSecret }}
+        - name: proxy-config
+          configMap:
+            name: yuyu-garage-proxy
+        - name: tls
+          secret:
+            secretName: yuyu-garage-tls
+            defaultMode: 0440
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: {{ .Values.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.garage.storage }}
