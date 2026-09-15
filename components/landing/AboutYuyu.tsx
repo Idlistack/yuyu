@@ -53,44 +53,44 @@ export function AboutYuyu() {
 
   const heroBackground = isDark
     ? "radial-gradient(circle at 82% 18%, rgba(185,174,255,0.25), transparent 30%), radial-gradient(circle at 15% 85%, rgba(124,245,182,0.2), transparent 36%), linear-gradient(145deg, rgba(10,132,255,0.12), rgba(12,16,22,0.35) 68%)"
-    : "radial-gradient(circle at 84% 16%, rgba(154,128,255,0.48), transparent 31%), radial-gradient(circle at 12% 88%, rgba(55,209,137,0.38), transparent 40%), radial-gradient(circle at 62% 100%, rgba(255,146,83,0.32), transparent 32%), linear-gradient(145deg, #E9FFF5 0%, #EEF0FF 52%, #FFF0E6 100%)";
+    : "radial-gradient(circle at 84% 16%, rgba(154,128,255,0.18), transparent 31%), radial-gradient(circle at 12% 88%, rgba(55,209,137,0.12), transparent 40%), radial-gradient(circle at 62% 100%, rgba(255,146,83,0.10), transparent 32%), linear-gradient(145deg, #E9FFF5 0%, #EEF0FF 52%, #FFF0E6 100%)";
   const strongInk = isDark ? "text.primary" : "#15243A";
 
   return (
-    <Box sx={{ maxWidth: 1120, mx: "auto", py: { xs: 2, md: 5 }, pb: { xs: 7, md: 12 } }}>
-      <Paper variant="outlined" sx={{ position: "relative", minHeight: { xs: 540, md: 600 }, overflow: "hidden", p: { xs: 3, sm: 5, md: 7 }, borderRadius: 5, background: heroBackground, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(90,112,148,0.18)", boxShadow: isDark ? "none" : "0 28px 80px rgba(63, 85, 120, 0.16)" }}>
+    <Box sx={{ maxWidth: 1120, mx: "auto", py: { xs: 2, md: 4 }, pb: { xs: 7, md: 12 }, "& .MuiTypography-root": { overflowWrap: "break-word" } }}>
+      <Paper variant="outlined" sx={{ position: "relative", minHeight: { xs: 0, md: 620 }, overflow: "hidden", p: { xs: 3, sm: 5, md: 8 }, borderRadius: { xs: 4, md: 7 }, background: heroBackground, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(90,112,148,0.18)", boxShadow: isDark ? "none" : "0 18px 60px rgba(63, 85, 120, 0.07)" }}>
         <motion.div aria-hidden animate={prefersReducedMotion ? undefined : { rotate: 360 }} transition={{ duration: 32, repeat: Infinity, ease: "linear" }} style={{ position: "absolute", width: 360, height: 360, border: "1px dashed rgba(10,132,255,0.28)", borderRadius: "50%", right: -110, top: -110 }} />
         <motion.div aria-hidden animate={prefersReducedMotion ? undefined : { y: [0, -12, 0], rotate: [0, 5, 0] }} transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }} style={{ position: "absolute", right: "clamp(1.5rem, 10vw, 7rem)", top: "clamp(2rem, 13vw, 7rem)" }}>
-          <Box component="img" src="/brand/yuyu-mark.svg" alt="" sx={{ width: { xs: 76, sm: 104 }, height: { xs: 76, sm: 104 }, display: "block", filter: "drop-shadow(0 18px 22px rgba(10,132,255,0.18))" }} />
+          <Box component="img" src="/brand/yuyu-mark.svg" alt="" sx={{ width: { xs: 44, sm: 64, md: 104 }, height: { xs: 44, sm: 64, md: 104 }, display: "block", opacity: { xs: 0.3, md: 0.85 }, filter: "drop-shadow(0 18px 22px rgba(10,132,255,0.18))" }} />
         </motion.div>
-        <Stack spacing={3} sx={{ position: "relative", zIndex: 1, maxWidth: { xs: "100%", md: 650 }, minHeight: "100%", justifyContent: "center" }}>
+        <Stack spacing={3} sx={{ position: "relative", zIndex: 1, maxWidth: { xs: "100%", md: 690 }, minHeight: "100%", justifyContent: "center" }}>
           <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.55 }}><Chip icon={<FavoriteBorderOutlinedIcon />} label="ABOUT YUYU" color="primary" variant="outlined" sx={{ fontWeight: 700, letterSpacing: "0.08em" }} /></motion.div>
-          <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.65, delay: prefersReducedMotion ? 0 : 0.1 }}><Typography component="h1" variant="h1" sx={{ color: strongInk, fontSize: { xs: "2.65rem", sm: "4.2rem", md: "5rem" }, maxWidth: 650, fontWeight: 850, lineHeight: 0.98, letterSpacing: "-0.07em" }}>A small idea for <Box component="span" sx={{ background: isDark ? "linear-gradient(120deg, #7CF5B6, #B9AEFF)" : "linear-gradient(120deg, #087A5A, #6551C7 58%, #C45532)", backgroundClip: "text", WebkitBackgroundClip: "text", color: "transparent" }}>better gatherings.</Box></Typography></motion.div>
-          <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.55, delay: prefersReducedMotion ? 0 : 0.23 }}><Typography color="text.secondary" sx={{ maxWidth: 500, fontSize: { xs: "1rem", md: "1.15rem" }, lineHeight: 1.7 }}>Yuyu runs on <Box component="a" href="https://idlistack.com" target="_blank" rel="noopener noreferrer" sx={{ color: "primary.main", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: "3px", "&:hover": { color: "primary.dark" } }}>IdliStack</Box>, digital infrastructure that hosts and runs powerful open-source tools with just one click. No servers to manage, no deployment struggles—just affordable software without tiered limits. This is the story of Abhiram: an engineer at Tech4Good Community, the person building IdliStack, and the person behind Yuyu.</Typography></motion.div>
+          <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.65, delay: prefersReducedMotion ? 0 : 0.1 }}><Typography component="h1" variant="h1" sx={{ color: strongInk, fontSize: { xs: "2.8rem", sm: "4rem", md: "5.1rem" }, maxWidth: 650, fontWeight: 800, lineHeight: 1.06, letterSpacing: "-0.055em", textWrap: "balance" }}>A small idea for <Box component="span" sx={{ background: isDark ? "linear-gradient(120deg, #7CF5B6, #B9AEFF)" : "linear-gradient(120deg, #087A5A, #6551C7 58%, #C45532)", backgroundClip: "text", WebkitBackgroundClip: "text", color: "transparent" }}>better gatherings.</Box></Typography></motion.div>
+          <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.55, delay: prefersReducedMotion ? 0 : 0.23 }}><Typography color="text.secondary" sx={{ maxWidth: 620, fontSize: { xs: "1rem", md: "1.08rem" }, lineHeight: 1.85 }}>Yuyu runs on <Box component="a" href="https://idlistack.com" target="_blank" rel="noopener noreferrer" sx={{ color: "primary.main", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: "3px", "&:hover": { color: "primary.dark" } }}>IdliStack</Box>, digital infrastructure that hosts and runs powerful open-source tools with just one click. No servers to manage, no deployment struggles—just affordable software without tiered limits. This is the story of Abhiram: an engineer at Tech4Good Community, the person building IdliStack, and the person behind Yuyu.</Typography></motion.div>
           <motion.div initial={prefersReducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: prefersReducedMotion ? 0 : 0.5, delay: prefersReducedMotion ? 0 : 0.42 }}><Stack direction="row" spacing={1} sx={{ alignItems: "center", color: "text.secondary", pt: 1 }}><ArrowDownwardOutlinedIcon fontSize="small" /><Typography variant="body2" sx={{ fontWeight: 700 }}>Scroll to follow the story</Typography></Stack></motion.div>
         </Stack>
       </Paper>
 
       <Box ref={storyRef} sx={{ mt: { xs: 6, md: 10 }, pb: { xs: 2, md: 4 } }}>
-        <Box sx={{ position: "relative", maxWidth: 760, mx: "auto" }}>
+        <Box sx={{ position: "relative", maxWidth: 920, mx: "auto" }}>
           <Box aria-hidden sx={{ position: "absolute", left: 19, top: 50, bottom: 58, width: 2, bgcolor: "divider" }} />
           <motion.div aria-hidden style={{ position: "absolute", left: 19, top: 50, bottom: 58, width: 2, background: "linear-gradient(#7CF5B6, #0A84FF, #B9AEFF)", scaleY: prefersReducedMotion ? 1 : progress, transformOrigin: "top" }} />
           {chapters.map((chapter, index) => {
           const Icon = chapter.icon;
           return (
-            <Box key={chapter.number} sx={{ position: "relative", pl: 7, pb: { xs: 5, md: 8 } }}>
+            <Box key={chapter.number} sx={{ position: "relative", pl: { xs: 5, sm: 8 }, pb: { xs: 3, md: 5 } }}>
               <Box aria-hidden sx={{ position: "absolute", zIndex: 2, left: 9, top: 40, width: 22, height: 22, borderRadius: "50%", border: "4px solid", borderColor: "background.default", bgcolor: "primary.main", boxShadow: "0 0 0 4px rgba(10,132,255,0.16)" }} />
-              <Box aria-hidden sx={{ position: "absolute", left: 30, right: "auto", top: 50, width: 26, height: 2, bgcolor: "divider" }} />
+              <Box aria-hidden sx={{ position: "absolute", left: 30, right: "auto", top: 50, width: { xs: 10, sm: 34 }, height: 2, bgcolor: "divider" }} />
               <motion.div initial={prefersReducedMotion ? false : "hidden"} whileInView="visible" viewport={{ once: true, amount: 0.35 }} variants={revealVariants} style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-                <Paper variant="outlined" sx={{ width: "100%", p: { xs: 3, sm: 4 }, borderRadius: 4, background: `linear-gradient(135deg, ${isDark ? chapter.darkAccent : chapter.lightAccent}, ${isDark ? "rgba(18,18,20,0.88)" : "rgba(255,255,255,0.92)"} 62%)`, borderColor: isDark ? "divider" : "rgba(75,92,118,0.15)", boxShadow: isDark ? "0 14px 35px rgba(0,0,0,0.18)" : "0 18px 45px rgba(53,70,99,0.11)" }}>
+                <Paper variant="outlined" sx={{ width: "100%", p: { xs: 2.5, sm: 4, md: 5 }, borderRadius: { xs: 3, md: 5 }, background: `linear-gradient(135deg, ${isDark ? chapter.darkAccent : chapter.lightAccent}, ${isDark ? "rgba(18,18,20,0.88)" : "rgba(255,255,255,0.92)"} 28%)`, borderColor: isDark ? "divider" : "rgba(75,92,118,0.15)", boxShadow: isDark ? "0 14px 35px rgba(0,0,0,0.18)" : "0 8px 28px rgba(53,70,99,0.055)" }}>
                   <Stack spacing={2.25}>
                     <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
                       <Typography variant="overline" color="primary" sx={{ fontWeight: 800, letterSpacing: "0.13em" }}>{chapter.number} · {chapter.eyebrow}</Typography>
                       <motion.div animate={prefersReducedMotion ? undefined : { rotate: [0, -8, 6, 0] }} transition={{ duration: 4.5, repeat: Infinity, delay: index * 0.35, ease: "easeInOut" }}><Box sx={{ width: 46, height: 46, display: "grid", placeItems: "center", borderRadius: 2.5, bgcolor: "background.paper", color: "primary.main", border: 1, borderColor: "divider" }}><Icon /></Box></motion.div>
                     </Stack>
-                    <Typography variant="h3" sx={{ fontWeight: 800, lineHeight: 1.08, letterSpacing: "-0.05em" }}>{chapter.title}</Typography>
-                    <Typography color="text.secondary" sx={{ lineHeight: 1.7 }}>{chapter.body}</Typography>
-                    <Typography sx={{ pl: 2, borderLeft: "3px solid", borderColor: "primary.main", fontStyle: "italic", lineHeight: 1.65 }}>{chapter.detail}</Typography>
+                    <Typography variant="h3" sx={{ fontSize: { xs: "1.8rem", sm: "2.25rem", md: "2.65rem" }, fontWeight: 750, lineHeight: 1.16, letterSpacing: "-0.035em", textWrap: "balance" }}>{chapter.title}</Typography>
+                    <Typography color="text.secondary" sx={{ lineHeight: 1.85, maxWidth: "65ch" }}>{chapter.body}</Typography>
+                    <Typography sx={{ p: { xs: 2, sm: 2.5 }, borderLeft: "2px solid", borderColor: "primary.main", borderRadius: "0 12px 12px 0", bgcolor: isDark ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.7)", fontFamily: "Georgia, serif", fontStyle: "italic", lineHeight: 1.8 }}>{chapter.detail}</Typography>
                   </Stack>
                 </Paper>
               </motion.div>
@@ -101,7 +101,7 @@ export function AboutYuyu() {
       </Box>
 
       <Box component="section" aria-labelledby="about-principles-title" sx={{ mt: { xs: 2, md: 4 }, mb: { xs: 6, md: 10 } }}>
-        <Stack spacing={1} sx={{ maxWidth: 700, mb: { xs: 3, md: 4 } }}>
+        <Stack spacing={1} sx={{ maxWidth: 700, mb: { xs: 4, md: 5 }, mx: "auto", alignItems: "center", textAlign: "center" }}>
           <Typography variant="overline" sx={{ color: isDark ? "#7CF5B6" : "#087A5A", fontWeight: 800, letterSpacing: "0.13em" }}>WHAT YUYU STANDS FOR</Typography>
           <Typography id="about-principles-title" variant="h2" sx={{ color: strongInk, fontSize: { xs: "2rem", md: "3rem" }, fontWeight: 850, letterSpacing: "-0.055em" }}>A few principles, held on purpose.</Typography>
           <Typography color="text.secondary" sx={{ maxWidth: 620, lineHeight: 1.7 }}>These are not extras to add later. They shape how Yuyu is designed, built, and operated today.</Typography>
@@ -112,7 +112,7 @@ export function AboutYuyu() {
             return (
               <Grid key={principle.title} size={{ xs: 12, sm: 6 }}>
                 <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.25 }} transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : index * 0.06 }} style={{ height: "100%" }}>
-                  <Paper variant="outlined" sx={{ height: "100%", p: { xs: 3, md: 3.5 }, borderRadius: 4, background: isDark ? "linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))" : `linear-gradient(145deg, ${principle.surface}, rgba(255,255,255,0.94) 58%)`, borderColor: isDark ? "divider" : "rgba(75,92,118,0.14)", transition: "transform 180ms ease, box-shadow 180ms ease", "&:hover": { transform: "translateY(-4px)", boxShadow: isDark ? "0 18px 42px rgba(0,0,0,0.2)" : "0 20px 46px rgba(53,70,99,0.13)" } }}>
+                  <Paper variant="outlined" sx={{ height: "100%", p: { xs: 3, md: 4 }, borderRadius: 4, background: isDark ? "linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))" : `linear-gradient(145deg, ${principle.surface}, rgba(255,255,255,0.98) 28%)`, borderColor: isDark ? "divider" : "rgba(75,92,118,0.14)", transition: prefersReducedMotion ? "none" : "transform 240ms ease, box-shadow 240ms ease", "&:hover": { transform: prefersReducedMotion ? "none" : "translateY(-3px)", boxShadow: isDark ? "0 18px 42px rgba(0,0,0,0.2)" : "0 12px 32px rgba(53,70,99,0.08)" } }}>
                     <Stack spacing={2}>
                       <Box sx={{ width: 50, height: 50, display: "grid", placeItems: "center", borderRadius: 3, color: isDark ? "text.primary" : principle.color, bgcolor: isDark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.72)", border: "1px solid", borderColor: isDark ? "divider" : "rgba(255,255,255,0.9)" }}><Icon /></Box>
                       <Typography variant="h5" sx={{ color: strongInk, fontWeight: 800 }}>{principle.title}</Typography>
@@ -131,7 +131,7 @@ export function AboutYuyu() {
         <Grid container spacing={4} sx={{ position: "relative", alignItems: "center" }}>
           <Grid size={{ xs: 12, md: 5 }}>
             <Typography variant="overline" sx={{ color: isDark ? "#B9AEFF" : "#5E4DB2", fontWeight: 800, letterSpacing: "0.12em" }}>ROOM FOR MANY KINDS OF COMMUNITY</Typography>
-            <Typography variant="h3" sx={{ mt: 1, fontWeight: 850, letterSpacing: "-0.05em" }}>Made for gatherings with a reason to exist.</Typography>
+            <Typography variant="h3" sx={{ mt: 1.5, fontSize: { xs: "2rem", md: "2.65rem" }, lineHeight: 1.15, fontWeight: 750, letterSpacing: "-0.035em", textWrap: "balance" }}>Made for gatherings with a reason to exist.</Typography>
           </Grid>
           <Grid size={{ xs: 12, md: 7 }}>
             <Typography sx={{ mb: 2.5, lineHeight: 1.7, color: isDark ? "text.secondary" : "rgba(23,34,56,0.74)" }}>Yuyu is for organisers who care about the room they are creating—not monetising the doorway. Big or small, one-time or recurring, the gathering stays at the centre.</Typography>
@@ -144,9 +144,9 @@ export function AboutYuyu() {
         <Paper variant="outlined" sx={{ p: { xs: 3.5, sm: 5 }, borderRadius: 4, textAlign: { xs: "left", sm: "center" }, background: isDark ? "radial-gradient(circle at 50% 0%, rgba(124,245,182,0.18), transparent 64%), linear-gradient(135deg, rgba(10,132,255,0.08), rgba(185,174,255,0.1))" : "radial-gradient(circle at 50% 0%, rgba(100,224,164,0.42), transparent 62%), linear-gradient(135deg, #F0F7FF, #F3ECFF 55%, #FFF1E8)", borderColor: isDark ? "divider" : "rgba(75,92,118,0.16)", boxShadow: isDark ? "none" : "0 22px 58px rgba(53,70,99,0.12)" }}>
           <Stack spacing={2} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
             <Typography variant="overline" color="primary" sx={{ fontWeight: 800, letterSpacing: "0.12em" }}>THE NEXT CHAPTER</Typography>
-            <Typography variant="h3" sx={{ maxWidth: 620, fontWeight: 800, letterSpacing: "-0.05em" }}>The story gets better with people in the room.</Typography>
+            <Typography variant="h3" sx={{ maxWidth: 620, fontSize: { xs: "2rem", md: "2.8rem" }, lineHeight: 1.15, fontWeight: 750, letterSpacing: "-0.035em", textWrap: "balance" }}>The story gets better with people in the room.</Typography>
             <Typography color="text.secondary" sx={{ maxWidth: 580, lineHeight: 1.65 }}>Explore the gatherings being hosted with Yuyu—or start shaping one of your own.</Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ width: { xs: "100%", sm: "auto" } }}><Button component={Link} href="/discover" variant="contained" size="large" endIcon={<ArrowForwardIcon />}>Explore events</Button><Button component="a" href="https://abhiramnj.com" target="_blank" rel="noreferrer" variant="outlined" size="large" endIcon={<OpenInNewOutlinedIcon />}>Visit Abhiram&apos;s portfolio</Button></Stack>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ width: { xs: "100%", sm: "auto" }, pt: 1.5, "& .MuiButton-root": { borderRadius: 999, px: 3, py: 1.5, textTransform: "none", fontWeight: 700 } }}><Button component={Link} href="/discover" variant="contained" size="large" endIcon={<ArrowForwardIcon />}>Explore events</Button><Button component="a" href="https://abhiramnj.com" target="_blank" rel="noreferrer" variant="outlined" size="large" endIcon={<OpenInNewOutlinedIcon />}>Visit Abhiram&apos;s portfolio</Button></Stack>
           </Stack>
         </Paper>
       </motion.div>
