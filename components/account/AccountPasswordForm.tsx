@@ -6,9 +6,9 @@ import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { updateAccountPassword } from "@/app/actions/account";
+import { PasswordTextField } from "@/components/forms/PasswordTextField";
 
 export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -69,9 +69,8 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
         </Stack>
         {error ? <Alert severity="error">{error}</Alert> : null}
         {hasPassword ? (
-          <TextField
+          <PasswordTextField
             label="Current password"
-            type="password"
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.target.value)}
             autoComplete="current-password"
@@ -79,9 +78,8 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
             fullWidth
           />
         ) : null}
-        <TextField
+        <PasswordTextField
           label="New password"
-          type="password"
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
           autoComplete="new-password"
@@ -91,9 +89,8 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
           required
           fullWidth
         />
-        <TextField
+        <PasswordTextField
           label="Confirm new password"
-          type="password"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
           autoComplete="new-password"

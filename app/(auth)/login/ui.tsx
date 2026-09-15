@@ -15,6 +15,7 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import { safeAuthRedirect } from "@/lib/authRedirect";
 import { resendEmailVerification, signUpWithPassword } from "@/app/actions/auth";
+import { PasswordTextField } from "@/components/forms/PasswordTextField";
 
 function GoogleMark(props: { size?: number }) {
   const size = props.size ?? 18;
@@ -414,9 +415,8 @@ export function LoginForm({ accountCreationEnabled, googleSsoConfigured }: { acc
           helperText={fieldErrors.email?.[0]}
           sx={inputSx}
         />
-        <TextField
+        <PasswordTextField
           label="Password"
-          type="password"
           required
           fullWidth
           value={password}

@@ -16,6 +16,7 @@ import {
   requestPasswordReset,
   confirmPasswordReset,
 } from "@/app/actions/password-reset";
+import { PasswordTextField } from "@/components/forms/PasswordTextField";
 
 const inputSx = {
   "& .MuiInputLabel-root": { color: "text.secondary" },
@@ -183,9 +184,8 @@ export function ResetPasswordForm(props: { token: string; email: string }) {
                   spacing={2}
                   onSubmit={handleReset}
                 >
-                  <TextField
+                  <PasswordTextField
                     label="New Password"
-                    type="password"
                     required
                     fullWidth
                     value={password}
