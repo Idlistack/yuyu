@@ -21,5 +21,6 @@ describe("embedding response headers", () => {
     const eventPage = await proxy(new NextRequest("https://events.example.test/acme/launch"));
     expect(eventPage.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
     expect(eventPage.headers.get("x-frame-options")).toBe("DENY");
+    expect(eventPage.headers.get("cache-control")).toContain("no-transform");
   });
 });

@@ -9,6 +9,7 @@
 - Private S3-compatible object storage for generated safe image derivatives.
 - Transactional email with a verified sending domain, SPF, DKIM, DMARC, bounce handling, and delivery monitoring.
 - Edge TLS termination and WAF/rate limiting. Configure only proxy headers that the edge overwrites.
+- If Cloudflare proxies the application, disable Email Address Obfuscation for the application hostname. Yuyu sends `Cache-Control: no-transform` on HTML responses so Cloudflare does not inject its unsigned email-decoder script into pages protected by the nonce-based CSP.
 
 ## Deploy procedure
 

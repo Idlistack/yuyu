@@ -124,6 +124,11 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
+  // Cloudflare Email Address Obfuscation injects an unsigned decoder script
+  // after this CSP has been generated. Its script is intentionally blocked by
+  // the per-request nonce policy, so instruct intermediaries not to transform
+  // application HTML.
+  response.headers.set("Cache-Control", "no-transform");
   if (!isEmbedPage) response.headers.set("X-Frame-Options", "DENY");
   return response;
 }
