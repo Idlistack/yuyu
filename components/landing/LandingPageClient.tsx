@@ -24,6 +24,7 @@ import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOu
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import StarsIcon from "@mui/icons-material/Stars";
 import GitHubIcon from "@mui/icons-material/GitHub";
+import { LetterOpening } from "./LetterOpening";
 import CloseIcon from "@mui/icons-material/Close";
 import MarkunreadMailboxOutlinedIcon from "@mui/icons-material/MarkunreadMailboxOutlined";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
@@ -83,18 +84,6 @@ export function LandingPageClient(props: { getStartedHref: string }) {
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isBuildingNoteOpen]);
-
-  useEffect(() => {
-    if (!isBuildingNoteOpen || prefersReducedMotion) return;
-    const unseal = window.setTimeout(() => setBuildingNoteStage("unsealing"), 650);
-    const open = window.setTimeout(() => setBuildingNoteStage("opening"), 1_150);
-    const reveal = window.setTimeout(() => setBuildingNoteStage("letter"), 1_750);
-    return () => {
-      window.clearTimeout(unseal);
-      window.clearTimeout(open);
-      window.clearTimeout(reveal);
-    };
-  }, [isBuildingNoteOpen, prefersReducedMotion]);
 
   // Grid background style
   const gridBackground = {
@@ -756,7 +745,7 @@ export function LandingPageClient(props: { getStartedHref: string }) {
               component={motion.article}
               role="dialog"
               aria-modal="true"
-              aria-labelledby="building-note-title"
+              aria-label="A building note: From RForum to Yuyu"
               initial={prefersReducedMotion ? false : { opacity: 0, y: 36, scale: 0.94 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20, scale: 0.97 }}
@@ -771,66 +760,26 @@ export function LandingPageClient(props: { getStartedHref: string }) {
                 boxShadow: "0 28px 80px rgba(0,0,0,0.45)",
               }}
             >
-              <Box
-                aria-hidden
-                component={motion.div}
-                initial={prefersReducedMotion ? false : { opacity: 0, y: -18, rotateX: -35 }}
-                animate={{ opacity: displayedBuildingNoteStage === "sealed" ? 1 : 0.38, y: 0, rotateX: 0 }}
-                transition={{ duration: prefersReducedMotion ? 0 : 0.45, delay: prefersReducedMotion ? 0 : 0.05 }}
-                sx={{
-                  height: { xs: 104, sm: 128 },
-                  position: "relative",
-                  overflow: "hidden",
-                  background: "linear-gradient(135deg, #0F5B4C, #123B50 58%, #342D65)",
-                  borderBottom: "1px solid rgba(255,255,255,0.12)",
-                }}
-              >
-                <Box sx={{ position: "absolute", width: 176, height: 104, left: "50%", bottom: -22, transform: "translateX(-50%)", borderRadius: "88px 88px 14px 14px", border: "2px solid rgba(255,255,255,0.35)", background: "rgba(3,18,20,0.22)" }} />
-                <Box component={motion.div} animate={{ rotateX: displayedBuildingNoteStage === "sealed" ? 0 : -28 }} transition={{ duration: prefersReducedMotion ? 0 : 0.35, ease: "easeInOut" }} sx={{ position: "absolute", width: 174, height: 52, left: "50%", bottom: 44, transform: "translateX(-50%)", transformOrigin: "bottom", borderRadius: "88px 88px 0 0", border: "2px solid rgba(255,255,255,0.42)", background: "linear-gradient(180deg, rgba(88,206,163,0.48), rgba(8,59,55,0.85))" }} />
-                <Box sx={{ position: "absolute", left: "50%", bottom: 17, transform: "translateX(-50%)", width: 20, height: 20, borderRadius: "50%", bgcolor: "#EEC76B", border: "2px solid rgba(57,38,10,0.45)", boxShadow: "0 2px 6px rgba(0,0,0,0.24)" }} />
-              </Box>
-
-              <IconButton aria-label="Close building note" onClick={() => setIsBuildingNoteOpen(false)} sx={{ position: "absolute", top: 12, right: 12, zIndex: 1, color: "#fff", bgcolor: "rgba(0,0,0,0.2)", "&:hover": { bgcolor: "rgba(0,0,0,0.38)" } }}>
+              <IconButton aria-label="Close building note" onClick={() => setIsBuildingNoteOpen(false)} sx={{ position: "absolute", top: 12, right: 12, zIndex: 6, color: "#fff", bgcolor: "rgba(0,0,0,0.2)", "&:hover": { bgcolor: "rgba(0,0,0,0.38)" } }}>
                 <CloseIcon />
               </IconButton>
 
-              <Box aria-hidden sx={{ height: { xs: 210, sm: 250 }, position: "relative", display: "grid", placeItems: "center", perspective: "900px", overflow: "hidden" }}>
-                <Box
-                  component={motion.div}
-                  initial={prefersReducedMotion ? false : { opacity: 0, y: -36, scale: 0.92 }}
-                  animate={{ opacity: 1, y: displayedBuildingNoteStage === "letter" ? -34 : 0, scale: 1 }}
-                  transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: "easeOut" }}
-                  sx={{ position: "relative", width: { xs: 260, sm: 330 }, height: { xs: 164, sm: 194 }, filter: "drop-shadow(0 16px 18px rgba(0,0,0,0.22))" }}
-                >
-                  <Box sx={{ position: "absolute", inset: 0, borderRadius: 2, background: "linear-gradient(145deg, #E9D6A7, #CBAA70)", border: "1px solid rgba(74,48,18,0.3)" }} />
-                  <Box
-                    component={motion.div}
-                    animate={{ rotateX: displayedBuildingNoteStage === "opening" || displayedBuildingNoteStage === "letter" ? -178 : 0 }}
-                    transition={{ duration: prefersReducedMotion ? 0 : 0.5, ease: "easeInOut" }}
-                    sx={{ position: "absolute", zIndex: 3, left: 0, top: 0, width: "100%", height: "56%", transformOrigin: "top", clipPath: "polygon(0 0, 100% 0, 50% 100%)", background: "linear-gradient(145deg, #F4E6BE, #D6B879)", borderTopLeftRadius: 7, borderTopRightRadius: 7, backfaceVisibility: "hidden" }}
-                  />
-                  <Box sx={{ position: "absolute", zIndex: 2, left: 0, bottom: 0, width: "100%", height: "60%", clipPath: "polygon(0 0, 50% 72%, 100% 0, 100% 100%, 0 100%)", background: "linear-gradient(145deg, #E8D4A2, #C39B5D)" }} />
-                  <Box
-                    component={motion.div}
-                    animate={{ opacity: displayedBuildingNoteStage === "sealed" ? 1 : 0, y: displayedBuildingNoteStage === "sealed" ? 0 : -68, scale: displayedBuildingNoteStage === "sealed" ? 1 : 0.72, rotate: displayedBuildingNoteStage === "sealed" ? 0 : -18 }}
-                    transition={{ duration: prefersReducedMotion ? 0 : 0.4, ease: "easeIn" }}
-                    sx={{ position: "absolute", zIndex: 4, width: 42, height: 42, left: "calc(50% - 21px)", top: "calc(50% - 21px)", display: "grid", placeItems: "center", borderRadius: "50%", color: "#5A280E", fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 12, border: "2px solid rgba(81,31,10,0.55)", background: "radial-gradient(circle at 35% 30%, #F1B75F, #A9481A 72%)", boxShadow: "0 3px 7px rgba(65,26,5,0.35)" }}
-                  >
-                    Y
-                  </Box>
-                </Box>
-              </Box>
+              {displayedBuildingNoteStage !== "letter" && (
+                <LetterOpening onOpened={() => setBuildingNoteStage("letter")} />
+              )}
 
               <AnimatePresence mode="wait">
                 {displayedBuildingNoteStage === "letter" ? <Box
                 key="building-note-letter"
                 component={motion.div}
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 42, rotate: 1.2 }}
-                animate={{ opacity: 1, y: 0, rotate: 0 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: -24, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: "easeOut" }}
                 sx={{
                   m: { xs: 1.25, sm: 2 },
-                  mt: { xs: -4, sm: -5 },
+                  mt: { xs: 1.25, sm: 2 },
+                  maxHeight: "calc(100dvh - 100px)",
+                  overflowY: "auto",
                   position: "relative",
                   zIndex: 1,
                   p: { xs: 3, sm: 5 },
