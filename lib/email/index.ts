@@ -1,5 +1,7 @@
 import type { RsvpStatus } from "@prisma/client";
 import { getEmailTransport } from "./transporter";
+import { calendarInviteFilename, createCalendarInvite } from "@/lib/calendarInvite";
+import { safeTimeZone } from "@/lib/timeZone";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]!);
@@ -14,11 +16,30 @@ function getBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 }
 
+function formatEventDateTime(value: Date, timezone: string) {
+  return value.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: safeTimeZone(timezone),
+    timeZoneName: "short",
+  });
+}
+
 export async function sendRSVPConfirmation(params: {
   to: string;
   eventTitle: string;
   status: RsvpStatus;
   checkInToken?: string;
+  calendarEvent?: {
+    startDateTime: Date;
+    endDateTime: Date;
+    timezone: string;
+    location?: string | null;
+  };
   messageId?: string;
 }): Promise<void> {
   const { transporter, from } = await getEmailTransport();
@@ -28,6 +49,13 @@ export async function sendRSVPConfirmation(params: {
   const safeTitle = escapeHtml(params.eventTitle);
   const subjectTitle = headerText(params.eventTitle);
   const safeTicketUrl = ticketUrl ? escapeHtml(ticketUrl) : null;
+  const eventDetails = params.status === "CONFIRMED" && params.calendarEvent
+    ? {
+      startsAt: formatEventDateTime(params.calendarEvent.startDateTime, params.calendarEvent.timezone),
+      endsAt: formatEventDateTime(params.calendarEvent.endDateTime, params.calendarEvent.timezone),
+      location: params.calendarEvent.location?.trim() || null,
+    }
+    : null;
 
   let statusText = "Confirmed";
   let statusMessage = "Your RSVP has been confirmed. We look forward to seeing you!";
@@ -57,6 +85,14 @@ export async function sendRSVPConfirmation(params: {
               Hello,<br><br>
               Thank you for registering for <strong>${safeTitle}</strong>. ${statusMessage}
             </p>
+            ${eventDetails ? `
+              <div style="margin: 24px 0; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #f8f9fa;">
+                <h3 style="margin: 0 0 12px; color: #6750A4; font-size: 16px;">Event details</h3>
+                <p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Starts:</strong> ${escapeHtml(eventDetails.startsAt)}</p>
+                <p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Ends:</strong> ${escapeHtml(eventDetails.endsAt)}</p>
+                ${eventDetails.location ? `<p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Location:</strong> ${escapeHtml(eventDetails.location)}</p>` : ""}
+              </div>
+            ` : ""}
             ${
               ticketUrl && params.status === "CONFIRMED"
                 ? `
@@ -82,7 +118,7 @@ export async function sendRSVPConfirmation(params: {
     </html>
   `;
 
-  const text = `RSVP ${statusText}: ${params.eventTitle}\n\nHello,\n\nThank you for registering for "${params.eventTitle}". ${statusMessage}${ticketUrl && params.status === "CONFIRMED" ? `\n\nView your ticket here: ${ticketUrl}` : ""}\n\nBest regards,\nYuyu Events`;
+  const text = `RSVP ${statusText}: ${params.eventTitle}\n\nHello,\n\nThank you for registering for "${params.eventTitle}". ${statusMessage}${eventDetails ? `\n\nEvent details\nStarts: ${eventDetails.startsAt}\nEnds: ${eventDetails.endsAt}${eventDetails.location ? `\nLocation: ${eventDetails.location}` : ""}` : ""}${ticketUrl && params.status === "CONFIRMED" ? `\n\nView your ticket here: ${ticketUrl}` : ""}\n\nBest regards,\nYuyu Events`;
 
   if (!transporter) {
     // Email bodies can contain attendee PII and bearer ticket links. Mock
@@ -98,6 +134,17 @@ export async function sendRSVPConfirmation(params: {
     subject: `RSVP ${statusText}: ${subjectTitle}`,
     text,
     html,
+    attachments: params.status === "CONFIRMED" && params.calendarEvent
+      ? [{
+        filename: calendarInviteFilename(params.eventTitle),
+        content: createCalendarInvite({
+          ...params.calendarEvent,
+          title: params.eventTitle,
+          uid: params.messageId?.replace(/[<>]/g, "") ?? `yuyu-${Date.now()}@calendar.yuyu.invalid`,
+        }),
+        contentType: "text/calendar; charset=utf-8; method=PUBLISH",
+      }]
+      : undefined,
   });
 }
 

@@ -181,12 +181,29 @@ function asRsvpStatusPayload(value: Prisma.JsonValue): RsvpStatusPayload | null 
   return payload as RsvpStatusPayload;
 }
 
-async function hasCurrentRsvpStatus(checkInToken: string, status: RsvpStatus) {
-  const rsvp = await prisma.rSVP.findUnique({
+async function getCurrentRsvp(checkInToken: string) {
+  return prisma.rSVP.findUnique({
     where: { checkInToken },
-    select: { status: true },
+    select: {
+      status: true,
+      event: { select: { startDateTime: true, endDateTime: true, timezone: true, location: true } },
+      eventInstance: { select: { startDateTime: true, endDateTime: true, series: { select: { timezone: true } } } },
+    },
   });
-  return rsvp?.status === status;
+}
+
+function calendarEvent(rsvp: Awaited<ReturnType<typeof getCurrentRsvp>>) {
+  if (rsvp?.event) {
+    return rsvp.event;
+  }
+  if (rsvp?.eventInstance) {
+    return {
+      startDateTime: rsvp.eventInstance.startDateTime,
+      endDateTime: rsvp.eventInstance.endDateTime,
+      timezone: rsvp.eventInstance.series.timezone,
+    };
+  }
+  return undefined;
 }
 
 function asPasswordResetPayload(value: Prisma.JsonValue): PasswordResetPayload | null {
@@ -256,16 +273,18 @@ export async function deliverOutboxBatch(limit = 20) {
       if (message.kind === "rsvp-confirmation") {
         const payload = asRsvpConfirmationPayload(message.payload);
         if (!payload) throw new PermanentOutboxError();
-        if (!(await hasCurrentRsvpStatus(payload.checkInToken, payload.status))) {
+        const rsvp = await getCurrentRsvp(payload.checkInToken);
+        if (rsvp?.status !== payload.status) {
           await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });
           continue;
         }
-        await sendRSVPConfirmation({ ...payload, messageId: stableMessageId });
+        await sendRSVPConfirmation({ ...payload, calendarEvent: calendarEvent(rsvp), messageId: stableMessageId });
       } else if (message.kind === "rsvp-status") {
         const payload = asRsvpStatusPayload(message.payload);
         if (!payload) throw new PermanentOutboxError();
         if (payload.approved) {
-          if (!(await hasCurrentRsvpStatus(payload.checkInToken!, RsvpStatus.CONFIRMED))) {
+          const rsvp = await getCurrentRsvp(payload.checkInToken!);
+          if (rsvp?.status !== RsvpStatus.CONFIRMED) {
             await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });
             continue;
           }
@@ -274,6 +293,7 @@ export async function deliverOutboxBatch(limit = 20) {
             eventTitle: payload.eventTitle,
             status: RsvpStatus.CONFIRMED,
             checkInToken: payload.checkInToken,
+            calendarEvent: calendarEvent(rsvp),
             messageId: stableMessageId,
           });
         } else {
