@@ -21,7 +21,6 @@ import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import CloudDoneOutlinedIcon from "@mui/icons-material/CloudDoneOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import StarsIcon from "@mui/icons-material/Stars";
 import GitHubIcon from "@mui/icons-material/GitHub";
@@ -142,7 +141,7 @@ export function LandingPageClient(props: { getStartedHref: string }) {
                 >
                   <StarsIcon sx={{ fontSize: 16, color: "#7CF5B6" }} />
                   <Typography variant="caption" sx={{ color: "#7CF5B6", fontWeight: 700, letterSpacing: 0.5 }}>
-                    SELF-HOSTED & SOURCE AVAILABLE
+                    SELF-HOSTABLE & OPEN SOURCE
                   </Typography>
                 </Box>
               </motion.div>
@@ -213,7 +212,7 @@ export function LandingPageClient(props: { getStartedHref: string }) {
                         },
                       }}
                     >
-                      Start hosting free
+                      Start organizing free
                     </Button>
                   </Link>
 
@@ -652,32 +651,6 @@ export function LandingPageClient(props: { getStartedHref: string }) {
                 Deploy Yuyu on your own server, retain control of your event data, and manage meetups with confidence.
               </Typography>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                <Link href={getStartedHref} style={{ textDecoration: "none" }}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    component="span"
-                    endIcon={<KeyboardArrowRightIcon />}
-                    sx={{
-                      px: 5,
-                      py: 1.75,
-                      borderRadius: 999,
-                      fontWeight: 700,
-                      fontSize: "0.95rem",
-                      boxShadow: "0 8px 25px rgba(124, 245, 182, 0.25)",
-                      background: "linear-gradient(135deg, #7CF5B6 0%, #B9AEFF 100%)",
-                      color: "#061814",
-                      transition: "all 0.2s ease-in-out",
-                      "&:hover": {
-                        transform: "translateY(-2px)",
-                        boxShadow: "0 12px 30px rgba(124, 245, 182, 0.4)",
-                        background: "linear-gradient(135deg, #90ffd0 0%, #cac0ff 100%)",
-                      },
-                    }}
-                  >
-                    Get started now
-                  </Button>
-                </Link>
                 <Button
                   component="a"
                   href={GITHUB_REPOSITORY_URL}

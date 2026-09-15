@@ -24,6 +24,10 @@ const sections = [
     body: "Information is used to provide and secure the event service: to authenticate users, create and manage events, accept and manage registrations, issue tickets, support check-in, send transactional email, and investigate security or operational issues. Event organisers may use attendee information to run their events and communicate with registered attendees. Yuyu does not sell personal information.",
   },
   {
+    title: "Analytics",
+    body: "This instance uses Plausible Analytics to understand aggregated page use. Analytics receives page origins and paths without query strings; ticket, invitation, password-reset, and email-verification routes are excluded. It does not receive attendee details, registration answers, or feedback content.",
+  },
+  {
     title: "Sharing and service providers",
     body: "Information is shared only as needed to deliver the service or where required by law. A deployment operator may use infrastructure providers for hosting, private object storage, email delivery, backups, or monitoring. Organisers can access information for events and organisations they are authorised to manage. Public event pages expose only the details the organiser chooses to publish.",
   },
@@ -56,7 +60,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Last updated August 28, 2026
+          Last updated September 15, 2026
         </Typography>
       </Stack>
 
