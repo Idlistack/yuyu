@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion, type TargetAndTransition, type Variants } from "framer-motion";
 import Box from "@mui/material/Box";
@@ -24,6 +24,10 @@ import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOu
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import StarsIcon from "@mui/icons-material/Stars";
 import GitHubIcon from "@mui/icons-material/GitHub";
+import CloseIcon from "@mui/icons-material/Close";
+import MarkunreadMailboxOutlinedIcon from "@mui/icons-material/MarkunreadMailboxOutlined";
+import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import IconButton from "@mui/material/IconButton";
 
 const GITHUB_REPOSITORY_URL = "https://github.com/twilighty-abhi/yuyu";
 
@@ -57,6 +61,8 @@ const floatAnimation: { animate: TargetAndTransition } = {
 export function LandingPageClient(props: { getStartedHref: string }) {
   const { getStartedHref } = props;
   const [activeTab, setActiveTab] = useState<"rsvp" | "waitlist" | "checkin">("rsvp");
+  const [isBuildingNoteOpen, setIsBuildingNoteOpen] = useState(false);
+  const [buildingNoteStage, setBuildingNoteStage] = useState<"sealed" | "unsealing" | "opening" | "letter">("sealed");
   const prefersReducedMotion = useReducedMotion();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -67,6 +73,28 @@ export function LandingPageClient(props: { getStartedHref: string }) {
   const accentGradient = isDark
     ? "linear-gradient(135deg, #7CF5B6 10%, #B9AEFF 100%)"
     : "linear-gradient(135deg, #087A5A 10%, #2D63C8 100%)";
+  const displayedBuildingNoteStage = prefersReducedMotion ? "letter" : buildingNoteStage;
+
+  useEffect(() => {
+    if (!isBuildingNoteOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsBuildingNoteOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isBuildingNoteOpen]);
+
+  useEffect(() => {
+    if (!isBuildingNoteOpen || prefersReducedMotion) return;
+    const unseal = window.setTimeout(() => setBuildingNoteStage("unsealing"), 650);
+    const open = window.setTimeout(() => setBuildingNoteStage("opening"), 1_150);
+    const reveal = window.setTimeout(() => setBuildingNoteStage("letter"), 1_750);
+    return () => {
+      window.clearTimeout(unseal);
+      window.clearTimeout(open);
+      window.clearTimeout(reveal);
+    };
+  }, [isBuildingNoteOpen, prefersReducedMotion]);
 
   // Grid background style
   const gridBackground = {
@@ -241,6 +269,29 @@ export function LandingPageClient(props: { getStartedHref: string }) {
                       Explore public events
                     </Button>
                   </Link>
+
+                  <Button
+                    variant="text"
+                    size="large"
+                    startIcon={<MarkunreadMailboxOutlinedIcon />}
+                    onClick={() => {
+                      setBuildingNoteStage("sealed");
+                      setIsBuildingNoteOpen(true);
+                    }}
+                    sx={{
+                      px: 2,
+                      borderRadius: 2.5,
+                      color: "text.secondary",
+                      fontWeight: 700,
+                      textTransform: "none",
+                      "&:hover": {
+                        color: "text.primary",
+                        backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(60,60,67,0.06)",
+                      },
+                    }}
+                  >
+                    Read the building note
+                  </Button>
                 </Stack>
               </motion.div>
             </motion.div>
@@ -677,6 +728,153 @@ export function LandingPageClient(props: { getStartedHref: string }) {
           </Paper>
         </motion.div>
       </Box>
+
+      <AnimatePresence>
+        {isBuildingNoteOpen ? (
+          <Box
+            component={motion.div}
+            role="presentation"
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setIsBuildingNoteOpen(false);
+            }}
+            sx={{
+              position: "fixed",
+              inset: 0,
+              zIndex: (theme) => theme.zIndex.modal + 1,
+              display: "grid",
+              placeItems: "center",
+              p: { xs: 1.5, sm: 3 },
+              overflowY: "auto",
+              backgroundColor: "rgba(4, 12, 17, 0.7)",
+              backdropFilter: "blur(9px)",
+            }}
+          >
+            <Box
+              component={motion.article}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="building-note-title"
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 36, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={prefersReducedMotion ? undefined : { opacity: 0, y: 20, scale: 0.97 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.42, ease: "easeOut" }}
+              sx={{
+                position: "relative",
+                width: "min(100%, 760px)",
+                my: "auto",
+                borderRadius: { xs: 3, sm: 4 },
+                overflow: "hidden",
+                background: isDark ? "#17221F" : "#FCF7E9",
+                boxShadow: "0 28px 80px rgba(0,0,0,0.45)",
+              }}
+            >
+              <Box
+                aria-hidden
+                component={motion.div}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: -18, rotateX: -35 }}
+                animate={{ opacity: displayedBuildingNoteStage === "sealed" ? 1 : 0.38, y: 0, rotateX: 0 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.45, delay: prefersReducedMotion ? 0 : 0.05 }}
+                sx={{
+                  height: { xs: 104, sm: 128 },
+                  position: "relative",
+                  overflow: "hidden",
+                  background: "linear-gradient(135deg, #0F5B4C, #123B50 58%, #342D65)",
+                  borderBottom: "1px solid rgba(255,255,255,0.12)",
+                }}
+              >
+                <Box sx={{ position: "absolute", width: 176, height: 104, left: "50%", bottom: -22, transform: "translateX(-50%)", borderRadius: "88px 88px 14px 14px", border: "2px solid rgba(255,255,255,0.35)", background: "rgba(3,18,20,0.22)" }} />
+                <Box component={motion.div} animate={{ rotateX: displayedBuildingNoteStage === "sealed" ? 0 : -28 }} transition={{ duration: prefersReducedMotion ? 0 : 0.35, ease: "easeInOut" }} sx={{ position: "absolute", width: 174, height: 52, left: "50%", bottom: 44, transform: "translateX(-50%)", transformOrigin: "bottom", borderRadius: "88px 88px 0 0", border: "2px solid rgba(255,255,255,0.42)", background: "linear-gradient(180deg, rgba(88,206,163,0.48), rgba(8,59,55,0.85))" }} />
+                <Box sx={{ position: "absolute", left: "50%", bottom: 17, transform: "translateX(-50%)", width: 20, height: 20, borderRadius: "50%", bgcolor: "#EEC76B", border: "2px solid rgba(57,38,10,0.45)", boxShadow: "0 2px 6px rgba(0,0,0,0.24)" }} />
+              </Box>
+
+              <IconButton aria-label="Close building note" onClick={() => setIsBuildingNoteOpen(false)} sx={{ position: "absolute", top: 12, right: 12, zIndex: 1, color: "#fff", bgcolor: "rgba(0,0,0,0.2)", "&:hover": { bgcolor: "rgba(0,0,0,0.38)" } }}>
+                <CloseIcon />
+              </IconButton>
+
+              <Box aria-hidden sx={{ height: { xs: 210, sm: 250 }, position: "relative", display: "grid", placeItems: "center", perspective: "900px", overflow: "hidden" }}>
+                <Box
+                  component={motion.div}
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: -36, scale: 0.92 }}
+                  animate={{ opacity: 1, y: displayedBuildingNoteStage === "letter" ? -34 : 0, scale: 1 }}
+                  transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: "easeOut" }}
+                  sx={{ position: "relative", width: { xs: 260, sm: 330 }, height: { xs: 164, sm: 194 }, filter: "drop-shadow(0 16px 18px rgba(0,0,0,0.22))" }}
+                >
+                  <Box sx={{ position: "absolute", inset: 0, borderRadius: 2, background: "linear-gradient(145deg, #E9D6A7, #CBAA70)", border: "1px solid rgba(74,48,18,0.3)" }} />
+                  <Box
+                    component={motion.div}
+                    animate={{ rotateX: displayedBuildingNoteStage === "opening" || displayedBuildingNoteStage === "letter" ? -178 : 0 }}
+                    transition={{ duration: prefersReducedMotion ? 0 : 0.5, ease: "easeInOut" }}
+                    sx={{ position: "absolute", zIndex: 3, left: 0, top: 0, width: "100%", height: "56%", transformOrigin: "top", clipPath: "polygon(0 0, 100% 0, 50% 100%)", background: "linear-gradient(145deg, #F4E6BE, #D6B879)", borderTopLeftRadius: 7, borderTopRightRadius: 7, backfaceVisibility: "hidden" }}
+                  />
+                  <Box sx={{ position: "absolute", zIndex: 2, left: 0, bottom: 0, width: "100%", height: "60%", clipPath: "polygon(0 0, 50% 72%, 100% 0, 100% 100%, 0 100%)", background: "linear-gradient(145deg, #E8D4A2, #C39B5D)" }} />
+                  <Box
+                    component={motion.div}
+                    animate={{ opacity: displayedBuildingNoteStage === "sealed" ? 1 : 0, y: displayedBuildingNoteStage === "sealed" ? 0 : -68, scale: displayedBuildingNoteStage === "sealed" ? 1 : 0.72, rotate: displayedBuildingNoteStage === "sealed" ? 0 : -18 }}
+                    transition={{ duration: prefersReducedMotion ? 0 : 0.4, ease: "easeIn" }}
+                    sx={{ position: "absolute", zIndex: 4, width: 42, height: 42, left: "calc(50% - 21px)", top: "calc(50% - 21px)", display: "grid", placeItems: "center", borderRadius: "50%", color: "#5A280E", fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 12, border: "2px solid rgba(81,31,10,0.55)", background: "radial-gradient(circle at 35% 30%, #F1B75F, #A9481A 72%)", boxShadow: "0 3px 7px rgba(65,26,5,0.35)" }}
+                  >
+                    Y
+                  </Box>
+                </Box>
+              </Box>
+
+              <AnimatePresence mode="wait">
+                {displayedBuildingNoteStage === "letter" ? <Box
+                key="building-note-letter"
+                component={motion.div}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 42, rotate: 1.2 }}
+                animate={{ opacity: 1, y: 0, rotate: 0 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.45, ease: "easeOut" }}
+                sx={{
+                  m: { xs: 1.25, sm: 2 },
+                  mt: { xs: -4, sm: -5 },
+                  position: "relative",
+                  zIndex: 1,
+                  p: { xs: 3, sm: 5 },
+                  borderRadius: 2,
+                  color: isDark ? "#E9E2CE" : "#2A251B",
+                  backgroundColor: isDark ? "#202A25" : "#FFFDF5",
+                  backgroundImage: isDark ? "repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(233,226,206,0.06) 32px)" : "repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(84,102,145,0.12) 32px)",
+                  boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
+                }}
+              >
+                <Stack spacing={2.2}>
+                  <Stack direction="row" spacing={1.2} sx={{ alignItems: "center", color: isDark ? "#7CF5B6" : "#0D745A" }}>
+                    <EmailOutlinedIcon fontSize="small" />
+                    <Typography variant="overline" sx={{ fontWeight: 800, letterSpacing: "0.13em" }}>A BUILDING NOTE</Typography>
+                  </Stack>
+                  <Typography id="building-note-title" variant="h4" sx={{ fontFamily: "Georgia, serif", fontWeight: 700, letterSpacing: "-0.035em" }}>From RForum to Yuyu</Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>Last year, at the T4GC Summit, we built <strong>RForum</strong>.</Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>The idea was simple: how can we make an event feel more engaging for the people attending it?</Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>RForum became an open-source platform focused on attendee engagement—a space for conversations, participation, and interaction within an event.</Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>But after the summit, another question stayed with us: <strong>what if we could build something that helped run the entire event?</strong> Not just engagement. Everything.</Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>That question eventually became <strong>Yuyu</strong>.</Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>This year, I started building Yuyu as the next piece of the event ecosystem we began with RForum—but with a much larger scope.</Typography>
+                  <Box component="ul" sx={{ m: 0, pl: 2.5, fontFamily: "Georgia, serif", lineHeight: 1.85, "&::marker": { color: isDark ? "#7CF5B6" : "#0D745A" } }}>
+                    <li>Registration and free tickets</li>
+                    <li>Attendee management</li>
+                    <li>Event schedules and sessions</li>
+                    <li>On-ground check-in</li>
+                    <li>Managing the event experience</li>
+                    <li>Post-event feedback</li>
+                  </Box>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>The goal wasn&apos;t to build another ticketing platform. It was to build an <strong>open-source event management suite that supports the complete lifecycle of an event—before, during, and after it happens.</strong></Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>RForum started with one part of the event experience. Yuyu is our attempt to connect the rest of it.</Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", lineHeight: 1.8 }}>And that&apos;s what I like most about how it came together:</Typography>
+                  <Typography component="div" sx={{ pl: 2, borderLeft: "3px solid", borderColor: isDark ? "#7CF5B6" : "#0D745A", fontFamily: "Georgia, serif", fontWeight: 700, lineHeight: 1.85 }}>
+                    One summit.<br />One problem.<br />One open-source project.<br />And then the question: what should we build next?
+                  </Typography>
+                  <Typography sx={{ fontFamily: "Georgia, serif", fontWeight: 700, lineHeight: 1.8 }}>That question became Yuyu.</Typography>
+                </Stack>
+              </Box> : null}
+              </AnimatePresence>
+            </Box>
+          </Box>
+        ) : null}
+      </AnimatePresence>
     </Box>
   );
 }
