@@ -22,19 +22,17 @@ import type { RegistrationFieldDefinition } from "@/components/rsvp/registration
 
 // MUI's outlined input labels intentionally truncate to a single line. In an
 // RSVP form, custom labels are attendee-facing questions, so hiding part of a
-// question is worse than allowing the field to take an extra line on a phone.
+// question is worse than allowing the field to take an extra line.
 const rsvpFormSx = {
-  "@media (max-width: 599.95px)": {
-    "& .MuiInputLabel-root": {
-      position: "static",
-      transform: "none !important",
-      maxWidth: "none",
-      overflow: "visible",
-      textOverflow: "clip",
-      whiteSpace: "normal",
-      lineHeight: 1.3,
-      marginBottom: 0.5,
-    },
+  "& .MuiInputLabel-root": {
+    position: "static",
+    transform: "none !important",
+    maxWidth: "none",
+    overflow: "visible",
+    textOverflow: "clip",
+    whiteSpace: "normal",
+    lineHeight: 1.3,
+    marginBottom: 0.5,
   },
 } as const;
 
