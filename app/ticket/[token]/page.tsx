@@ -10,6 +10,9 @@ import { CancelRsvpButton } from "@/components/ticket/CancelRsvpButton";
 import { TicketDownloadButton } from "@/components/ticket/TicketDownloadButton";
 import { TicketStatusStorageSync } from "@/components/ticket/TicketStatusStorageSync";
 import { safeTimeZone } from "@/lib/timeZone";
+import { googleCalendarEventUrl, type CalendarEvent } from "@/lib/calendarInvite";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import Button from "@mui/material/Button";
 
 type Props = {
   params: Promise<{ token: string }>;
@@ -113,6 +116,7 @@ export default async function TicketPage({ params }: Props) {
   let title: string;
   let when: string;
   let locationLine: string;
+  let calendarEvent: CalendarEvent;
 
   if (rsvp.eventId && rsvp.event) {
     const ev = rsvp.event;
@@ -130,6 +134,13 @@ export default async function TicketPage({ params }: Props) {
       timeZoneName: "short",
     });
     locationLine = ev.location ? ` · ${ev.location}` : "";
+    calendarEvent = {
+      title: ev.title,
+      startDateTime: ev.startDateTime,
+      endDateTime: ev.endDateTime,
+      timezone: ev.timezone,
+      location: ev.location,
+    };
   } else if (rsvp.eventInstanceId && rsvp.eventInstance) {
     const inst = rsvp.eventInstance;
     const tz = safeTimeZone(inst.series.timezone);
@@ -146,6 +157,12 @@ export default async function TicketPage({ params }: Props) {
       timeZoneName: "short",
     });
     locationLine = "";
+    calendarEvent = {
+      title: inst.series.title,
+      startDateTime: inst.startDateTime,
+      endDateTime: inst.endDateTime,
+      timezone: inst.series.timezone,
+    };
   } else {
     notFound();
   }
@@ -191,6 +208,18 @@ export default async function TicketPage({ params }: Props) {
           <TicketDownloadButton
             downloadUrl={`/api/ticket/${rsvp.checkInToken}/download`}
           />
+          <Button
+            component="a"
+            href={googleCalendarEventUrl(calendarEvent)}
+            target="_blank"
+            rel="noreferrer"
+            variant="outlined"
+            startIcon={<CalendarMonthOutlinedIcon />}
+            aria-label={`Add ${title} to Google Calendar`}
+            sx={{ borderRadius: 999, alignSelf: "flex-start" }}
+          >
+            Add to Google Calendar
+          </Button>
         </>
       ) : (
         <Alert severity={rsvp.status === "REJECTED" ? "error" : "info"}>

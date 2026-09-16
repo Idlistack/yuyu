@@ -314,11 +314,15 @@ export function EventRegistrationFormEditor(props: {
                         },
                       }}
                     >
-                      <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                        <DragIndicatorIcon sx={{ color: "rgba(255,255,255,0.3)" }} />
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={2}
+                        sx={{ alignItems: { xs: "stretch", sm: "center" } }}
+                      >
+                        <DragIndicatorIcon sx={{ color: "rgba(255,255,255,0.3)", alignSelf: { xs: "flex-start", sm: "auto" } }} />
                         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
                               {f.label}
                             </Typography>
                             {f.required && (
@@ -329,13 +333,13 @@ export function EventRegistrationFormEditor(props: {
                             key: {f.key} · type: {f.type.toLowerCase()}
                           </Typography>
                           {needsOptions(f.type) && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }} noWrap>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, overflowWrap: "anywhere" }}>
                               Options: {f.options.join(", ")}
                             </Typography>
                           )}
                         </Box>
 
-                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", alignSelf: { xs: "flex-end", sm: "auto" } }}>
                           <IconButton
                             aria-label="Move up"
                             disabled={pending || idx === 0}

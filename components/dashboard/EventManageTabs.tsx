@@ -40,7 +40,7 @@ export function EventManageTabs(props: {
   invites: InviteRow[];
   registrationFields: RegistrationFieldRow[];
   feedbackUrl: string;
-  feedbackForm: { isOpen: boolean; title: string; thankYouMessage: string; certificateEnabled: boolean } | null;
+  feedbackForm: { isOpen: boolean; title: string; thankYouMessage: string; certificateEnabled: boolean; certificateTemplate?: unknown } | null;
   feedbackFields: RegistrationFieldRow[];
   feedbackResponses: FeedbackResponseRow[];
   feedbackResponsesTruncated: boolean;

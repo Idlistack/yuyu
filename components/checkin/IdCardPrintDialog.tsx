@@ -10,6 +10,15 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import Divider from "@mui/material/Divider";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import Chip from "@mui/material/Chip";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import CloseIcon from "@mui/icons-material/Close";
+import UndoIcon from "@mui/icons-material/Undo";
+import RedoIcon from "@mui/icons-material/Redo";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
@@ -57,7 +66,7 @@ const sessionSettings = new Map<string, IdCardPrintSettings>();
 const registrationFieldKey = (key: string) => `registration:${key}`;
 // Keep the longest paper edge at a fixed preview length so orientation changes
 // do not inadvertently change the apparent scale of the card.
-const PREVIEW_LONG_EDGE_PX = 340;
+const PREVIEW_LONG_EDGE_PX = 460;
 const SAFE_MARGIN_MM = 5;
 const TEMPLATE_OPTIONS = [
   { key: "classic", label: "Classic", description: "Framed and balanced" },
@@ -255,6 +264,13 @@ export function IdCardPrintDialog(props: {
   const { open, onClose, eventId, eventTitle, organisationName, organisationLogoUrl, attendee, registrationFields } = props;
   const [layoutDrag, setLayoutDrag] = useState<LayoutDrag | null>(null);
   const [selectedLayoutElement, setSelectedLayoutElement] = useState<IdCardLayoutElement>("name");
+  const compactPreview = useMediaQuery("(max-width:599px)");
+  const [activeTab, setActiveTab] = useState(0);
+  const [cleanPreview, setCleanPreview] = useState(false);
+  const [undoHistory, setUndoHistory] = useState<IdCardPrintSettings[]>([]);
+  const [redoHistory, setRedoHistory] = useState<IdCardPrintSettings[]>([]);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
   const draggingElement = layoutDrag?.element ?? null;
   const defaultSettings = useMemo(() => defaultIdCardPrintSettings(eventTitle, organisationName), [eventTitle, organisationName]);
   const subscribe = useCallback((onStoreChange: () => void) => {
@@ -305,7 +321,7 @@ export function IdCardPrintDialog(props: {
   const previewFields = printableFields(settings, sampleAttendee);
   const ratio = `${settings.widthMm} / ${settings.heightMm}`;
   const paperDescription = `${settings.widthMm} × ${settings.heightMm} mm`;
-  const previewWidthPx = PREVIEW_LONG_EDGE_PX * settings.widthMm / Math.max(settings.widthMm, settings.heightMm);
+  const previewWidthPx = (compactPreview ? 270 : PREVIEW_LONG_EDGE_PX) * settings.widthMm / Math.max(settings.widthMm, settings.heightMm);
   const previewPixelsPerMillimetre = previewWidthPx / settings.widthMm;
   const isA6Portrait = settings.widthMm === A6_PORTRAIT.widthMm && settings.heightMm === A6_PORTRAIT.heightMm;
   const isA6Landscape = settings.widthMm === A6_LANDSCAPE.widthMm && settings.heightMm === A6_LANDSCAPE.heightMm;
@@ -318,20 +334,27 @@ export function IdCardPrintDialog(props: {
       position: "absolute" as const,
       left: `${position.xMm * previewPixelsPerMillimetre}px`,
       top: `${position.yMm * previewPixelsPerMillimetre}px`,
-      cursor: "grab",
-      touchAction: "none",
+      cursor: cleanPreview ? "default" : "grab",
+      touchAction: cleanPreview ? "auto" : "none",
       userSelect: "none",
       zIndex: draggingElement === element ? 3 : selectedLayoutElement === element ? 2 : 1,
-      outline: draggingElement === element || selectedLayoutElement === element ? "2px solid #1976d2" : "1px dashed transparent",
+      outline: cleanPreview ? "none" : draggingElement === element || selectedLayoutElement === element ? "2px solid #1976d2" : "1px dashed transparent",
       outlineOffset: 2,
-      "&:hover": { outlineColor: "#1976d2" },
+      "&:hover": { outlineColor: cleanPreview ? "transparent" : "#1976d2" },
       "&:focus-visible": { outline: "2px solid #1976d2", outlineOffset: 2 },
     };
   };
   const previewItemWidth = (element: IdCardLayoutElement) => `${settings.elementSizes[element] * previewPixelsPerMillimetre}px`;
 
-  const update = (patch: Partial<IdCardPrintSettings>) => {
+  const update = (patch: Partial<IdCardPrintSettings>, recordHistory = true) => {
+    if (recordHistory && !layoutDrag) {
+      setUndoHistory((history) => [...history.slice(-49), settings]);
+      setRedoHistory([]);
+    }
     const next = normalizeIdCardPrintSettings({ ...settings, ...patch }, eventTitle, organisationName);
+    for (const [key, maxLength] of [["heading", 120], ["badgeLabel", 40], ["footerText", 80]] as const) {
+      next[key] = (patch[key] ?? settings[key]).slice(0, maxLength);
+    }
     sessionSettings.set(eventId, next);
     try {
       window.localStorage.setItem(storageKey(eventId), JSON.stringify(next));
@@ -340,6 +363,12 @@ export function IdCardPrintDialog(props: {
     }
     window.dispatchEvent(new Event(settingsChangedEvent));
   };
+
+  const updatePaper = (paper: { widthMm: number; heightMm: number }) => update({
+    ...paper,
+    elementPositions: defaultIdCardElementPositions(settings.template, paper.widthMm, paper.heightMm),
+    elementSizes: defaultIdCardElementSizes(settings.template, paper.widthMm),
+  });
 
   const updateElementPosition = (element: IdCardLayoutElement, xMm: number, yMm: number) => {
     const current = settings.elementPositions[element];
@@ -380,7 +409,10 @@ export function IdCardPrintDialog(props: {
 
   const startLayoutDrag = (element: IdCardLayoutElement, event: ReactPointerEvent<HTMLElement>) => {
     const preview = event.currentTarget.closest<HTMLElement>("[data-id-card-preview]");
-    if (event.button !== 0 || !preview) return;
+    if (cleanPreview || event.button !== 0 || !preview) return;
+    setUndoHistory((history) => [...history.slice(-49), settings]);
+    setRedoHistory([]);
+    setActiveTab(2);
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     setLayoutDrag({
@@ -410,14 +442,15 @@ export function IdCardPrintDialog(props: {
 
   const layoutItemProps = (element: IdCardLayoutElement) => ({
     role: "button" as const,
-    tabIndex: 0,
+    tabIndex: cleanPreview ? -1 : 0,
     "aria-label": `${LAYOUT_ELEMENT_LABELS[element]}. Drag to move; arrow keys move by ${settings.gridSizeMm} millimetres.`,
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => startLayoutDrag(element, event),
     onPointerMove: moveLayoutDrag,
     onPointerUp: endLayoutDrag,
     onPointerCancel: endLayoutDrag,
-    onFocus: () => setSelectedLayoutElement(element),
+    onFocus: () => { if (!cleanPreview) { setSelectedLayoutElement(element); setActiveTab(2); } },
     onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => {
+      if (cleanPreview) return;
       const position = settings.elementPositions[element];
       if (event.key === "ArrowLeft") updateElementPosition(element, position.xMm - settings.gridSizeMm, position.yMm);
       else if (event.key === "ArrowRight") updateElementPosition(element, position.xMm + settings.gridSizeMm, position.yMm);
@@ -453,19 +486,32 @@ export function IdCardPrintDialog(props: {
       ? { border: 0, boxShadow: 1 }
       : {};
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>{attendee ? "Print attendee ID card" : "Set up attendee ID cards"}</DialogTitle>
-      <DialogContent dividers>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
-          <Stack spacing={2} sx={{ flex: 1, minWidth: 0 }}>
-            <Alert severity="info">Card settings are saved only in this browser for this event.</Alert>
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth aria-labelledby="id-card-designer-title"
+      slotProps={{ paper: { sx: { height: { md: "min(900px, 94dvh)" }, maxHeight: "94dvh", m: { xs: 1, sm: 3 }, width: { xs: "calc(100% - 16px)", sm: "calc(100% - 48px)" }, borderRadius: 3 } } }}>
+      <DialogTitle id="id-card-designer-title" sx={{ px: 3, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+        <Box>
+          <Typography component="span" variant="h6" sx={{ fontWeight: 800 }}>ID card designer</Typography>
+          <Typography variant="body2" color="text.secondary">{eventTitle} · {attendee ? "Personalise and print this attendee’s card" : "Create a reusable card for your check-in desk"}</Typography>
+        </Box>
+        <IconButton aria-label="Close designer" onClick={onClose}><CloseIcon /></IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ p: 0, display: { md: "flex" }, minHeight: 0 }}>
+        <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, width: "100%", minHeight: 0 }}>
+          <Box sx={{ width: { md: 380 }, flexShrink: 0, borderRight: { md: "1px solid" }, borderColor: "divider", display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <Tabs value={activeTab} onChange={(_, value: number) => setActiveTab(value)} variant="fullWidth" aria-label="Designer settings" sx={{ borderBottom: "1px solid", borderColor: "divider", flexShrink: 0 }}>
+              {["Design", "Content", "Layout"].map((label, index) => <Tab key={label} id={`id-card-tab-${index}`} aria-controls={`id-card-panel-${index}`} label={label} />)}
+            </Tabs>
+            <Box sx={{ overflowY: "auto", p: 2.5, maxHeight: { xs: 360, md: "none" } }}>
+            <Stack spacing={2.5} role="tabpanel" id="id-card-panel-0" aria-labelledby="id-card-tab-0" hidden={activeTab !== 0} sx={{ display: activeTab === 0 ? "flex" : "none" }}>
+              <Box><Typography variant="subtitle1" sx={{ fontWeight: 750 }}>Start with a style</Typography><Typography variant="body2" color="text.secondary">Choose a template, then make it yours. Switching styles resets the layout.</Typography></Box>
             <Box>
               <Typography variant="subtitle2" gutterBottom>Template</Typography>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} aria-label="ID card template">
+              <Stack direction="column" spacing={1} aria-label="ID card template">
                 {TEMPLATE_OPTIONS.map((template) => (
                   <Button
                     key={template.key}
-                    variant={settings.template === template.key ? "contained" : "outlined"}
+                    variant="outlined"
+                    aria-pressed={settings.template === template.key}
                     onClick={() => update({
                       template: template.key,
                       elementPositions: defaultIdCardElementPositions(template.key, settings.widthMm, settings.heightMm),
@@ -473,8 +519,14 @@ export function IdCardPrintDialog(props: {
                       elementBold: defaultIdCardElementBold(),
                       elementTextSizes: defaultIdCardElementTextSizes(template.key),
                     })}
-                    sx={{ flex: 1, minHeight: 64, alignItems: "flex-start", justifyContent: "flex-start", textAlign: "left", textTransform: "none" }}
+                    sx={{ borderColor: settings.template === template.key ? "primary.main" : "divider", bgcolor: settings.template === template.key ? "action.selected" : "transparent", flex: 1, minHeight: 76, alignItems: "flex-start", justifyContent: "flex-start", textAlign: "left", textTransform: "none" }}
                   >
+                    <Box aria-hidden sx={{ width: 42, height: 54, mr: 2, flexShrink: 0, bgcolor: "#fff", color: "#172032", border: template.key === "minimal" ? "1px solid #ddd" : "2px solid", borderLeftWidth: template.key === "bold" ? 7 : 1, p: 0.7, boxShadow: 1 }}>
+                      <Box sx={{ width: "80%", height: 3, bgcolor: "currentColor", mb: 1 }} />
+                      <Box sx={{ width: "65%", height: 5, bgcolor: "currentColor", mb: 0.5 }} />
+                      <Box sx={{ width: "90%", height: 2, bgcolor: "#aaa" }} />
+                      <Box sx={{ width: 10, height: 10, border: "2px dotted", mt: 0.8, ml: "auto" }} />
+                    </Box>
                     <Box>
                       <Typography variant="body2" sx={{ fontWeight: 800 }}>{template.label}</Typography>
                       <Typography variant="caption" sx={{ display: "block", opacity: 0.8 }}>{template.description}</Typography>
@@ -485,20 +537,23 @@ export function IdCardPrintDialog(props: {
             </Box>
             <Box>
               <Typography variant="subtitle2" gutterBottom>Paper size</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>Presets refit the layout. Use custom dimensions for your own stock.</Typography>
               <ButtonGroup size="small" aria-label="ID card paper size">
-                <Button variant={isA6Portrait ? "contained" : "outlined"} onClick={() => update(A6_PORTRAIT)}>A6 portrait</Button>
-                <Button variant={isA6Landscape ? "contained" : "outlined"} onClick={() => update(A6_LANDSCAPE)}>A6 landscape</Button>
+                <Button variant={isA6Portrait ? "contained" : "outlined"} onClick={() => updatePaper(A6_PORTRAIT)}>A6 portrait</Button>
+                <Button variant={isA6Landscape ? "contained" : "outlined"} onClick={() => updatePaper(A6_LANDSCAPE)}>A6 landscape</Button>
               </ButtonGroup>
             </Box>
             <Stack direction="row" spacing={1.5}>
               <TextField label="Width (mm)" type="number" value={settings.widthMm} onChange={(event) => update({ widthMm: Number(event.target.value) })} slotProps={{ htmlInput: { min: 40, max: 300, step: 0.1 } }} fullWidth />
               <TextField label="Height (mm)" type="number" value={settings.heightMm} onChange={(event) => update({ heightMm: Number(event.target.value) })} slotProps={{ htmlInput: { min: 40, max: 300, step: 0.1 } }} fullWidth />
             </Stack>
-            <Typography variant="body2" color="text.secondary">The card uses one high-contrast layout that prints cleanly on both monochrome laser and thermal printers.</Typography>
+            <Typography variant="body2" color="text.secondary">All styles use high-contrast black and white for laser and thermal printing.</Typography>
+            </Stack>
+            <Stack spacing={2} role="tabpanel" id="id-card-panel-2" aria-labelledby="id-card-tab-2" hidden={activeTab !== 2} sx={{ display: activeTab === 2 ? "flex" : "none" }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
               <Box>
                 <Typography variant="subtitle2">Layout</Typography>
-                <Typography variant="body2" color="text.secondary">Drag preview elements on a millimetre grid. Their printed positions will match.</Typography>
+                <Typography variant="body2" color="text.secondary">Select an item on the card to edit it. Drag to move, or use arrow keys for small adjustments.</Typography>
               </Box>
               <Button size="small" color="inherit" onClick={() => update({ elementPositions: defaultIdCardElementPositions(settings.template, settings.widthMm, settings.heightMm) })}>Reset layout</Button>
             </Stack>
@@ -522,6 +577,7 @@ export function IdCardPrintDialog(props: {
                 ) : (
                   <TextField label="Square size (mm)" type="number" value={settings.elementSizes[selectedLayoutElement]} onChange={(event) => updateElementSize(selectedLayoutElement, Number(event.target.value))} slotProps={{ htmlInput: { min: 10, max: settings.widthMm - 4, step: 1 } }} fullWidth />
                 )}
+                {selectedElementIsText ? <TextField label="Text box width (mm)" type="number" value={settings.elementSizes[selectedLayoutElement]} onChange={(event) => updateElementSize(selectedLayoutElement, Number(event.target.value))} slotProps={{ htmlInput: { min: 20, max: settings.widthMm - 4, step: 1 } }} fullWidth /> : null}
                 {selectedElementIsText ? <FormControlLabel control={<Switch checked={settings.elementBold[selectedLayoutElement]} onChange={(_, checked) => update({ elementBold: { ...settings.elementBold, [selectedLayoutElement]: checked } })} />} label="Bold text" /> : null}
                 <Stack direction="row" spacing={1}>
                   <TextField label="X position (mm)" type="number" value={settings.elementPositions[selectedLayoutElement].xMm} onChange={(event) => updateElementPosition(selectedLayoutElement, Number(event.target.value), settings.elementPositions[selectedLayoutElement].yMm)} slotProps={{ htmlInput: { min: 0, max: settings.widthMm, step: settings.gridSizeMm } }} fullWidth />
@@ -539,11 +595,14 @@ export function IdCardPrintDialog(props: {
               </Stack>
             </Box>
             {settings.elementSizes.qr < 20 ? <Alert severity="warning">Keep the QR code at least 20 mm square for reliable scanning after printing.</Alert> : null}
+            </Stack>
+            <Stack spacing={2.5} role="tabpanel" id="id-card-panel-1" aria-labelledby="id-card-tab-1" hidden={activeTab !== 1} sx={{ display: activeTab === 1 ? "flex" : "none" }}>
+              <Box><Typography variant="subtitle1" sx={{ fontWeight: 750 }}>Make it your event</Typography><Typography variant="body2" color="text.secondary">Names and QR codes update automatically for each attendee.</Typography></Box>
             <TextField label="Card heading" value={settings.heading} onChange={(event) => update({ heading: event.target.value })} slotProps={{ htmlInput: { maxLength: 120 } }} fullWidth />
             <TextField label="Badge label" value={settings.badgeLabel} onChange={(event) => update({ badgeLabel: event.target.value })} slotProps={{ htmlInput: { maxLength: 40 } }} fullWidth />
             <TextField label="Footer text" value={settings.footerText} onChange={(event) => update({ footerText: event.target.value })} slotProps={{ htmlInput: { maxLength: 80 } }} fullWidth />
             <Divider />
-            <FormControlLabel control={<Switch checked={settings.showLogo} onChange={(_, checked) => update({ showLogo: checked })} />} label="Include organisation logo" />
+            <FormControlLabel control={<Switch disabled={!organisationLogoUrl} checked={settings.showLogo && !!organisationLogoUrl} onChange={(_, checked) => update({ showLogo: checked })} />} label={organisationLogoUrl ? "Include organisation logo" : "No organisation logo available"} />
             <FormControlLabel control={<Switch checked={settings.showEmail} onChange={(_, checked) => update({ showEmail: checked })} />} label="Include attendee email" />
             <Divider />
             <Box>
@@ -592,20 +651,43 @@ export function IdCardPrintDialog(props: {
                 </Stack>
               )}
             </Box>
-          </Stack>
-          <Stack spacing={1} sx={{ flex: 1, minWidth: 0, alignItems: "center" }}>
-            <Typography variant="subtitle2" color="text.secondary">Live preview · {paperDescription}</Typography>
+            </Stack>
+            </Box>
+          </Box>
+          <Stack sx={{ flex: { md: 1 }, flexShrink: 0, minWidth: 0, bgcolor: "action.hover", overflowY: { md: "auto" } }}>
+            <Stack direction="row" sx={{ px: 2.5, py: 1.5, alignItems: "center", justifyContent: "space-between", gap: 1, flexWrap: "wrap", borderBottom: "1px solid", borderColor: "divider" }}>
+              <Box><Typography variant="subtitle2">{cleanPreview ? "Print preview" : "Design canvas"}</Typography><Typography variant="caption" color="text.secondary">{paperDescription} · {attendee ? "Attendee card" : "Sample attendee"}</Typography></Box>
+              <Stack direction="row" sx={{ alignItems: "center" }} spacing={0.5}>
+                <Tooltip title="Undo"><span><IconButton aria-label="Undo design change" disabled={!undoHistory.length} onClick={() => {
+                  const previous = undoHistory[undoHistory.length - 1];
+                  if (!previous) return;
+                  setRedoHistory((history) => [...history, settings]);
+                  setUndoHistory((history) => history.slice(0, -1));
+                  update(previous, false);
+                }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
+                <Tooltip title="Redo"><span><IconButton aria-label="Redo design change" disabled={!redoHistory.length} onClick={() => {
+                  const next = redoHistory[redoHistory.length - 1];
+                  if (!next) return;
+                  setUndoHistory((history) => [...history, settings]);
+                  setRedoHistory((history) => history.slice(0, -1));
+                  update(next, false);
+                }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
+                <Button size="small" variant={cleanPreview ? "contained" : "outlined"} aria-pressed={cleanPreview} onClick={() => setCleanPreview(!cleanPreview)}>{cleanPreview ? "Back to editing" : "Preview"}</Button>
+              </Stack>
+            </Stack>
+            <Box sx={{ flex: 1, minHeight: 360, overflow: "auto", display: "grid", placeItems: "center", p: { xs: 2, sm: 4 }, backgroundImage: "radial-gradient(circle, rgba(128,128,128,0.2) 1px, transparent 1px)", backgroundSize: "16px 16px" }}>
+            <Box sx={{ width: previewWidthPx, flexShrink: 0 }}>
             <Box
               data-id-card-preview
               sx={{
-                width: `${previewWidthPx}px`, maxWidth: "100%", aspectRatio: ratio, position: "relative", border: "2px solid", borderColor: "#000", bgcolor: "#fff", color: "#000", boxShadow: 3, overflow: "hidden",
-                backgroundImage: settings.showGrid ? "linear-gradient(to right, rgb(0 0 0 / 8%) 1px, transparent 1px), linear-gradient(to bottom, rgb(0 0 0 / 8%) 1px, transparent 1px)" : "none",
+                width: `${previewWidthPx}px`, aspectRatio: ratio, position: "relative", border: "2px solid", borderColor: "#000", bgcolor: "#fff", color: "#000", boxShadow: 3, overflow: "hidden",
+                backgroundImage: settings.showGrid && !cleanPreview ? "linear-gradient(to right, rgb(0 0 0 / 8%) 1px, transparent 1px), linear-gradient(to bottom, rgb(0 0 0 / 8%) 1px, transparent 1px)" : "none",
                 backgroundSize: `${settings.gridSizeMm * previewPixelsPerMillimetre}px ${settings.gridSizeMm * previewPixelsPerMillimetre}px`,
-                "&::after": { content: '""', position: "absolute", inset: `${SAFE_MARGIN_MM * previewPixelsPerMillimetre}px`, border: "1px dashed rgb(0 0 0 / 25%)", pointerEvents: "none", zIndex: 0 },
+                "&::after": { display: cleanPreview ? "none" : "block", content: '""', position: "absolute", inset: `${SAFE_MARGIN_MM * previewPixelsPerMillimetre}px`, border: "1px dashed rgb(0 0 0 / 25%)", pointerEvents: "none", zIndex: 0 },
                 ...previewTemplateSx,
               }}
             >
-              <Box aria-hidden sx={{ position: "absolute", left: `${settings.elementPositions[selectedLayoutElement].xMm * previewPixelsPerMillimetre}px`, top: `${Math.max(0, settings.elementPositions[selectedLayoutElement].yMm * previewPixelsPerMillimetre - 19)}px`, zIndex: 4, pointerEvents: "none", bgcolor: "#1976d2", color: "#fff", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: "0.6rem", fontWeight: 700, whiteSpace: "nowrap" }}>{LAYOUT_ELEMENT_LABELS[selectedLayoutElement]} · {settings.elementPositions[selectedLayoutElement].xMm} × {settings.elementPositions[selectedLayoutElement].yMm} mm</Box>
+              <Box aria-hidden sx={{ display: cleanPreview ? "none" : "block", position: "absolute", left: `${settings.elementPositions[selectedLayoutElement].xMm * previewPixelsPerMillimetre}px`, top: `${Math.max(0, settings.elementPositions[selectedLayoutElement].yMm * previewPixelsPerMillimetre - 19)}px`, zIndex: 4, pointerEvents: "none", bgcolor: "#1976d2", color: "#fff", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: "0.6rem", fontWeight: 700, whiteSpace: "nowrap" }}>{LAYOUT_ELEMENT_LABELS[selectedLayoutElement]} · {settings.elementPositions[selectedLayoutElement].xMm} × {settings.elementPositions[selectedLayoutElement].yMm} mm</Box>
               <Box {...layoutItemProps("header")} sx={{ ...previewPositionSx("header"), width: previewItemWidth("header"), pb: 0.75, borderBottom: settings.template === "classic" ? "1px solid #000" : 0, borderTop: settings.template === "classic" ? 0 : "1px solid #000", pt: settings.template === "classic" ? 0 : 0.75 }}>
                 <Typography sx={{ fontSize: "0.62rem", letterSpacing: "0.14em", fontWeight: settings.elementBold.header ? 800 : 400 }}>{settings.badgeLabel}</Typography>
                 <Typography sx={{ mt: settings.template === "minimal" ? 0.25 : 0.75, fontSize: previewTextSize("header"), fontWeight: settings.elementBold.header ? 700 : 400, lineHeight: 1.08, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>{settings.heading}</Typography>
@@ -626,18 +708,32 @@ export function IdCardPrintDialog(props: {
               ) : null}
               <Typography {...layoutItemProps("footer")} variant="caption" sx={{ ...previewPositionSx("footer"), width: previewItemWidth("footer"), fontSize: previewTextSize("footer"), fontWeight: settings.elementBold.footer ? 700 : 400, opacity: 0.68, overflowWrap: "anywhere" }}>{settings.footerText}</Typography>
             </Box>
-            <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>Drag an outlined item, use the position controls, or focus it and use arrow keys. Positions snap to {settings.gridSizeMm} mm and print exactly from this layout.</Typography>
+            </Box>
+            </Box>
+            <Stack spacing={1} sx={{ px: 3, py: 2, borderTop: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}><Chip size="small" variant="outlined" label={cleanPreview ? "Guides hidden" : `${settings.gridSizeMm} mm snap`} /><Typography variant="caption" color="text.secondary">{cleanPreview ? "Grid and selection guides never print." : "Select to edit · Drag to move · Arrow keys to nudge"}</Typography></Stack>
+              <Typography variant="caption" color="text.secondary">Print at 100% / actual size. Match your printer’s paper to {paperDescription} and turn off headers and footers.</Typography>
+            </Stack>
           </Stack>
-        </Stack>
+        </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="inherit">Close</Button>
-        <Button variant="contained" startIcon={<PrintOutlinedIcon />} disabled={!attendee} onClick={() => {
+      {printError ? <Alert severity="error" onClose={() => setPrintError(null)} sx={{ mx: 2, mt: 1 }}>{printError}</Alert> : null}
+      <DialogActions sx={{ px: 3, py: 2, gap: 1, flexWrap: "wrap" }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mr: "auto", flexBasis: { xs: "100%", sm: "auto" } }}>Changes are kept in this browser for this event.{!attendee ? " Print a card after checking in an attendee." : ""}</Typography>
+        <Button onClick={onClose} color="inherit">Done</Button>
+        <Button variant="contained" startIcon={<PrintOutlinedIcon />} disabled={!attendee || printing} onClick={async () => {
           if (!attendee) return;
-          void printCard({ settings, attendee, organisationLogoUrl }).then((printed) => {
-            if (!printed) window.alert("The print window was blocked or the QR code could not be prepared. Allow pop-ups for this check-in station and try again.");
-          });
-        }}>Print ID card</Button>
+          setPrinting(true);
+          setPrintError(null);
+          try {
+            const printed = await printCard({ settings, attendee, organisationLogoUrl });
+            if (!printed) setPrintError("Could not open the print window. Allow pop-ups for this station and try again.");
+          } catch {
+            setPrintError("Could not prepare the card. Please try again.");
+          } finally {
+            setPrinting(false);
+          }
+        }}>{printing ? "Preparing…" : "Print ID card"}</Button>
       </DialogActions>
     </Dialog>
   );

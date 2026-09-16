@@ -44,6 +44,7 @@ describe("email construction", () => {
       to: "person@example.test",
       eventTitle: "Planning, review; kickoff",
       status: RsvpStatus.CONFIRMED,
+      recipientName: "Asha <Admin>",
       messageId: "<stable@outbox.invalid>",
       calendarEvent: {
         startDateTime: new Date("2030-01-01T10:00:00.000Z"),
@@ -54,15 +55,20 @@ describe("email construction", () => {
     });
 
     const message = mocks.sendMail.mock.calls[0]?.[0];
-    expect(message.attachments).toEqual([expect.objectContaining({
+    expect(message.icalEvent).toEqual(expect.objectContaining({
       filename: "Planning_review_kickoff.ics",
-      contentType: "text/calendar; charset=utf-8; method=PUBLISH",
-    })]);
-    expect(message.attachments[0].content).toContain("DTSTART:20300101T100000Z");
-    expect(message.attachments[0].content).toContain("SUMMARY:Planning\\, review\\; kickoff");
-    expect(message.attachments[0].content).toContain("LOCATION:Room A\\, HQ");
+      method: "PUBLISH",
+    }));
+    expect(message.icalEvent.content).toContain("DTSTART:20300101T100000Z");
+    expect(message.icalEvent.content).toContain("SUMMARY:Planning\\, review\\; kickoff");
+    expect(message.icalEvent.content).toContain("LOCATION:Room A\\, HQ");
     expect(message.html).toContain("Event details");
+    expect(message.html).toContain("Hello Asha &lt;Admin&gt;,");
+    expect(message.text).toContain("Hello Asha <Admin>,");
     expect(message.html).toContain("Location:</strong> Room A, HQ");
+    expect(message.html).toContain("Add to Google Calendar");
+    expect(message.html).toContain("calendar.google.com/calendar/render?action=TEMPLATE");
     expect(message.text).toContain("Starts: Tue, Jan 1, 2030, 3:30 PM GMT+5:30");
+    expect(message.text).toContain("Add to Google Calendar: https://calendar.google.com/calendar/render?action=TEMPLATE");
   });
 });

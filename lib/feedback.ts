@@ -1,6 +1,6 @@
 import "server-only";
 
-import { EventStatus, RegistrationFieldType, RsvpStatus } from "@prisma/client";
+import { Prisma, EventStatus, RegistrationFieldType, RsvpStatus } from "@prisma/client";
 import crypto from "node:crypto";
 import { z } from "zod";
 import type { ActionResult } from "@/app/actions/org";
@@ -141,6 +141,7 @@ export async function submitFeedback(input: unknown): Promise<ActionResult<{ cer
           formId: form.id,
           rsvpId,
           certificateToken,
+          certificateTemplate: certificateToken && form.certificateTemplate ? form.certificateTemplate as Prisma.InputJsonValue : Prisma.DbNull,
           answers: { create: normalized.rows },
         },
         select: { id: true },

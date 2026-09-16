@@ -854,6 +854,7 @@ export function EventCheckInClient(props: {
       ) : null}
 
       <IdCardPrintDialog
+        key={eventId}
         open={idCardOpen}
         onClose={() => setIdCardOpen(false)}
         eventId={eventId}

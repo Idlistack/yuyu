@@ -566,7 +566,9 @@ export function EventPublicShell(props: Props) {
                     },
                     paper: {
                       sx: {
-                        borderRadius: 4,
+                        borderRadius: { xs: 3, sm: 4 },
+                        margin: { xs: 2, sm: 4 },
+                        maxHeight: { xs: "calc(100dvh - 32px)", sm: "calc(100% - 64px)" },
                         overflow: "hidden",
                       },
                     },
@@ -575,7 +577,7 @@ export function EventPublicShell(props: Props) {
                   <DialogTitle sx={{ fontWeight: 750, overflowWrap: "anywhere", wordBreak: "break-word" }}>
                     Register · {event.title}
                   </DialogTitle>
-                  <DialogContent sx={{ pt: 1 }}>
+                  <DialogContent sx={{ pt: 1, pb: 2 }}>
                     <Stack spacing={1.5}>
                       {full ? (
                         <Typography variant="body2" color="text.secondary">

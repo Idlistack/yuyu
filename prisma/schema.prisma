@@ -732,6 +732,7 @@ model EventFeedbackForm {
   title              String   @default("Event feedback")
   thankYouMessage    String   @default("Thanks for sharing your feedback.")
   certificateEnabled Boolean  @default(false)
+  certificateTemplate Json?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -766,6 +767,7 @@ model EventFeedbackResponse {
   formId           String
   rsvpId           String?
   certificateToken String?  @unique @default(cuid(2))
+  certificateTemplate Json?
   submittedAt      DateTime @default(now())
 
   form    EventFeedbackForm     @relation(fields: [formId], references: [id], onDelete: Cascade)

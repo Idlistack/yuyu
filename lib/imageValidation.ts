@@ -94,6 +94,7 @@ type DerivativeOptions = {
   height: number;
   fit: "inside" | "cover";
   position?: "attention";
+  lossless?: boolean;
 };
 
 /** Decode a validated, single-frame image under a hard pixel limit and strip metadata by re-encoding it. */
@@ -131,7 +132,7 @@ export async function createSafeWebpDerivative(
           withoutEnlargement: options.fit === "inside",
           ...(options.position ? { position: options.position } : {}),
         })
-        .webp({ quality: 86, effort: 5 })
+        .webp({ quality: 86, effort: 5, lossless: options.lossless ?? false })
         .toBuffer(),
     };
   } catch {

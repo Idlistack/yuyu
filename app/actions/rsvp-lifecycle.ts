@@ -55,7 +55,7 @@ async function loadRsvpContext(
     if (!event) return { error: "Event not found." as const };
     const rsvp = await prisma.rSVP.findFirst({
       where: { id: rsvpId, eventId: event.id },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true, name: true } } },
     });
     if (!rsvp) return { error: "RSVP not found." as const };
     return { org, event, rsvp, instance: null as null };
@@ -72,7 +72,7 @@ async function loadRsvpContext(
     if (!instance) return { error: "Instance not found." as const };
     const rsvp = await prisma.rSVP.findFirst({
       where: { id: rsvpId, eventInstanceId: instance.id },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true, name: true } } },
     });
     if (!rsvp) return { error: "RSVP not found." as const };
     return { org, event: null, instance, rsvp };
@@ -86,6 +86,13 @@ function attendeeEmail(rsvp: {
   user: { email: string | null } | null;
 }): string | null {
   return rsvp.user?.email?.trim() || rsvp.guestEmail;
+}
+
+function attendeeName(rsvp: {
+  guestName: string | null;
+  user: { name: string | null } | null;
+}): string | undefined {
+  return rsvp.user?.name?.trim() || rsvp.guestName?.trim() || undefined;
 }
 
 export async function approveRsvp(input: unknown): Promise<ActionResult> {
@@ -222,6 +229,7 @@ export async function rejectRsvp(input: unknown): Promise<ActionResult> {
         to,
         eventTitle: ctx.event?.title ?? ctx.instance!.series.title,
         approved: false,
+        recipientName: attendeeName(rsvp),
       });
     }
     return result;

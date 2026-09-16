@@ -1,6 +1,6 @@
 import type { RsvpStatus } from "@prisma/client";
 import { getEmailTransport } from "./transporter";
-import { calendarInviteFilename, createCalendarInvite } from "@/lib/calendarInvite";
+import { calendarInviteFilename, createCalendarInvite, googleCalendarEventUrl } from "@/lib/calendarInvite";
 import { safeTimeZone } from "@/lib/timeZone";
 
 function escapeHtml(value: string) {
@@ -11,6 +11,10 @@ function headerText(value: string) {
   return value.replace(/[\u0000-\u001F\u007F]+/g, " ").trim().slice(0, 240);
 }
 
+function greeting(name?: string) {
+  const safeName = name?.replace(/[\u0000-\u001F\u007F]+/g, " ").trim().slice(0, 200);
+  return safeName ? { html: `Hello ${escapeHtml(safeName)},`, text: `Hello ${safeName},` } : { html: "Hello,", text: "Hello," };
+}
 
 function getBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -41,6 +45,7 @@ export async function sendRSVPConfirmation(params: {
     location?: string | null;
   };
   messageId?: string;
+  recipientName?: string;
 }): Promise<void> {
   const { transporter, from } = await getEmailTransport();
   const baseUrl = getBaseUrl();
@@ -49,6 +54,11 @@ export async function sendRSVPConfirmation(params: {
   const safeTitle = escapeHtml(params.eventTitle);
   const subjectTitle = headerText(params.eventTitle);
   const safeTicketUrl = ticketUrl ? escapeHtml(ticketUrl) : null;
+  const calendarUrl = params.status === "CONFIRMED" && params.calendarEvent
+    ? googleCalendarEventUrl({ ...params.calendarEvent, title: params.eventTitle })
+    : null;
+  const safeCalendarUrl = calendarUrl ? escapeHtml(calendarUrl) : null;
+  const salutation = greeting(params.recipientName);
   const eventDetails = params.status === "CONFIRMED" && params.calendarEvent
     ? {
       startsAt: formatEventDateTime(params.calendarEvent.startDateTime, params.calendarEvent.timezone),
@@ -82,7 +92,7 @@ export async function sendRSVPConfirmation(params: {
           <div style="padding: 32px;">
             <h2 style="margin-top: 0; color: #6750A4; font-size: 20px; font-weight: 600;">RSVP Status: ${statusText}</h2>
             <p style="font-size: 16px; line-height: 1.5; color: #49454f; margin-bottom: 24px;">
-              Hello,<br><br>
+              ${salutation.html}<br><br>
               Thank you for registering for <strong>${safeTitle}</strong>. ${statusMessage}
             </p>
             ${eventDetails ? `
@@ -91,6 +101,14 @@ export async function sendRSVPConfirmation(params: {
                 <p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Starts:</strong> ${escapeHtml(eventDetails.startsAt)}</p>
                 <p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Ends:</strong> ${escapeHtml(eventDetails.endsAt)}</p>
                 ${eventDetails.location ? `<p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Location:</strong> ${escapeHtml(eventDetails.location)}</p>` : ""}
+              </div>
+            ` : ""}
+            ${safeCalendarUrl ? `
+              <div style="text-align: center; margin: 24px 0;">
+                <a href="${safeCalendarUrl}" style="background-color: #6750A4; color: #ffffff; padding: 14px 28px; border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  Add to Google Calendar
+                </a>
+                <p style="font-size: 12px; color: #79747e; margin: 12px 0 0;">An .ics calendar invite is also attached for other calendar apps.</p>
               </div>
             ` : ""}
             ${
@@ -118,7 +136,7 @@ export async function sendRSVPConfirmation(params: {
     </html>
   `;
 
-  const text = `RSVP ${statusText}: ${params.eventTitle}\n\nHello,\n\nThank you for registering for "${params.eventTitle}". ${statusMessage}${eventDetails ? `\n\nEvent details\nStarts: ${eventDetails.startsAt}\nEnds: ${eventDetails.endsAt}${eventDetails.location ? `\nLocation: ${eventDetails.location}` : ""}` : ""}${ticketUrl && params.status === "CONFIRMED" ? `\n\nView your ticket here: ${ticketUrl}` : ""}\n\nBest regards,\nYuyu Events`;
+  const text = `RSVP ${statusText}: ${params.eventTitle}\n\n${salutation.text}\n\nThank you for registering for "${params.eventTitle}". ${statusMessage}${eventDetails ? `\n\nEvent details\nStarts: ${eventDetails.startsAt}\nEnds: ${eventDetails.endsAt}${eventDetails.location ? `\nLocation: ${eventDetails.location}` : ""}` : ""}${calendarUrl ? `\n\nAdd to Google Calendar: ${calendarUrl}\nAn .ics calendar invite is also attached for other calendar apps.` : ""}${ticketUrl && params.status === "CONFIRMED" ? `\n\nView your ticket here: ${ticketUrl}` : ""}\n\nBest regards,\nYuyu Events`;
 
   if (!transporter) {
     // Email bodies can contain attendee PII and bearer ticket links. Mock
@@ -134,16 +152,18 @@ export async function sendRSVPConfirmation(params: {
     subject: `RSVP ${statusText}: ${subjectTitle}`,
     text,
     html,
-    attachments: params.status === "CONFIRMED" && params.calendarEvent
-      ? [{
+    // `icalEvent` emits both a text/calendar MIME alternative (which mail
+    // clients recognise as an add-to-calendar action) and an .ics fallback.
+    icalEvent: params.status === "CONFIRMED" && params.calendarEvent
+      ? {
         filename: calendarInviteFilename(params.eventTitle),
         content: createCalendarInvite({
           ...params.calendarEvent,
           title: params.eventTitle,
           uid: params.messageId?.replace(/[<>]/g, "") ?? `yuyu-${Date.now()}@calendar.yuyu.invalid`,
         }),
-        contentType: "text/calendar; charset=utf-8; method=PUBLISH",
-      }]
+        method: "PUBLISH",
+      }
       : undefined,
   });
 }
@@ -153,12 +173,14 @@ export async function sendApprovalNotification(params: {
   eventTitle: string;
   approved: boolean;
   messageId?: string;
+  recipientName?: string;
 }): Promise<void> {
   const { transporter, from } = await getEmailTransport();
 
   const statusText = params.approved ? "Approved" : "Declined";
   const safeTitle = escapeHtml(params.eventTitle);
   const subjectTitle = headerText(params.eventTitle);
+  const salutation = greeting(params.recipientName);
   const statusMessage = params.approved
     ? `Great news! Your RSVP request for <strong>${safeTitle}</strong> has been approved by the organizer.`
     : `We regret to inform you that your RSVP request for <strong>${safeTitle}</strong> has been declined by the organizer.`;
@@ -178,7 +200,7 @@ export async function sendApprovalNotification(params: {
           <div style="padding: 32px;">
             <h2 style="margin-top: 0; color: #6750A4; font-size: 20px; font-weight: 600;">RSVP Update: ${statusText}</h2>
             <p style="font-size: 16px; line-height: 1.5; color: #49454f; margin-bottom: 24px;">
-              Hello,<br><br>
+              ${salutation.html}<br><br>
               ${statusMessage}
             </p>
           </div>
@@ -191,7 +213,7 @@ export async function sendApprovalNotification(params: {
     </html>
   `;
 
-  const text = `RSVP Update: ${statusText}\n\nHello,\n\n${params.approved ? `Your RSVP for "${params.eventTitle}" was approved!` : `Your RSVP for "${params.eventTitle}" was declined.`}\n\nBest regards,\nYuyu Events`;
+  const text = `RSVP Update: ${statusText}\n\n${salutation.text}\n\n${params.approved ? `Your RSVP for "${params.eventTitle}" was approved!` : `Your RSVP for "${params.eventTitle}" was declined.`}\n\nBest regards,\nYuyu Events`;
 
   if (!transporter) {
     console.log("[EMAIL MOCK] RSVP update queued");

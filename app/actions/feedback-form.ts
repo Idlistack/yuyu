@@ -1,6 +1,6 @@
 "use server";
 
-import { RegistrationFieldType } from "@prisma/client";
+import { Prisma, RegistrationFieldType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "@/app/actions/org";
@@ -9,6 +9,8 @@ import { requireOrgRole } from "@/lib/permissions";
 import { recordAuditEvent } from "@/lib/audit";
 import { isActionRateLimited } from "@/lib/actionRateLimit";
 import { getFeedbackTemplate } from "@/lib/feedbackTemplates";
+
+import { certificateTemplateSchema } from "@/lib/certificateTemplate";
 
 const base = z.object({ organisationSlug: z.string().trim().min(1).max(120), eventId: z.string().trim().min(1).max(128) });
 
@@ -95,10 +97,15 @@ export async function applyFeedbackTemplate(input: unknown): Promise<ActionResul
 }
 
 export async function saveFeedbackSettings(input: unknown): Promise<ActionResult<{ formId: string }>> {
-  const parsed = base.extend({ isOpen: z.boolean(), title: z.string().trim().min(1).max(120), thankYouMessage: z.string().trim().min(1).max(500), certificateEnabled: z.boolean() }).strict().safeParse(input);
+  const parsed = base.extend({ isOpen: z.boolean(), title: z.string().trim().min(1).max(120), thankYouMessage: z.string().trim().min(1).max(500), certificateEnabled: z.boolean(), certificateTemplate: certificateTemplateSchema.nullable().optional() }).strict().safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the feedback settings." };
   const context = await access(parsed.data);
   if (!context || "error" in context) return { ok: false, error: context?.error ?? "Event not found." };
+  if (parsed.data.certificateTemplate) {
+    const key = parsed.data.certificateTemplate.backgroundKey;
+    if (!key.startsWith(`organisations/${context.organisation.id}/certificate-backgrounds/`) || !await prisma.asset.findFirst({ where: { key, organisationId: context.organisation.id, contentType: "image/webp" }, select: { id: true } })) return { ok: false, error: "Choose a certificate image uploaded by this organisation." };
+  }
+  const certificateData = parsed.data.certificateTemplate === undefined ? {} : { certificateTemplate: parsed.data.certificateTemplate ?? Prisma.DbNull };
   const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.eventFeedbackForm.findUnique({ where: { eventId: context.event.id }, select: { id: true } });
     if (existing) await tx.$queryRaw`SELECT "id" FROM "EventFeedbackForm" WHERE "id" = ${existing.id} FOR UPDATE`;
@@ -107,7 +114,7 @@ export async function saveFeedbackSettings(input: unknown): Promise<ActionResult
       const fieldCount = await tx.eventFeedbackField.count({ where: { formId: existing.id } });
       if (fieldCount === 0) return { error: "Add at least one feedback question before opening the form." } as const;
     }
-    const saved = await tx.eventFeedbackForm.upsert({ where: { eventId: context.event.id }, create: { eventId: context.event.id, isOpen: parsed.data.isOpen, title: parsed.data.title, thankYouMessage: parsed.data.thankYouMessage, certificateEnabled: parsed.data.certificateEnabled }, update: { isOpen: parsed.data.isOpen, title: parsed.data.title, thankYouMessage: parsed.data.thankYouMessage, certificateEnabled: parsed.data.certificateEnabled } });
+    const saved = await tx.eventFeedbackForm.upsert({ where: { eventId: context.event.id }, create: { eventId: context.event.id, isOpen: parsed.data.isOpen, title: parsed.data.title, thankYouMessage: parsed.data.thankYouMessage, certificateEnabled: parsed.data.certificateEnabled, ...certificateData }, update: { isOpen: parsed.data.isOpen, title: parsed.data.title, thankYouMessage: parsed.data.thankYouMessage, certificateEnabled: parsed.data.certificateEnabled, ...certificateData } });
     await recordAuditEvent({ action: "FEEDBACK_FORM_UPDATED", actorUserId: context.userId, organisationId: context.organisation.id, targetType: "EventFeedbackForm", targetId: saved.id, metadata: { eventId: context.event.id, isOpen: saved.isOpen, certificateEnabled: saved.certificateEnabled }, client: tx });
     return { form: saved } as const;
   });

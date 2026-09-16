@@ -40,6 +40,14 @@ beforeEach(() => {
 });
 
 describe("feedback form maintenance", () => {
+  it("rejects certificate artwork from another organisation before saving", async () => {
+    const result = await saveFeedbackSettings({ organisationSlug: "org", eventId: "event_1", isOpen: true, title: "Feedback", thankYouMessage: "Thanks", certificateEnabled: true, certificateTemplate: {
+      backgroundKey: "organisations/other/certificate-backgrounds/12345678-1234-4123-8123-123456789abc.webp",
+      x: 10, y: 40, width: 80, height: 15, font: "serif", fontSize: 48, color: "#000000", bold: false, align: "center",
+    } });
+    expect(result.ok).toBe(false);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
   it("commits privacy settings and their audit record together", async () => {
     const result = await saveFeedbackSettings({ organisationSlug: "org", eventId: "event_1", isOpen: true, title: "Feedback", thankYouMessage: "Thanks", certificateEnabled: false });
     expect(result).toEqual({ ok: true, data: { formId: "form_1" } });
