@@ -515,6 +515,14 @@ export function EventWebsiteShell(p: Props) {
         fullWidth
         maxWidth="sm"
         aria-labelledby="event-registration-title"
+        slotProps={{
+          paper: {
+            sx: {
+              margin: { xs: 2, sm: 4 },
+              maxHeight: { xs: "calc(100dvh - 32px)", sm: "calc(100% - 64px)" },
+            },
+          },
+        }}
       >
         <DialogTitle id="event-registration-title">
           Register for {p.event.title}
