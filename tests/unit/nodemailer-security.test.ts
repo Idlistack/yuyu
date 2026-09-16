@@ -42,11 +42,11 @@ describe("real Nodemailer composition and access restrictions", () => {
     if (directory) await rm(directory, { recursive: true, force: true });
   });
 
-  it("composes text, HTML and an inline calendar attachment without SMTP", async () => {
+  it("composes text, HTML and a client-recognised calendar event without SMTP", async () => {
     const calendar = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
     const result = await transporter.sendMail({
       ...envelope, text: "Event details", html: "<p>Event details</p>",
-      attachments: [{ filename: "event.ics", content: calendar, contentType: "text/calendar; charset=utf-8; method=PUBLISH" }],
+      icalEvent: { filename: "event.ics", content: calendar, method: "PUBLISH" },
     });
     const message = result.message.toString();
     expect(result.messageId).toBe(envelope.messageId);

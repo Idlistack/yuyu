@@ -21,6 +21,7 @@ type RsvpStatusPayload = {
   eventTitle: string;
   approved: boolean;
   checkInToken?: string;
+  recipientName?: string;
 };
 
 type PasswordResetPayload = {
@@ -176,7 +177,8 @@ function asRsvpStatusPayload(value: Prisma.JsonValue): RsvpStatusPayload | null 
     !isBoundedString(payload.eventTitle, 200) ||
     typeof payload.approved !== "boolean" ||
     (payload.approved && !isBoundedString(payload.checkInToken, 128)) ||
-    (payload.checkInToken !== undefined && !isBoundedString(payload.checkInToken, 128))
+    (payload.checkInToken !== undefined && !isBoundedString(payload.checkInToken, 128)) ||
+    (payload.recipientName !== undefined && !isBoundedString(payload.recipientName, 200))
   ) return null;
   return payload as RsvpStatusPayload;
 }
@@ -186,6 +188,8 @@ async function getCurrentRsvp(checkInToken: string) {
     where: { checkInToken },
     select: {
       status: true,
+      guestName: true,
+      user: { select: { name: true } },
       event: { select: { startDateTime: true, endDateTime: true, timezone: true, location: true } },
       eventInstance: { select: { startDateTime: true, endDateTime: true, series: { select: { timezone: true } } } },
     },
@@ -204,6 +208,10 @@ function calendarEvent(rsvp: Awaited<ReturnType<typeof getCurrentRsvp>>) {
     };
   }
   return undefined;
+}
+
+function attendeeName(rsvp: Awaited<ReturnType<typeof getCurrentRsvp>>) {
+  return rsvp?.user?.name?.trim() || rsvp?.guestName?.trim() || undefined;
 }
 
 function asPasswordResetPayload(value: Prisma.JsonValue): PasswordResetPayload | null {
@@ -278,7 +286,7 @@ export async function deliverOutboxBatch(limit = 20) {
           await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });
           continue;
         }
-        await sendRSVPConfirmation({ ...payload, calendarEvent: calendarEvent(rsvp), messageId: stableMessageId });
+        await sendRSVPConfirmation({ ...payload, recipientName: attendeeName(rsvp), calendarEvent: calendarEvent(rsvp), messageId: stableMessageId });
       } else if (message.kind === "rsvp-status") {
         const payload = asRsvpStatusPayload(message.payload);
         if (!payload) throw new PermanentOutboxError();
@@ -293,6 +301,7 @@ export async function deliverOutboxBatch(limit = 20) {
             eventTitle: payload.eventTitle,
             status: RsvpStatus.CONFIRMED,
             checkInToken: payload.checkInToken,
+            recipientName: attendeeName(rsvp),
             calendarEvent: calendarEvent(rsvp),
             messageId: stableMessageId,
           });

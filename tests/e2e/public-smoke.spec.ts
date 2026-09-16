@@ -138,6 +138,10 @@ test("a confirmed attendee can download a QR ticket", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Downloadable ticket test" })).toBeVisible();
   await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
   await expect(page.getByText(/Ticket link:/)).toHaveCount(0);
+  const calendarLink = page.getByRole("link", { name: "Add Downloadable ticket test to Google Calendar" });
+  await expect(calendarLink).toHaveAttribute("href", /calendar\.google\.com\/calendar\/render/);
+  await expect(calendarLink).toHaveAttribute("href", /action=TEMPLATE/);
+  await expect(calendarLink).not.toHaveAttribute("href", new RegExp(ticketToken));
 
   const ticketResponse = await page.request.get(`/api/ticket/${ticketToken}/download`);
   expect(ticketResponse.headers()["content-type"]).toBe("image/jpeg");
