@@ -235,23 +235,6 @@ export function AppBarNav() {
         </MenuItem>
         {status !== "authenticated" ? <MenuItem component={Link} href="/features" onClick={closeMobileMenu} selected={pathname === "/features"} sx={{ minHeight: 48 }}>Features</MenuItem> : null}
         <MenuItem component={Link} href="/about" onClick={closeMobileMenu} selected={pathname === "/about"} sx={{ minHeight: 48 }}>About</MenuItem>
-        <MenuItem
-          component="a"
-          href="https://idlistack.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={closeMobileMenu}
-          aria-label="Powered by Idlistack (opens in a new tab)"
-          sx={{ minHeight: 48, gap: 1, color: "#ed4690" }}
-        >
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>Powered by</Typography>
-          <Box
-            component="img"
-            src={theme.palette.mode === "dark" ? "/brand/idlistack-logo-white.png" : "/brand/idlistack-logo-black.png"}
-            alt="Idlistack"
-            sx={{ width: 96, height: 26, objectFit: "cover", objectPosition: "center" }}
-          />
-        </MenuItem>
         {status === "authenticated" ? (
           <MenuItem component={Link} href="/dashboard" onClick={closeMobileMenu} selected={pathname?.startsWith("/dashboard")} sx={{ minHeight: 48 }}>
             Dashboard
@@ -272,6 +255,23 @@ export function AppBarNav() {
             Sign in
           </MenuItem>
         )}
+        <MenuItem
+          component="a"
+          href="https://idlistack.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={closeMobileMenu}
+          aria-label="Powered by Idlistack (opens in a new tab)"
+          sx={{ minHeight: 48, gap: 1, color: "#ed4690" }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>Powered by</Typography>
+          <Box
+            component="img"
+            src={theme.palette.mode === "dark" ? "/brand/idlistack-logo-white.png" : "/brand/idlistack-logo-black.png"}
+            alt="Idlistack"
+            sx={{ width: 96, height: 26, objectFit: "cover", objectPosition: "center" }}
+          />
+        </MenuItem>
       </Menu>
     </AppBar>
   );
