@@ -105,8 +105,8 @@ function PhoneField(props: {
           );
         }}
         onChange={(_, option) => onChange(setPhoneValue(value, { dial: typeof option === "string" ? option : option?.dial ?? "" }))}
-        renderOption={(optionProps, option) => (
-          <li {...optionProps}>
+        renderOption={({ key, ...optionProps }, option) => (
+          <li key={key} {...optionProps}>
             {option.label} ({option.dial})
           </li>
         )}
