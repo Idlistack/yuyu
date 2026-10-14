@@ -64,7 +64,7 @@ export function AboutPage({ getStartedHref }: { getStartedHref: string }) {
       <section aria-labelledby="principles-title">
         <Container className="flex flex-col gap-10 py-16 lg:py-[88px]">
           <SectionHeading id="principles-title" overline="What we believe" title="Six promises we design by" />
-          <ul className="grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid auto-rows-fr gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {principles.map((principle) => (
               <li key={principle.title} className="group flex flex-col items-center gap-[18px] rounded-[24px] bg-tint-peach px-6 py-7 text-center">
                 <DotFace mood={principle.face} size={108.8} />
