@@ -1,12 +1,7 @@
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
 import { prisma } from "@/lib/db";
+import { AdminPanel, NameCell } from "@/components/super-admin/AdminPanel";
+import { SectionHeading, StatTile } from "@/components/ui/display";
+import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 function formatBytes(bytes: number | null): string {
   if (bytes == null || Number.isNaN(bytes)) return "—";
@@ -83,91 +78,65 @@ export default async function SuperAdminStoragePage() {
     .catch(() => new Map<string, number>());
 
   return (
-    <Stack spacing={2}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 800 }}>
-        Storage
-      </Typography>
+    <div className="flex flex-col gap-5">
+      <SectionHeading title="Storage" />
 
-      <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Database size
-        </Typography>
-        <Typography color="text.secondary">
-          {dbSizeBytes == null
-            ? "Unavailable (DB functions may be restricted)."
-            : formatBytes(dbSizeBytes)}
-        </Typography>
-      </Paper>
+      <StatTile
+        className="sm:max-w-sm"
+        label="Database size"
+        value={dbSizeBytes == null ? "—" : formatBytes(dbSizeBytes)}
+        hint={dbSizeBytes == null ? "Unavailable (DB functions may be restricted)." : undefined}
+      />
 
-      <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          Largest tables (top 25)
-        </Typography>
+      <AdminPanel title="Largest tables (top 25)">
         {tableSizes == null ? (
-          <Typography color="text.secondary">
-            Unavailable (DB functions may be restricted).
-          </Typography>
+          <p className="text-body-ui text-ink-muted">Unavailable (DB functions may be restricted).</p>
         ) : (
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Table</TableCell>
-                <TableCell align="right">Bytes</TableCell>
-                <TableCell align="right">Pretty</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <Table label="Largest tables">
+            <THead>
+              <tr>
+                <TH>Table</TH>
+                <TH className="text-right">Bytes</TH>
+                <TH className="text-right">Pretty</TH>
+              </tr>
+            </THead>
+            <TBody>
               {tableSizes.map((t) => (
-                <TableRow key={t.table_name}>
-                  <TableCell sx={{ fontFamily: "monospace" }}>{t.table_name}</TableCell>
-                  <TableCell align="right">{t.total_bytes.toLocaleString()}</TableCell>
-                  <TableCell align="right">{t.total_pretty}</TableCell>
-                </TableRow>
+                <TR key={t.table_name}>
+                  <TD className="font-mono text-sm">{t.table_name}</TD>
+                  <TD className="text-right tabular-nums">{t.total_bytes.toLocaleString()}</TD>
+                  <TD className="text-right tabular-nums">{t.total_pretty}</TD>
+                </TR>
               ))}
-            </TableBody>
+            </TBody>
           </Table>
         )}
-      </Paper>
+      </AdminPanel>
 
-      <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          Per-org logical footprint (counts)
-        </Typography>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Org</TableCell>
-              <TableCell align="right">Assets bytes</TableCell>
-              <TableCell align="right">Members</TableCell>
-              <TableCell align="right">Events</TableCell>
-              <TableCell align="right">Series</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
+      <AdminPanel title="Per-org logical footprint (counts)">
+        <Table label="Per-org logical footprint">
+          <THead>
+            <tr>
+              <TH>Org</TH>
+              <TH className="text-right">Assets bytes</TH>
+              <TH className="text-right">Members</TH>
+              <TH className="text-right">Events</TH>
+              <TH className="text-right">Series</TH>
+            </tr>
+          </THead>
+          <TBody>
             {perOrgCounts.map((o) => (
-              <TableRow key={o.id}>
-                <TableCell sx={{ fontWeight: 650 }}>
-                  {o.name}
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block" }}
-                  >
-                    /{o.slug}
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">
-                  {formatBytes(assetTotals.get(o.id) ?? 0)}
-                </TableCell>
-                <TableCell align="right">{o._count.memberships}</TableCell>
-                <TableCell align="right">{o._count.events}</TableCell>
-                <TableCell align="right">{o._count.eventSeries}</TableCell>
-              </TableRow>
+              <TR key={o.id}>
+                <TD><NameCell name={o.name} sub={`/${o.slug}`} /></TD>
+                <TD className="text-right tabular-nums">{formatBytes(assetTotals.get(o.id) ?? 0)}</TD>
+                <TD className="text-right tabular-nums">{o._count.memberships}</TD>
+                <TD className="text-right tabular-nums">{o._count.events}</TD>
+                <TD className="text-right tabular-nums">{o._count.eventSeries}</TD>
+              </TR>
             ))}
-          </TableBody>
+          </TBody>
         </Table>
-      </Paper>
-    </Stack>
+      </AdminPanel>
+    </div>
   );
 }
-

@@ -1,15 +1,7 @@
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Link from "next/link";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
 import { prisma } from "@/lib/db";
+import { AdminPager, AdminSearchForm, NameCell } from "@/components/super-admin/AdminPanel";
+import { SectionHeading } from "@/components/ui/display";
+import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 type Props = {
   searchParams: Promise<{ q?: string; page?: string }>;
@@ -46,99 +38,42 @@ export default async function SuperAdminUsersPage({ searchParams }: Props) {
   });
 
   return (
-    <Stack spacing={2}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 800 }}>
-        Users
-      </Typography>
+    <div className="flex flex-col gap-5">
+      <SectionHeading title="Users" />
+      <AdminSearchForm action="/super-admin/users" label="Search by name or email" defaultValue={q} />
 
-      <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 3 }}>
-        <Stack
-          component="form"
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1.5}
-          action="/super-admin/users"
-          method="GET"
-        >
-          <TextField
-            name="q"
-            label="Search by name or email"
-            defaultValue={q}
-            size="small"
-            fullWidth
-          />
-          <input type="hidden" name="page" value="0" />
-          <Button type="submit" variant="contained">
-            Search
-          </Button>
-        </Stack>
-      </Paper>
+      <Table label="Users">
+        <THead>
+          <tr>
+            <TH>User</TH>
+            <TH>Email</TH>
+            <TH className="text-right">Orgs</TH>
+            <TH className="text-right">Accounts</TH>
+            <TH className="text-right">Sessions</TH>
+            <TH className="text-right">RSVPs</TH>
+            <TH>Created</TH>
+          </tr>
+        </THead>
+        <TBody>
+          {users.length === 0 ? (
+            <tr><TD colSpan={7} className="py-8 text-center text-ink-muted">No users.</TD></tr>
+          ) : (
+            users.map((u) => (
+              <TR key={u.id}>
+                <TD><NameCell name={u.name ?? "—"} sub={u.id} /></TD>
+                <TD className="font-mono text-sm">{u.email ?? "—"}</TD>
+                <TD className="text-right tabular-nums">{u._count.memberships}</TD>
+                <TD className="text-right tabular-nums">{u._count.accounts}</TD>
+                <TD className="text-right tabular-nums">{u._count.sessions}</TD>
+                <TD className="text-right tabular-nums">{u._count.rsvps}</TD>
+                <TD className="whitespace-nowrap text-ink-secondary">{u.createdAt.toLocaleString()}</TD>
+              </TR>
+            ))
+          )}
+        </TBody>
+      </Table>
 
-      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>User</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell align="right">Orgs</TableCell>
-              <TableCell align="right">Accounts</TableCell>
-              <TableCell align="right">Sessions</TableCell>
-              <TableCell align="right">RSVPs</TableCell>
-              <TableCell>Created</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {users.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7}>
-                  <Typography color="text.secondary">No users.</Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              users.map((u) => (
-                <TableRow key={u.id} hover>
-                  <TableCell sx={{ fontWeight: 650 }}>
-                    {u.name ?? "—"}
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block" }}
-                    >
-                      {u.id}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ fontFamily: "monospace" }}>
-                    {u.email ?? "—"}
-                  </TableCell>
-                  <TableCell align="right">{u._count.memberships}</TableCell>
-                  <TableCell align="right">{u._count.accounts}</TableCell>
-                  <TableCell align="right">{u._count.sessions}</TableCell>
-                  <TableCell align="right">{u._count.rsvps}</TableCell>
-                  <TableCell>{u.createdAt.toLocaleString()}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Paper>
-
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-        <Link
-          href={`/super-admin/users?q=${encodeURIComponent(q)}&page=${Math.max(0, page - 1)}`}
-          style={{ textDecoration: "none" }}
-        >
-          Prev
-        </Link>
-        <Typography color="text.secondary">·</Typography>
-        <Typography color="text.secondary">Page {page + 1}</Typography>
-        <Typography color="text.secondary">·</Typography>
-        <Link
-          href={`/super-admin/users?q=${encodeURIComponent(q)}&page=${page + 1}`}
-          style={{ textDecoration: "none" }}
-        >
-          Next
-        </Link>
-      </Stack>
-    </Stack>
+      <AdminPager basePath="/super-admin/users" query={q} page={page} />
+    </div>
   );
 }
-
