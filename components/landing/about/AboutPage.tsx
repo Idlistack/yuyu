@@ -6,6 +6,8 @@ import type { DotFaceMood } from "@/components/brand/patterns";
 import { GitHubMark } from "@/components/ui/github-mark";
 import { CONTRIBUTING_URL, DISCUSSIONS_URL, GITHUB_REPO, GITHUB_URL, NEW_ISSUE_URL, SETUP_GUIDE_URL } from "@/lib/openSource";
 import { Container, DotIcon, SectionHeading } from "../primitives";
+import { BuildingNote } from "./BuildingNote";
+import { MakerSection } from "./MakerSection";
 
 
 const story = [
@@ -43,8 +45,8 @@ export function AboutPage({ getStartedHref }: { getStartedHref: string }) {
               Most event tools are built to sell tickets. Yuyu is built for the other kind of event: the free meetup, the campus club, the NGO workshop, organised by volunteers in their spare time.
             </p>
           </div>
-          <DotMark size={312} label={null} className="hidden lg:inline-flex" />
-          <DotMark size={160} label={null} className="lg:hidden" />
+          {/* The builder's note: a sealed envelope that opens into a letter. */}
+          <BuildingNote className="lg:w-[420px] lg:shrink-0" />
         </Container>
       </section>
 
@@ -114,23 +116,7 @@ export function AboutPage({ getStartedHref }: { getStartedHref: string }) {
       </section>
 
       {/* Who makes Yuyu */}
-      <section aria-labelledby="makers-title">
-        <Container className="py-16 lg:py-[88px]">
-          <SectionHeading
-            id="makers-title"
-            overline="Who makes Yuyu"
-            className="max-w-[820px]"
-            title={
-              <>
-                Built by{" "}
-                <a href="https://abhiramnj.com" target="_blank" rel="noopener noreferrer" className="underline decoration-2 underline-offset-[6px] hover:decoration-[3px]">Abhiram</a>
-                , hosted on{" "}
-                <a href="https://idlistack.com" target="_blank" rel="noopener noreferrer" className="underline decoration-2 underline-offset-[6px] hover:decoration-[3px]">Idlistack</a>
-              </>
-            }
-          />
-        </Container>
-      </section>
+      <MakerSection />
 
       {/* Closing CTA (always dark) */}
       <section aria-labelledby="about-cta-title">
