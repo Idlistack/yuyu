@@ -85,20 +85,20 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
       <section aria-labelledby="hero-title">
         <Container className="grid items-center gap-14 pb-20 pt-12 lg:grid-cols-2 lg:pt-[72px]">
           <div className="flex flex-col items-start gap-7">
-            <h1 id="hero-title" className="max-w-[552px] text-display-xl text-ink">Host events people show up to.</h1>
+            <h1 id="hero-title" className="max-w-[552px] text-display-xl text-ink">Your whole event, in one place.</h1>
             <p className="max-w-[552px] text-body-l text-ink-secondary">
-              Yuyu gives clubs, meetups and community groups everything to run free events: a beautiful event page, registrations and waitlists, tickets, check-in at the door and feedback afterwards.
+              From the invite to the thank-you, Yuyu gives clubs, meetups and volunteer teams one free tool for sign-ups, check-in and feedback.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild variant="primary" size="lg">
-                <Link href={getStartedHref}>Start organising — it’s free</Link>
+                <Link href={getStartedHref}>Create your first event</Link>
               </Button>
               <Button asChild variant="secondary" size="lg">
-                <Link href="/discover">Discover events</Link>
+                <Link href="/discover">Browse events</Link>
               </Button>
             </div>
             <div className="flex flex-col gap-2">
-              <p className="text-caption text-ink-muted">No tickets for sale, no payments, no ad trackers. Ever.</p>
+              <p className="text-caption text-ink-muted">Free to organise and free to attend, for every event.</p>
               <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 self-start text-label text-ink-secondary underline-offset-4 transition-colors hover:text-ink hover:underline">
                 <GitHubMark />
                 Open source on GitHub · {GITHUB_REPO}
