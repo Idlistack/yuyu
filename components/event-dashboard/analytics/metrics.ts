@@ -25,16 +25,24 @@ export type FunnelStep = {
   /** Null when the step only happens after the event and nothing is recorded yet. */
   value: number | null;
   dots: number;
-  /** Share of the previous step, as a whole percentage. */
+  /** Share of the previous step, as a whole percentage (never over 100). */
   percent: number | null;
+  /** What the percentage is a share of, e.g. "responses", "going". */
   of: string | null;
+  /** Shown instead of a percentage when the step is larger than the one before it. */
+  note: string | null;
 };
+
+/** How each step's share is described, relative to the step before it. */
+const SHARE_OF: Record<FunnelStep["key"], string> = { responded: "", going: "responses", checkedIn: "going", feedback: "checked in" };
+/** Feedback can come from anyone with the link, so it may outnumber check-ins. */
+const OVERFLOW_NOTE: Partial<Record<FunnelStep["key"], string>> = { feedback: "includes people who didn't check in", checkedIn: "includes door overrides" };
 
 /** "From sign-up to thank-you": responded → going → checked in → gave feedback. */
 export function funnelSteps(input: { responded: number; going: number; checkedIn: number; feedback: number; ended: boolean }, maxDots = 60): { steps: FunnelStep[]; perDot: number; total: number } {
   const perDot = peoplePerDot(input.responded, maxDots);
   const later = (value: number) => (input.ended || value > 0 ? value : null);
-  const raw: Array<Omit<FunnelStep, "dots" | "percent" | "of">> = [
+  const raw: Array<Omit<FunnelStep, "dots" | "percent" | "of" | "note">> = [
     { key: "responded", label: "Responded", value: input.responded },
     { key: "going", label: "Going", value: input.going },
     { key: "checkedIn", label: "Checked in", value: later(input.checkedIn) },
@@ -42,8 +50,16 @@ export function funnelSteps(input: { responded: number; going: number; checkedIn
   ];
   const steps = raw.map((step, index) => {
     const previous = index > 0 ? raw[index - 1]! : null;
-    const percent = previous && step.value != null && previous.value != null && previous.value > 0 ? Math.round((step.value / previous.value) * 100) : null;
-    return { ...step, dots: step.value == null ? 0 : dotsFor(step.value, perDot), percent, of: previous && percent != null ? previous.label.toLowerCase() : null };
+    const comparable = previous && step.value != null && previous.value != null && previous.value > 0;
+    const overflow = Boolean(comparable && step.value! > previous!.value!);
+    const percent = comparable && !overflow ? Math.round((step.value! / previous!.value!) * 100) : null;
+    return {
+      ...step,
+      dots: step.value == null ? 0 : dotsFor(step.value, perDot),
+      percent,
+      of: percent != null ? SHARE_OF[step.key] : null,
+      note: overflow ? OVERFLOW_NOTE[step.key] ?? null : null,
+    };
   });
   return { steps, perDot, total: Math.max(1, Math.ceil(input.responded / perDot)) };
 }

@@ -35,7 +35,7 @@ export function FunnelCard({ steps, perDot, total }: { steps: FunnelStep[]; perD
       </div>
       <ol className="flex flex-col gap-4">
         {steps.map((step) => (
-          <li key={step.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:grid-cols-[8rem_minmax(0,1fr)_9rem]">
+          <li key={step.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:grid-cols-[8rem_minmax(0,1fr)_12rem]">
             <span className="font-semibold text-ink">{step.label}</span>
             <span className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto">
               <Dots count={step.dots} total={total} className={FUNNEL_TONE[step.key]} />
@@ -49,10 +49,11 @@ export function FunnelCard({ steps, perDot, total }: { steps: FunnelStep[]; perD
                 <>
                   <strong className="font-display text-xl font-extrabold text-ink">{step.value}</strong>
                   {step.percent != null ? (
-                    <span className="text-caption text-ink-muted">
-                      {" "}
-                      {step.percent}%<span className="sr-only"> of {step.of}</span>
+                    <span className="block text-caption text-ink-muted">
+                      {step.percent}% of {step.of}
                     </span>
+                  ) : step.note ? (
+                    <span className="block text-caption text-ink-muted">{step.note}</span>
                   ) : null}
                 </>
               )}

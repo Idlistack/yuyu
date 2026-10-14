@@ -131,7 +131,7 @@ describe("funnelSteps", () => {
     expect(perDot).toBe(1);
     expect(total).toBe(44);
     expect(steps.map((step) => step.value)).toEqual([44, 34, null, null]);
-    expect(steps[1]).toMatchObject({ percent: 77, of: "responded", dots: 34 });
+    expect(steps[1]).toMatchObject({ percent: 77, of: "responses", dots: 34 });
     expect(steps[2]).toMatchObject({ percent: null, dots: 0 });
   });
 
@@ -140,6 +140,13 @@ describe("funnelSteps", () => {
     expect(steps.map((step) => step.value)).toEqual([10, 8, 6, 0]);
     expect(steps[2]).toMatchObject({ percent: 75, of: "going" });
     expect(steps[3]).toMatchObject({ percent: 0, of: "checked in" });
+  });
+
+  it("never shows a share over 100% — feedback can outnumber check-ins", () => {
+    const { steps } = funnelSteps({ responded: 54, going: 5, checkedIn: 2, feedback: 15, ended: true });
+    expect(steps[1]).toMatchObject({ value: 5, percent: 9, of: "responses", note: null });
+    expect(steps[2]).toMatchObject({ value: 2, percent: 40, of: "going" });
+    expect(steps[3]).toMatchObject({ value: 15, percent: null, of: null, note: "includes people who didn't check in" });
   });
 
   it("shows check-ins already recorded during a live event", () => {
