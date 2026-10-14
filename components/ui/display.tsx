@@ -190,8 +190,8 @@ export function YuyuMark({ size = 32, className }: { size?: number; className?: 
 
 /* ---------- Date block (docs/DESIGN.md §4.6) ---------- */
 
-export function DateBlock({ month, day, tone = "accent", size = "md", series = false, className }: { month: string; day: string; tone?: "accent" | "draft" | "ink"; size?: "sm" | "md" | "lg"; series?: boolean; className?: string }) {
-  const header = tone === "accent" ? "bg-accent text-on-accent" : tone === "draft" ? "bg-ink-disabled text-white" : "bg-primary text-on-primary";
+export function DateBlock({ month, day, tone = "accent", color, size = "md", series = false, className }: { month: string; day: string; tone?: "accent" | "draft" | "ink"; /** Explicit header colour (validated hex), e.g. an event's own accent in a dashboard list. */ color?: string; size?: "sm" | "md" | "lg"; series?: boolean; className?: string }) {
+  const header = color ? "text-white" : tone === "accent" ? "bg-accent text-on-accent" : tone === "draft" ? "bg-ink-disabled text-white" : "bg-primary text-on-primary";
   return (
     <span
       aria-hidden
@@ -203,7 +203,7 @@ export function DateBlock({ month, day, tone = "accent", size = "md", series = f
         className,
       )}
     >
-      <span className={cn("block py-0.5 text-[11px] font-bold tracking-[0.08em]", size === "lg" && "text-xs", header)}>{month}</span>
+      <span className={cn("block py-0.5 text-[11px] font-bold tracking-[0.08em]", size === "lg" && "text-xs", header)} style={color ? { backgroundColor: color } : undefined}>{month}</span>
       <span
         className={cn(
           "flex items-center justify-center font-display font-extrabold leading-none text-ink",
