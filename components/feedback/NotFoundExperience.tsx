@@ -8,7 +8,6 @@ import { ArrowLeft, ArrowRight, Compass, Scissors, Search } from "lucide-react";
 import { chromeFor } from "@/components/chrome/ChromeSwitch";
 import { SiteHeader } from "@/components/chrome/SiteHeader";
 import { SiteFooter } from "@/components/chrome/SiteFooter";
-import { DotFace } from "@/components/brand/DotFace";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/field";
 import { accentStyle } from "@/lib/theme/accent";
@@ -127,7 +126,6 @@ export function NotFoundExperience() {
     <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[1160px] flex-col items-center gap-12 px-4 pb-28 pt-14 sm:px-6 sm:pt-20 lg:pb-[140px] lg:pt-[120px] xl:px-0">
       <NotFoundPet />
       <div className="flex flex-col items-center gap-5 text-center">
-        <DotFace mood="sleepy" size={128} />
         <p className="text-overline text-ink-muted">Error 404 · Lost &amp; found</p>
         <h1 className="max-w-[760px] text-display-m text-ink">This page isn’t on the programme</h1>
         <p className="max-w-[560px] text-body-l text-ink-secondary">
