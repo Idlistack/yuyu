@@ -1,14 +1,12 @@
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import Grid from "@mui/material/Grid";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Link from "next/link";
+import { KeyRound } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { canDeleteOrg, requireOrgRole } from "@/lib/permissions";
 import { EditOrgForm } from "@/components/org/EditOrgForm";
+import { CopyOrganisationUrl } from "@/components/org/CopyOrganisationUrl";
 import { DeleteOrganisationButton } from "@/components/dashboard/DeleteOrganisationButton";
+import { Button } from "@/components/ui/button";
+import { DangerZone, PageHeader, SettingsRow } from "@/components/ui/display";
 
 import type { Metadata } from "next";
 
@@ -30,89 +28,53 @@ export default async function OrgSettingsPage({ params }: Props) {
 
   if (!org) {
     // requireOrgRole guarantees the org exists; this is defensive.
-    return (
-      <Typography color="text.secondary">
-        Organisation not found.
-      </Typography>
-    );
+    return <p className="text-body-ui text-ink-muted">Organisation not found.</p>;
   }
 
   return (
-    <Stack spacing={3.5}>
-      <Paper
-        variant="outlined"
-        sx={{
-          p: { xs: 2.5, sm: 3.5 },
-          borderRadius: "22px",
-          borderColor: "rgba(255,255,255,0.09)",
-          background: "linear-gradient(120deg, rgba(10,132,255,0.14), rgba(28,28,30,0.96) 60%)",
+    <div className="flex max-w-[880px] flex-col gap-6">
+      <PageHeader
+        kicker="Organisation settings"
+        title="Shape your workspace"
+        description={`Update the details people see when they visit ${org.name}. Changes are visible on the public organisation page as soon as you save them.`}
+      />
+
+      <EditOrgForm
+        organisationSlug={org.slug}
+        initial={{
+          name: org.name,
+          description: org.description ?? "",
+          logoUrl: org.logoUrl,
         }}
-      >
-        <Typography variant="overline" sx={{ color: "#0A84FF", fontWeight: 700, letterSpacing: "1.5px", lineHeight: 1.3 }}>
-          Organisation settings
-        </Typography>
-        <Typography variant="h4" component="h1" sx={{ mt: 0.5, fontWeight: 700, letterSpacing: "-1px" }}>
-          Shape your workspace
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 1, color: "rgba(255,255,255,0.58)", maxWidth: 560 }}>
-          Update the details people see when they visit {org.name}.
-        </Typography>
-      </Paper>
+      />
 
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 8 }}>
-          <EditOrgForm
-            organisationSlug={org.slug}
-            initial={{
-              name: org.name,
-              description: org.description ?? "",
-              logoUrl: org.logoUrl,
-            }}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Stack spacing={2.5}>
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: "16px", borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.025)" }}>
-              <Stack spacing={1}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>About this workspace</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Changes are visible on the public organisation page as soon as you save them.
-                </Typography>
-                <Box sx={{ pt: 1 }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary" }}>Organisation URL</Typography>
-                  <Typography variant="body2" sx={{ mt: 0.25, fontWeight: 600 }}>/{org.slug}</Typography>
-                </Box>
-              </Stack>
-            </Paper>
+      <div className="border-t border-line">
+        <SettingsRow title="Organisation URL" description="About this workspace">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-subtle px-3.5 py-2.5">
+            <span className="font-semibold text-ink">/{org.slug}</span>
+            <CopyOrganisationUrl slug={org.slug} />
+          </div>
+        </SettingsRow>
 
-            {membership.role === "OWNER" ? (
-              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: "16px", borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.025)" }}>
-                <Stack spacing={1.25}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>API access</Typography>
-                  <Typography variant="body2" color="text.secondary">Manage machine clients, scopes, and rotatable credentials.</Typography>
-                  <Link href={`/dashboard/${org.slug}/settings/api`} style={{ textDecoration: "none" }}>
-                    <Button variant="outlined" size="small">Manage API access</Button>
-                  </Link>
-                </Stack>
-              </Paper>
-            ) : null}
+        {membership.role === "OWNER" ? (
+          <SettingsRow title="API access" description="Manage machine clients, scopes, and rotatable credentials.">
+            <Button asChild variant="secondary" size="sm">
+              <Link href={`/dashboard/${org.slug}/settings/api`}>
+                <KeyRound aria-hidden className="size-4" />
+                Manage API access
+              </Link>
+            </Button>
+          </SettingsRow>
+        ) : null}
+      </div>
 
-            {canDeleteOrg(membership) ? (
-              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: "16px", borderColor: "rgba(255,69,58,0.35)", backgroundColor: "rgba(255,69,58,0.06)" }}>
-                <Stack spacing={1.25}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#FF6961" }}>Danger zone</Typography>
-                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.65)" }}>
-                    Permanently delete this organisation and all of its events, registrations, and memberships.
-                  </Typography>
-                  <Box sx={{ pt: 0.5 }}>
-                    <DeleteOrganisationButton organisationSlug={org.slug} />
-                  </Box>
-                </Stack>
-              </Paper>
-            ) : null}
-          </Stack>
-        </Grid>
-      </Grid>
-    </Stack>
+      {canDeleteOrg(membership) ? (
+        <DangerZone
+          title="Danger zone"
+          description="Permanently delete this organisation and all of its events, registrations, and memberships."
+          action={<DeleteOrganisationButton organisationSlug={org.slug} />}
+        />
+      ) : null}
+    </div>
   );
 }

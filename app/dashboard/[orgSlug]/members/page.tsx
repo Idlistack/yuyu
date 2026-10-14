@@ -1,15 +1,4 @@
-import Typography from "@mui/material/Typography";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import TableContainer from "@mui/material/TableContainer";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Avatar from "@mui/material/Avatar";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
+import Link from "next/link";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import {
@@ -19,6 +8,9 @@ import {
 } from "@/lib/permissions";
 import { MemberRoleActions } from "@/components/members/MemberRoleActions";
 import { OrgInviteLinkPanel } from "@/components/members/OrgInviteLinkPanel";
+import { Button } from "@/components/ui/button";
+import { Avatar, EmptyState, PageHeader } from "@/components/ui/display";
+import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 import type { Metadata } from "next";
 
@@ -71,19 +63,17 @@ export default async function OrgMembersPage({ params, searchParams }: Props) {
     })();
 
   return (
-    <Stack spacing={3.5} sx={{ pb: 2 }}>
-      <Stack spacing={0.5} sx={{ px: { xs: 0.5, sm: 0 } }}>
-        <Typography variant="h5" component="h1" sx={{ fontWeight: 700, letterSpacing: "-0.5px" }}>
-          Members
-        </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          {ownerView
+    <div className="flex flex-col gap-6 pb-4">
+      <PageHeader
+        title="Members"
+        description={
+          ownerView
             ? "Manage roles, invite collaborators, and keep your workspace in good shape."
             : adminView
               ? "Invite collaborators and manage the members of this workspace."
-              : "Everyone who belongs to this organisation."}
-        </Typography>
-      </Stack>
+              : "Everyone who belongs to this organisation."
+        }
+      />
 
       {adminView ? (
         <OrgInviteLinkPanel
@@ -98,79 +88,57 @@ export default async function OrgMembersPage({ params, searchParams }: Props) {
       ) : null}
 
       {members.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 5, textAlign: "center", borderRadius: "16px", borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.025)" }}>
-          <Typography color="text.secondary">No members found.</Typography>
-        </Paper>
+        <EmptyState>No members found.</EmptyState>
       ) : (
-        <TableContainer
-          component={Paper}
-          variant="outlined"
-          sx={{
-            overflow: "hidden",
-            borderRadius: "18px",
-            borderColor: "rgba(255,255,255,0.09)",
-            backgroundColor: "rgba(28,28,30,0.88)",
-            boxShadow: "none",
-          }}
-        >
-          <Table size="small" sx={{ minWidth: 560 }}>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: "rgba(255,255,255,0.025)" }}>
-                <TableCell sx={{ py: 1.25, color: "rgba(255,255,255,0.48)", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.7px", textTransform: "uppercase" }}>Member</TableCell>
-                <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, py: 1.25, color: "rgba(255,255,255,0.48)", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.7px", textTransform: "uppercase" }}>Email</TableCell>
-                <TableCell sx={{ py: 1.25, color: "rgba(255,255,255,0.48)", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.7px", textTransform: "uppercase" }}>Access</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {members.map((m) => (
-                <TableRow
-                  key={m.id}
-                  hover
-                  sx={{
-                    "&:last-child td, &:last-child th": { borderBottom: 0 },
-                    "&:hover": { backgroundColor: "rgba(255,255,255,0.035)" },
-                  }}
-                >
-                  <TableCell sx={{ py: 1.5 }}>
-                    <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                      <Avatar
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          fontSize: "0.85rem",
-                          fontWeight: 700,
-                          color: "#fff",
-                          background: "linear-gradient(135deg, rgba(10,132,255,0.9), rgba(185,174,255,0.75))",
-                        }}
-                      >
-                        {(m.user.name ?? m.user.email ?? "?").trim().slice(0, 1).toUpperCase()}
-                      </Avatar>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 650 }} noWrap>
-                          {m.user.name ?? "Unnamed member"}
-                        </Typography>
-                        <Typography variant="caption" sx={{ display: { xs: "block", sm: "none" }, color: "text.secondary" }} noWrap>
-                          {m.user.email ?? "—"}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, color: "text.secondary" }}>{m.user.email ?? "—"}</TableCell>
-                  <TableCell sx={{ py: 1.25 }}>
-                    <MemberRoleActions
-                      organisationSlug={organisation.slug}
-                      targetUserId={m.userId}
-                      role={m.role}
-                      actorRole={membership.role}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Table label="Members" className="min-w-[560px]">
+          <THead>
+            <tr>
+              <TH>Member</TH>
+              <TH className="hidden sm:table-cell">Email</TH>
+              <TH>Access</TH>
+            </tr>
+          </THead>
+          <TBody>
+            {members.map((m) => (
+              <TR key={m.id}>
+                <TD>
+                  <div className="flex items-center gap-3">
+                    <Avatar name={m.user.name ?? m.user.email} size="md" />
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-ink">{m.user.name ?? "Unnamed member"}</p>
+                      <p className="truncate text-caption text-ink-muted sm:hidden">{m.user.email ?? "—"}</p>
+                    </div>
+                  </div>
+                </TD>
+                <TD className="hidden text-ink-secondary sm:table-cell">{m.user.email ?? "—"}</TD>
+                <TD>
+                  <MemberRoleActions
+                    organisationSlug={organisation.slug}
+                    targetUserId={m.userId}
+                    role={m.role}
+                    actorRole={membership.role}
+                  />
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
       )}
-      {memberPages > 1 ? <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end", alignItems: "center" }}><Typography variant="body2" color="text.secondary">Page {memberPage} of {memberPages}</Typography><Button href={`?page=${memberPage - 1}`} disabled={memberPage <= 1}>Previous</Button><Button href={`?page=${memberPage + 1}`} disabled={memberPage >= memberPages}>Next</Button></Stack> : null}
-    </Stack>
+      {memberPages > 1 ? (
+        <nav aria-label="Member pages" className="flex items-center justify-end gap-2">
+          <p className="text-sm text-ink-muted">Page {memberPage} of {memberPages}</p>
+          {memberPage <= 1 ? (
+            <Button size="sm" variant="secondary" disabled>Previous</Button>
+          ) : (
+            <Button asChild size="sm" variant="secondary"><Link href={`?page=${memberPage - 1}`}>Previous</Link></Button>
+          )}
+          {memberPage >= memberPages ? (
+            <Button size="sm" variant="secondary" disabled>Next</Button>
+          ) : (
+            <Button asChild size="sm" variant="secondary"><Link href={`?page=${memberPage + 1}`}>Next</Link></Button>
+          )}
+        </nav>
+      ) : null}
+    </div>
   );
 }

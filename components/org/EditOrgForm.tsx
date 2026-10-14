@@ -2,22 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Divider from "@mui/material/Divider";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Alert from "@mui/material/Alert";
-import Grid from "@mui/material/Grid";
-import Box from "@mui/material/Box";
-import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { updateOrganisation } from "@/app/actions/org";
 import { uploadOrganisationLogo } from "@/app/actions/media";
 import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
+import { Button } from "@/components/ui/button";
+import { Callout, SettingsRow } from "@/components/ui/display";
+import { Field, Input, Textarea } from "@/components/ui/field";
 
 export function EditOrgForm(props: {
   organisationSlug: string;
@@ -34,9 +26,8 @@ export function EditOrgForm(props: {
   useUnsavedChangesGuard(dirty && !pending);
 
   return (
-    <Stack
-      component="form"
-      spacing={2.5}
+    <form
+      className="flex flex-col"
       onChangeCapture={() => setDirty(true)}
       onSubmit={(e) => {
         e.preventDefault();
@@ -78,109 +69,38 @@ export function EditOrgForm(props: {
         });
       }}
     >
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      {error ? <Callout tone="danger" role="alert" className="mb-2">{error}</Callout> : null}
 
-      <Paper
-        variant="outlined"
-        sx={{
-          p: { xs: 2, sm: 2.5 },
-          borderRadius: "16px",
-          borderColor: "rgba(255,255,255,0.08)",
-          backgroundColor: "rgba(255,255,255,0.025)",
-        }}
-      >
-        <Stack spacing={2}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <SettingsOutlinedIcon color="primary" />
-            <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Organisation settings
-              </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 0.5 }}
-              >
-                Update how your organisation appears on public pages.
-              </Typography>
-            </Box>
-          </Stack>
-          <Divider />
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                name="name"
-                label="Organisation name"
-                required
-                fullWidth
-                defaultValue={initial.name}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                name="description"
-                label="Description"
-                fullWidth
-                multiline
-                minRows={4}
-                defaultValue={initial.description}
-                helperText="Shown on your organisation page."
-              />
-            </Grid>
-          </Grid>
-        </Stack>
-      </Paper>
-
-      <Paper
-        variant="outlined"
-        sx={{
-          p: { xs: 2, sm: 2.5 },
-          borderRadius: "16px",
-          borderColor: "rgba(255,255,255,0.08)",
-          backgroundColor: "rgba(255,255,255,0.025)",
-        }}
-      >
-        <Stack spacing={2}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <ImageOutlinedIcon sx={{ color: "text.secondary" }} />
-            <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Logo
-              </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 0.5 }}
-              >
-                Add a logo for a more recognizable presence.
-              </Typography>
-            </Box>
-          </Stack>
-          <Divider />
-          <ImageUploadPicker
-            initialUrl={initial.logoUrl}
-            label="Logo"
-            placeholder="Your logo will appear here."
-            disabled={pending}
-            onChange={(file, previewUrl) => {
-              setLogoFile(file);
-              setLogoPreviewUrl(previewUrl);
-              setDirty(true);
-            }}
-          />
-        </Stack>
-      </Paper>
-
-      <Stack direction="row" spacing={2} useFlexGap sx={{ flexWrap: "wrap" }}>
-        <Button
-          type="submit"
-          variant="contained"
+      <SettingsRow title="Logo" description="Add a logo for a more recognizable presence.">
+        <ImageUploadPicker
+          initialUrl={initial.logoUrl}
+          label="Logo"
+          placeholder="Your logo will appear here."
           disabled={pending}
-          sx={{ textTransform: "none", borderRadius: 2, px: 2.5 }}
-        >
+          onChange={(file, previewUrl) => {
+            setLogoFile(file);
+            setLogoPreviewUrl(previewUrl);
+            setDirty(true);
+          }}
+        />
+      </SettingsRow>
+
+      <SettingsRow title="Name & description" description="Update how your organisation appears on public pages.">
+        <div className="flex flex-col gap-4">
+          <Field label="Name" required>
+            <Input name="name" defaultValue={initial.name} />
+          </Field>
+          <Field label="Description" helperText="Shown on your organisation page.">
+            <Textarea name="description" rows={4} defaultValue={initial.description} />
+          </Field>
+        </div>
+      </SettingsRow>
+
+      <div className="flex justify-end border-t border-line pt-5">
+        <Button type="submit" variant="primary" disabled={pending} loading={pending}>
           Save changes
         </Button>
-      </Stack>
-    </Stack>
+      </div>
+    </form>
   );
 }

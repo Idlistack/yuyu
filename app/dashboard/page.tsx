@@ -1,21 +1,9 @@
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Stack from "@mui/material/Stack";
-import Card from "@mui/material/Card";
-import CardActionArea from "@mui/material/CardActionArea";
-import CardContent from "@mui/material/CardContent";
-import Grid from "@mui/material/Grid";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
-import Avatar from "@mui/material/Avatar";
-import Divider from "@mui/material/Divider";
 import Link from "next/link";
+import { ArrowRight, Building2, Plus } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import BusinessIcon from "@mui/icons-material/Business";
-import AddIcon from "@mui/icons-material/Add";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import EventIcon from "@mui/icons-material/Event";
+import { Button } from "@/components/ui/button";
+import { Avatar, Card, OrgLogo, PageHeader, StatTile } from "@/components/ui/display";
 
 import type { Metadata } from "next";
 
@@ -23,8 +11,6 @@ export const metadata: Metadata = {
   title: "Dashboard",
   description: "Manage your organisations, events, and RSVPs.",
 };
-
-const DASHBOARD_BLUE = "#0A84FF";
 
 function getTimeAgo(date: Date): string {
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
@@ -116,427 +102,125 @@ export default async function DashboardPage() {
   const userName = session.user.name || "User";
 
   return (
-    <Stack spacing={4} sx={{ py: { xs: 3, sm: 5 }, px: { xs: 1, sm: 2 } }}>
-      {/* ── HEADER (APPLE HIG MINIMALIST STYLE) ── */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        sx={{
-          justifyContent: "space-between",
-          alignItems: { xs: "stretch", sm: "flex-end" },
-          gap: 2,
-          p: { xs: 2.5, sm: 3.5 },
-          border: 1,
-          borderColor: "divider",
-          borderRadius: "24px",
-          backgroundColor: "background.paper",
-          backgroundImage: "linear-gradient(120deg, rgba(10,132,255,0.14), transparent 55%, rgba(48,209,88,0.08))",
-          boxShadow: "0 18px 45px rgba(28,28,30,0.1)",
-        }}
-      >
-        <Stack spacing={0.5}>
-          <Typography
-            variant="overline"
-            sx={{ color: "primary.main", fontWeight: 700, letterSpacing: "1.6px", lineHeight: 1.3 }}
-          >
-            Workspace overview
-          </Typography>
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{
-              fontWeight: 700,
-              letterSpacing: "-1px",
-              color: "text.primary",
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-            }}
-          >
-            Dashboard
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: "text.secondary", fontWeight: 400 }}
-          >
-            Welcome back, {userName}. Everything you need to run your events, in one place.
-          </Typography>
-        </Stack>
-
-        <Link href="/dashboard/org/new" style={{ textDecoration: "none" }}>
-          <Button
-            variant="contained"
-            component="span"
-            startIcon={<AddIcon />}
-            sx={{
-              alignSelf: { xs: "flex-start", sm: "center" },
-              backgroundColor: DASHBOARD_BLUE,
-              color: "#FFFFFF",
-              fontWeight: 600,
-              textTransform: "none",
-              borderRadius: "10px",
-              px: 3,
-              py: 1,
-              fontSize: "0.9rem",
-              boxShadow: "none",
-              transition: "opacity 0.15s ease",
-              "&:hover": {
-                backgroundColor: DASHBOARD_BLUE,
-                opacity: 0.9,
-                boxShadow: "none",
-              },
-            }}
-          >
-            New Organisation
+    <div className="flex flex-col gap-10">
+      <PageHeader
+        kicker="Workspace overview"
+        title="Dashboard"
+        description={`Welcome back, ${userName}. Everything you need to run your events, in one place.`}
+        actions={
+          <Button asChild variant="primary">
+            <Link href="/dashboard/org/new">
+              <Plus aria-hidden className="size-[18px]" />
+              New Organisation
+            </Link>
           </Button>
-        </Link>
-      </Stack>
+        }
+      />
 
       {coOrganizedEvents.length ? (
-        <Stack spacing={2}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "text.primary", letterSpacing: "-0.3px" }}>
-              Co-organized events
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Events you can manage without organisation membership
-            </Typography>
-          </Stack>
-          <Grid container spacing={2}>
+        <section aria-labelledby="co-organized-title" className="flex flex-col gap-3">
+          <div>
+            <h2 id="co-organized-title" className="text-h3 text-ink">Co-organized events</h2>
+            <p className="mt-1 text-body-ui text-ink-muted">Events you can manage without organisation membership</p>
+          </div>
+          <ul className="grid gap-3 md:grid-cols-2">
             {coOrganizedEvents.map((item) => (
-              <Grid key={`${item.label}-${item.id}`} size={{ xs: 12, md: 6 }}>
-                <Card variant="outlined" sx={{ borderRadius: "16px", backgroundColor: "background.paper", borderColor: "divider" }}>
-                  <Link href={item.href} style={{ color: "inherit", display: "block", textDecoration: "none" }}>
-                  <CardActionArea component="div">
-                    <CardContent sx={{ p: 2.5 }}>
-                      <Stack spacing={0.75}>
-                        <Typography variant="caption" color="text.secondary">{item.label} · {item.organisation.name}</Typography>
-                        <Typography sx={{ fontWeight: 700 }}>{item.title}</Typography>
-                        <Typography variant="caption" color="text.secondary">{item.permissions.map((permission) => permission.replaceAll("_", " ").toLowerCase()).join(" · ")}</Typography>
-                      </Stack>
-                    </CardContent>
-                  </CardActionArea>
-                  </Link>
-                </Card>
-              </Grid>
+              <li key={`${item.label}-${item.id}`}>
+                <Link href={item.href} className="flex h-full flex-col gap-1 rounded-lg border border-line bg-canvas p-5 transition-colors hover:bg-subtle">
+                  <span className="text-caption text-ink-muted">{item.label} · {item.organisation.name}</span>
+                  <span className="text-[17px] font-bold text-ink">{item.title}</span>
+                  <span className="text-caption text-ink-muted">{item.permissions.map((permission) => permission.replaceAll("_", " ").toLowerCase()).join(" · ")}</span>
+                </Link>
+              </li>
             ))}
-          </Grid>
-        </Stack>
+          </ul>
+        </section>
       ) : null}
 
-      {/* ── TWO COLUMN LISTS (HIG GROUPED LAYOUT) ── */}
-      <Grid container spacing={4}>
-        {/* Left Column: Organisations */}
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <Stack spacing={2}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 700,
-                      color: "text.primary",
-                      letterSpacing: "-0.3px",
-                    }}
-                  >
-                    Organisations
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Your workspaces
-                  </Typography>
-                </Stack>
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section aria-labelledby="orgs-title" className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <h2 id="orgs-title" className="text-h3 text-ink">Organisations</h2>
+            <p className="text-body-ui text-ink-muted">Your workspaces</p>
+          </div>
 
-            {orgs.length === 0 ? (
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: 6,
-                  borderRadius: "16px",
-                  textAlign: "center",
-                  backgroundColor: "background.paper",
-                  borderColor: "divider",
-                }}
-              >
-                <Stack spacing={2} sx={{ alignItems: "center" }}>
-                  <Avatar
-                    sx={{
-                      bgcolor: "action.hover",
-                      color: "text.secondary",
-                      width: 56,
-                      height: 56,
-                    }}
+          {orgs.length === 0 ? (
+            <Card padding="lg" className="flex flex-col items-center gap-3 text-center">
+              <span aria-hidden className="flex size-14 items-center justify-center rounded-full bg-muted text-ink-muted">
+                <Building2 className="size-7" />
+              </span>
+              <p className="text-label text-ink">No organisations yet</p>
+              <p className="max-w-[360px] text-body-ui text-ink-muted">
+                Create your first organisation workspace to manage events and check-ins.
+              </p>
+              <Button asChild variant="primary" className="mt-1">
+                <Link href="/dashboard/org/new">
+                  <Plus aria-hidden className="size-[18px]" />
+                  Create Organisation
+                </Link>
+              </Button>
+            </Card>
+          ) : (
+            <ul className="grid gap-3 md:grid-cols-2">
+              {orgs.map((org) => (
+                <li key={org.id}>
+                  <Link
+                    href={`/dashboard/${org.slug}`}
+                    className="group flex h-full flex-col gap-4 rounded-xl border border-line bg-canvas p-5 transition-colors hover:bg-subtle"
                   >
-                    <BusinessIcon sx={{ fontSize: 30 }} />
-                  </Avatar>
-                  <Typography variant="body1" sx={{ fontWeight: 600, color: "text.primary" }}>
-                    No organisations yet
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: "text.secondary", maxWidth: 360, lineHeight: 1.5 }}
-                  >
-                    Create your first organisation workspace to manage events and check-ins.
-                  </Typography>
-                  <Box sx={{ pt: 1 }}>
-                    <Link href="/dashboard/org/new" style={{ textDecoration: "none" }}>
-                      <Button
-                        variant="contained"
-                        component="span"
-                        startIcon={<AddIcon />}
-                        sx={{
-                          backgroundColor: DASHBOARD_BLUE,
-                          color: "#FFFFFF",
-                          fontWeight: 600,
-                          textTransform: "none",
-                          borderRadius: "10px",
-                          px: 3,
-                          "&:hover": {
-                            backgroundColor: DASHBOARD_BLUE,
-                            opacity: 0.9,
-                          },
-                        }}
-                      >
-                        Create Organisation
-                      </Button>
-                    </Link>
-                  </Box>
-                </Stack>
-              </Paper>
+                    <div className="flex min-w-0 items-center gap-3.5">
+                      <OrgLogo name={org.name} src={org.logoUrl} size="lg" />
+                      <div className="min-w-0">
+                        <p className="truncate text-[17px] font-bold text-ink">{org.name}</p>
+                        <p className="truncate text-sm text-ink-muted">/{org.slug}</p>
+                      </div>
+                    </div>
+                    {org.description ? <p className="line-clamp-2 text-sm text-ink-secondary">{org.description}</p> : null}
+                    <span className="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-ink-secondary group-hover:text-ink">
+                      Open workspace
+                      <ArrowRight aria-hidden className="size-4" />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <aside className="flex flex-col gap-6">
+          <StatTile label="Active Events" value={totalEventsCount} hint="Published across your workspaces" />
+
+          <section aria-labelledby="activity-title" className="flex flex-col gap-3">
+            <h2 id="activity-title" className="text-h3 text-ink">Activity</h2>
+            {recentRsvps.length === 0 ? (
+              <p className="text-body-ui text-ink-muted">No recent registrations.</p>
             ) : (
-              <Stack spacing={2}>
-                {orgs.map((org) => (
-                  <Card
-                    key={org.id}
-                    variant="outlined"
-                    sx={{
-                      borderRadius: "16px",
-                      backgroundColor: "background.paper",
-                      borderColor: "divider",
-                      boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
-                      "&:hover": {
-                        backgroundColor: "action.hover",
-                        transform: "translateY(-2px)",
-                        borderColor: "rgba(10,132,255,0.35)",
-                      },
-                      transition: "background-color 0.15s ease, transform 0.15s ease, border-color 0.15s ease",
-                    }}
-                  >
-                    <Link
-                      href={`/dashboard/${org.slug}`}
-                      style={{
-                        textDecoration: "none",
-                        color: "inherit",
-                        display: "block",
-                      }}
-                    >
-                      <CardActionArea component="div">
-                        <CardContent sx={{ p: 3 }}>
-                          <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={3}
-                            sx={{
-                              alignItems: { xs: "flex-start", sm: "center" },
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            {/* Org Profile Header */}
-                            <Stack direction="row" spacing={2} sx={{ alignItems: "center", minWidth: 0, flex: 1 }}>
-                              <Avatar
-                                variant="rounded"
-                                src={org.logoUrl ?? undefined}
-                                alt={org.name}
-                                sx={{
-                                  background: "action.hover",
-                                  color: "text.primary",
-                                  width: 52,
-                                  height: 52,
-                                  borderRadius: "12px",
-                                  fontWeight: 600,
-                                  fontSize: "1.2rem",
-                                  border: 1,
-                                  borderColor: "divider",
-                                }}
-                              >
-                                {org.name.trim().slice(0, 1).toUpperCase()}
-                              </Avatar>
-                              <Box sx={{ minWidth: 0 }}>
-                                <Typography
-                                  variant="body1"
-                                  sx={{ fontWeight: 600, color: "text.primary" }}
-                                  noWrap
-                                >
-                                  {org.name}
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ color: "text.secondary", mt: 0.25 }}
-                                  noWrap
-                                >
-                                  /{org.slug}
-                                </Typography>
-                                {org.description ? (
-                                  <Typography
-                                    variant="caption"
-                                    sx={{ color: "text.secondary", display: "block", mt: 0.75 }}
-                                    noWrap
-                                  >
-                                    {org.description}
-                                  </Typography>
-                                ) : null}
-                              </Box>
-                            </Stack>
+              <ul className="flex flex-col gap-4">
+                {recentRsvps.map((rsvp) => {
+                  const eventTitle = rsvp.event?.title ?? rsvp.eventInstance?.series?.title ?? "Event";
+                  const orgName = rsvp.event?.organisation?.name ?? rsvp.eventInstance?.series?.organisation?.name ?? "";
+                  const attendeeName = rsvp.user?.name ?? rsvp.guestName ?? "Guest";
+                  const isConfirmed = rsvp.status === "CONFIRMED";
 
-                            {/* Info & Navigation */}
-                            <Stack
-                              direction="row"
-                              spacing={3}
-                              sx={{
-                                alignItems: "center",
-                                width: { xs: "100%", sm: "auto" },
-                                justifyContent: { xs: "space-between", sm: "flex-end" },
-                                pt: { xs: 2, sm: 0 },
-                                borderTop: { xs: 1, sm: "none" },
-                                borderColor: { xs: "divider", sm: "transparent" },
-                              }}
-                            >
-                              <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                                Open workspace
-                              </Typography>
-                              <ArrowForwardIcon sx={{ color: "text.secondary", fontSize: 18 }} />
-                            </Stack>
-                          </Stack>
-                        </CardContent>
-                      </CardActionArea>
-                    </Link>
-                  </Card>
-                ))}
-              </Stack>
+                  return (
+                    <li key={rsvp.id} className="flex items-start gap-3">
+                      <Avatar name={attendeeName} size="sm" tone={isConfirmed ? "success" : "warning"} />
+                      <div className="min-w-0 text-sm">
+                        <p className="text-ink-secondary">
+                          <strong className="font-semibold text-ink">{attendeeName}</strong>{" "}
+                          {isConfirmed ? "Registered for" : "Waitlisted for"}{" "}
+                          <span className="text-ink">{eventTitle}</span> ({orgName})
+                        </p>
+                        <p className="text-caption text-ink-muted">{getTimeAgo(rsvp.createdAt)}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-          </Stack>
-        </Grid>
-
-        {/* Right Column: Activity Feed (Grouped List Style) */}
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Stack spacing={2}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 3,
-                borderRadius: "16px",
-                backgroundColor: "background.paper",
-                borderColor: "divider",
-                backgroundImage: "linear-gradient(145deg, rgba(10,132,255,0.18), transparent 68%)",
-                boxShadow: "0 14px 30px rgba(10,132,255,0.1)",
-              }}
-            >
-              <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-                <Stack spacing={1}>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: "text.secondary",
-                      fontWeight: 600,
-                      fontSize: "0.8rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                    }}
-                  >
-                    Active Events
-                  </Typography>
-                  <Typography
-                    variant="h3"
-                    sx={{ fontWeight: 700, color: "text.primary", letterSpacing: "-1px" }}
-                  >
-                    {totalEventsCount}
-                  </Typography>
-                </Stack>
-                <Box
-                  sx={{
-                    display: "grid",
-                    placeItems: "center",
-                    width: 44,
-                    height: 44,
-                    borderRadius: "14px",
-                    color: "#fff",
-                    backgroundColor: "rgba(10,132,255,0.78)",
-                  }}
-                >
-                  <EventIcon sx={{ fontSize: 24 }} />
-                </Box>
-              </Stack>
-              <Typography variant="caption" sx={{ display: "block", mt: 2, color: "text.secondary" }}>
-                Published across your workspaces
-              </Typography>
-            </Paper>
-
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                color: "text.primary",
-                letterSpacing: "-0.3px",
-              }}
-            >
-              Activity
-            </Typography>
-
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 3,
-                borderRadius: "16px",
-                backgroundColor: "background.paper",
-                borderColor: "divider",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
-              }}
-            >
-              {recentRsvps.length === 0 ? (
-                <Typography
-                  variant="body2"
-                  sx={{ color: "text.secondary", textAlign: "center", py: 4 }}
-                >
-                  No recent registrations.
-                </Typography>
-              ) : (
-                <Stack spacing={2}>
-                  {recentRsvps.map((rsvp, idx) => {
-                    const eventTitle = rsvp.event?.title ?? rsvp.eventInstance?.series?.title ?? "Event";
-                    const orgName = rsvp.event?.organisation?.name ?? rsvp.eventInstance?.series?.organisation?.name ?? "";
-                    const attendeeName = rsvp.user?.name ?? rsvp.guestName ?? "Guest";
-                    const isConfirmed = rsvp.status === "CONFIRMED";
-
-                    return (
-                      <Stack key={rsvp.id} spacing={1.5}>
-                        {idx > 0 && <Divider />}
-                        <Stack spacing={0.5}>
-                          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 600, color: "text.primary" }}
-                            >
-                              {attendeeName}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              sx={{ color: "text.secondary", fontSize: "0.7rem" }}
-                            >
-                              {getTimeAgo(rsvp.createdAt)}
-                            </Typography>
-                          </Stack>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "text.secondary", lineHeight: 1.4 }}
-                          >
-                            {isConfirmed ? "Registered for" : "Waitlisted for"}{" "}
-                            <Box component="span" sx={{ color: "text.primary" }}>{eventTitle}</Box> ({orgName})
-                          </Typography>
-                        </Stack>
-                      </Stack>
-                    );
-                  })}
-                </Stack>
-              )}
-            </Paper>
-          </Stack>
-        </Grid>
-      </Grid>
-    </Stack>
+          </section>
+        </aside>
+      </div>
+    </div>
   );
 }
