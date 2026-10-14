@@ -7,6 +7,16 @@ import { cn } from "@/lib/cn";
 import { FeedbackResponsesPanel, type FeedbackResponseRow } from "@/components/feedback/FeedbackResponsesPanel";
 import { RATING_DOTS, type FeedbackInsights } from "./helpers";
 
+/** Rating labels can be numbers ("5") or words ("Excellent"); the label column fits the longest one. */
+function labelIsWord(rows: ReadonlyArray<{ value: string | number }>) {
+  return rows.some((row) => !/^\d+$/.test(String(row.value)));
+}
+
+function labelWidth(rows: ReadonlyArray<{ value: string | number }>) {
+  const longest = Math.max(1, ...rows.map((row) => String(row.value).length));
+  return `${Math.min(longest, 16) + 0.5}ch`;
+}
+
 /**
  * Feedback summary for organisation admins: rating distributions, the latest
  * text answers and the full anonymous response list on demand. Data arrives
@@ -70,7 +80,13 @@ export function ResponsesCard({
                   <ul className="flex flex-col gap-1.5">
                     {rating.rows.map((row) => (
                       <li key={row.value} className="flex items-center gap-2.5 text-sm">
-                        <span className="w-6 shrink-0 text-right tabular-nums text-ink-muted">{row.value}</span>
+                        <span
+                          title={String(row.value)}
+                          className={cn("shrink-0 truncate tabular-nums text-ink-muted", labelIsWord(rating.rows) ? "text-left" : "text-right")}
+                          style={{ width: labelWidth(rating.rows) }}
+                        >
+                          {row.value}
+                        </span>
                         <span aria-hidden className="flex gap-[3px]">
                           {Array.from({ length: RATING_DOTS }, (_, index) => (
                             <span key={index} className={cn("size-2.5 rounded-full", index < row.dots ? "bg-brand-marigold" : "bg-track")} />
