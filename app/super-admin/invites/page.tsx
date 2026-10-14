@@ -1,9 +1,12 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { AdminPanel, NameCell } from "@/components/super-admin/AdminPanel";
-import { SectionHeading } from "@/components/ui/display";
+import { PageHeader } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 export default async function SuperAdminInvitesPage() {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   const [orgInvites, eventInvites, seriesInvites] = await Promise.all([
     prisma.organisationInvite.findMany({
       orderBy: { createdAt: "desc" },
@@ -57,8 +60,8 @@ export default async function SuperAdminInvitesPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-5">
-      <SectionHeading title="Invites" />
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Invites" description="Organisation invite links and event and series invites across the instance." />
 
       <AdminPanel title="Organisation invite links">
         <Table label="Organisation invite links">

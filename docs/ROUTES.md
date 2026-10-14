@@ -44,7 +44,7 @@ Dashboard pages require authentication and enforce membership/role permissions o
 
 ## Super-admin pages
 
-The `/super-admin` area includes overview, audit log, auth, events, invites, monitoring, operations, organisations, settings, storage, and users. The Auth page includes the instance-wide new-account creation control. `/super-admin/settings` manages SMTP, Google SSO, and displayed backup posture; secrets entered there are write-only. Access requires the authenticated email configured in `SUPER_ADMIN_EMAIL`; other users receive a not-found response.
+The `/super-admin` area includes overview, activity, audit log, auth, email, events, invites, monitoring, operations, organisations (with a detail page per organisation), security, settings, storage, and users (with a detail page per user at `/super-admin/users/[userId]`). The Auth page includes the instance-wide new-account creation control. `/super-admin/settings` manages SMTP, Google SSO, and displayed backup posture; secrets entered there are write-only. Access requires the authenticated email configured in `SUPER_ADMIN_EMAIL`; other users receive a not-found response.
 
 Every super-admin page additionally requires a current TOTP verification. Users without a valid 10-minute step-up proof are sent to `/super-admin-mfa`; authenticator MFA must be enrolled first from `/account/security`.
 

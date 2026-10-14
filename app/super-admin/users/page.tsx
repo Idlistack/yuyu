@@ -1,28 +1,47 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
+import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { cn } from "@/lib/cn";
 import { AdminPager, AdminSearchForm, NameCell } from "@/components/super-admin/AdminPanel";
-import { SectionHeading } from "@/components/ui/display";
+import { Chip, PageHeader } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 type Props = {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; filter?: string }>;
 };
 
+const filters = {
+  all: { label: "All", where: {} },
+  unverified: { label: "Unverified email", where: { emailVerified: null } },
+  "no-mfa": { label: "Without MFA", where: { mfaEnabledAt: null } },
+  mfa: { label: "With MFA", where: { mfaEnabledAt: { not: null } } },
+} satisfies Record<string, { label: string; where: Prisma.UserWhereInput }>;
+
+type FilterKey = keyof typeof filters;
+
 export default async function SuperAdminUsersPage({ searchParams }: Props) {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
+  const filter: FilterKey = sp.filter && sp.filter in filters ? (sp.filter as FilterKey) : "all";
   const page = Math.max(0, Number.parseInt(sp.page ?? "0", 10) || 0);
   const take = 50;
   const skip = page * take;
 
   const users = await prisma.user.findMany({
-    where: q
-      ? {
-          OR: [
-            { email: { contains: q, mode: "insensitive" } },
-            { name: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
+    where: {
+      ...filters[filter].where,
+      ...(q
+        ? {
+            OR: [
+              { email: { contains: q, mode: "insensitive" } },
+              { name: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
     orderBy: { createdAt: "desc" },
     take,
     skip,
@@ -30,6 +49,8 @@ export default async function SuperAdminUsersPage({ searchParams }: Props) {
       id: true,
       name: true,
       email: true,
+      emailVerified: true,
+      mfaEnabledAt: true,
       createdAt: true,
       _count: {
         select: { memberships: true, accounts: true, sessions: true, rsvps: true },
@@ -37,16 +58,38 @@ export default async function SuperAdminUsersPage({ searchParams }: Props) {
     },
   });
 
+  const filterHref = (key: FilterKey) => `/super-admin/users?q=${encodeURIComponent(q)}${key === "all" ? "" : `&filter=${key}`}`;
+
   return (
-    <div className="flex flex-col gap-5">
-      <SectionHeading title="Users" />
-      <AdminSearchForm action="/super-admin/users" label="Search by name or email" defaultValue={q} />
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Users" description="Every account on this instance, with verification, MFA, memberships, sign-in accounts, sessions, and RSVPs." />
+      <AdminSearchForm action="/super-admin/users" label="Search by name or email" defaultValue={q}>
+        {filter === "all" ? null : <input type="hidden" name="filter" value={filter} />}
+      </AdminSearchForm>
+
+      <nav aria-label="Filter users" className="flex flex-wrap gap-1.5">
+        {(Object.keys(filters) as FilterKey[]).map((key) => (
+          <Link
+            key={key}
+            href={filterHref(key)}
+            aria-current={key === filter ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-8 items-center rounded-full border border-line px-3 text-sm text-ink-secondary transition-colors hover:bg-muted hover:text-ink",
+              key === filter && "border-transparent bg-primary font-semibold text-on-primary hover:bg-primary hover:text-on-primary",
+            )}
+          >
+            {filters[key].label}
+          </Link>
+        ))}
+      </nav>
 
       <Table label="Users">
         <THead>
           <tr>
             <TH>User</TH>
             <TH>Email</TH>
+            <TH>Verified</TH>
+            <TH>MFA</TH>
             <TH className="text-right">Orgs</TH>
             <TH className="text-right">Accounts</TH>
             <TH className="text-right">Sessions</TH>
@@ -56,12 +99,14 @@ export default async function SuperAdminUsersPage({ searchParams }: Props) {
         </THead>
         <TBody>
           {users.length === 0 ? (
-            <tr><TD colSpan={7} className="py-8 text-center text-ink-muted">No users.</TD></tr>
+            <tr><TD colSpan={9} className="py-8 text-center text-ink-muted">No users.</TD></tr>
           ) : (
             users.map((u) => (
               <TR key={u.id}>
-                <TD><NameCell name={u.name ?? "—"} sub={u.id} /></TD>
+                <TD><NameCell href={`/super-admin/users/${u.id}`} name={u.name ?? "—"} sub={u.id} /></TD>
                 <TD className="font-mono text-sm">{u.email ?? "—"}</TD>
+                <TD>{u.emailVerified ? <Chip size="sm" tone="success">Yes</Chip> : <Chip size="sm" tone="warning">No</Chip>}</TD>
+                <TD>{u.mfaEnabledAt ? <Chip size="sm" tone="success">On</Chip> : <Chip size="sm" tone="neutral">Off</Chip>}</TD>
                 <TD className="text-right tabular-nums">{u._count.memberships}</TD>
                 <TD className="text-right tabular-nums">{u._count.accounts}</TD>
                 <TD className="text-right tabular-nums">{u._count.sessions}</TD>
@@ -73,7 +118,7 @@ export default async function SuperAdminUsersPage({ searchParams }: Props) {
         </TBody>
       </Table>
 
-      <AdminPager basePath="/super-admin/users" query={q} page={page} />
+      <AdminPager basePath="/super-admin/users" query={q} page={page} extra={filter === "all" ? "" : `&filter=${filter}`} />
     </div>
   );
 }

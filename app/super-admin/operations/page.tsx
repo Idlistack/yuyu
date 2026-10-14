@@ -1,3 +1,4 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { OutboxStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -7,7 +8,7 @@ import { OUTBOX_SCHEDULER_HEARTBEAT_KEY } from "@/lib/operationalHeartbeat";
 import { redactSensitiveText } from "@/lib/redactSensitiveText";
 import { INSTANCE_SETTINGS_ID } from "@/lib/instanceSettings";
 import { AdminPanel } from "@/components/super-admin/AdminPanel";
-import { Callout, Chip, EmptyState, SectionHeading } from "@/components/ui/display";
+import { Callout, Chip, EmptyState, PageHeader } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 function StatusChip(props: { ok: boolean; ready: string; missing: string }) {
@@ -28,6 +29,8 @@ function safeErrorSummary(value: string | null) {
 }
 
 export default async function SuperAdminOperationsPage() {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   const now = new Date();
   const heartbeat = (prisma as unknown as {
     operationalHeartbeat?: Pick<typeof prisma.operationalHeartbeat, "findUnique">;
@@ -76,10 +79,10 @@ export default async function SuperAdminOperationsPage() {
   const failedCount = outbox.get(OutboxStatus.FAILED) ?? 0;
 
   return (
-    <div className="flex flex-col gap-5">
-      <SectionHeading title="Instance operations" description="Backup posture, queue health, retention jobs, and safe maintenance controls for this deployment." />
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Operations" description="Backup posture, queue health, retention jobs, and safe maintenance controls for this deployment." />
 
-      <div className="grid gap-5 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <div className="grid gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <AdminPanel title="Database backups">
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-2">
@@ -155,7 +158,7 @@ export default async function SuperAdminOperationsPage() {
         )}
       </AdminPanel>
 
-      <Callout tone="info" title="Operational guardrail">
+      <Callout tone="info" title="Operational guardrail" className="rounded-2xl">
         These controls do not create or delete provider backups. Backup creation, retention, encryption, and restore access must remain controlled by the managed database provider and deployment credentials. Use this page to verify posture and record evidence, not to expose infrastructure secrets in the application.
       </Callout>
     </div>

@@ -1,10 +1,16 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
+import Link from "next/link";
+import { ApiClientStatus, MembershipRole, OutboxStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { minutesAgo } from "@/lib/superAdminInsights";
 import { SparklineCard } from "@/components/super-admin/Sparkline";
 import { AdminPanel, MetricRows, NameCell } from "@/components/super-admin/AdminPanel";
-import { StatTile } from "@/components/ui/display";
+import { PageHeader, StatTile } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 export default async function SuperAdminOverviewPage() {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   const [
     orgs,
     users,
@@ -14,6 +20,14 @@ export default async function SuperAdminOverviewPage() {
     rsvps,
     memberships,
     orgInvites,
+    checkIns,
+    feedbackResponses,
+    broadcasts,
+    apiClients,
+    failedEmails,
+    stuckEmails,
+    managersWithoutMfa,
+    unverifiedUsers,
   ] = await Promise.all([
     prisma.organisation.count(),
     prisma.user.count(),
@@ -23,6 +37,14 @@ export default async function SuperAdminOverviewPage() {
     prisma.rSVP.count(),
     prisma.membership.count(),
     prisma.organisationInvite.count(),
+    prisma.rSVP.count({ where: { checkedInAt: { not: null } } }),
+    prisma.eventFeedbackResponse.count(),
+    prisma.eventBroadcast.count(),
+    prisma.apiClient.count({ where: { status: ApiClientStatus.ACTIVE } }),
+    prisma.outboxMessage.count({ where: { status: OutboxStatus.FAILED } }),
+    prisma.outboxMessage.count({ where: { status: OutboxStatus.PENDING, availableAt: { lt: minutesAgo(15) } } }),
+    prisma.user.count({ where: { mfaEnabledAt: null, memberships: { some: { role: { in: [MembershipRole.OWNER, MembershipRole.ADMIN] } } } } }),
+    prisma.user.count({ where: { emailVerified: null } }),
   ]);
 
   const [{ orgs24h, events24h, rsvps24h, rsvps7d }] = await prisma.$queryRaw<
@@ -131,17 +153,37 @@ export default async function SuperAdminOverviewPage() {
     { label: "Instances", value: instances },
     { label: "Memberships", value: memberships },
     { label: "Org invite links", value: orgInvites },
+    { label: "Check-ins", value: checkIns },
+    { label: "Feedback responses", value: feedbackResponses },
+    { label: "Broadcasts", value: broadcasts },
+    { label: "Active API clients", value: apiClients },
+  ];
+
+  const attention = [
+    { label: "Failed emails", value: failedEmails, href: "/super-admin/email" },
+    { label: "Emails queued over 15 minutes", value: stuckEmails, href: "/super-admin/email" },
+    { label: "Owners and admins without MFA", value: managersWithoutMfa, href: "/super-admin/security" },
+    { label: "Users with unverified email", value: unverifiedUsers, href: "/super-admin/users?filter=unverified" },
   ];
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-body-ui text-ink-secondary">Instance-wide master data and operational controls.</p>
+      <PageHeader title="Overview" description="Instance-wide master data and operational controls." />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((stat) => (
-          <StatTile key={stat.label} label={stat.label} value={stat.value.toLocaleString()} />
+          <StatTile key={stat.label} className="rounded-2xl" label={stat.label} value={stat.value.toLocaleString()} />
         ))}
       </div>
+
+      <AdminPanel title="Needs attention" description="Signals worth checking. Each links to the page with details.">
+        <MetricRows
+          rows={attention.map((item) => ({
+            label: <Link href={item.href} className="underline-offset-4 hover:text-ink hover:underline">{item.label}</Link>,
+            value: <span className={item.value > 0 ? "text-warning-fg" : "text-ink-muted"}>{item.value.toLocaleString()}</span>,
+          }))}
+        />
+      </AdminPanel>
 
       <div className="grid gap-3 md:grid-cols-3">
         <SparklineCard title="Orgs (7d)" subtitle="Created per day" points={activity7d.map((d) => ({ xLabel: d.day, y: d.orgs }))} />
@@ -149,7 +191,7 @@ export default async function SuperAdminOverviewPage() {
         <SparklineCard title="RSVPs (7d)" subtitle="Created per day" points={activity7d.map((d) => ({ xLabel: d.day, y: d.rsvps }))} />
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         <AdminPanel title="Recent activity">
           <MetricRows
             rows={[
@@ -187,7 +229,7 @@ export default async function SuperAdminOverviewPage() {
         </AdminPanel>
       </div>
 
-      <div className="grid gap-5">
+      <div className="grid gap-6">
         <AdminPanel title="Recent organisations">
           <Table label="Recent organisations">
             <TBody>

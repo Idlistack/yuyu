@@ -1,9 +1,10 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getApiMonitorSnapshot } from "@/lib/apiMonitor";
 import { Histogram } from "@/components/super-admin/Histogram";
 import { AdminPanel } from "@/components/super-admin/AdminPanel";
-import { Chip, EmptyState, SectionHeading } from "@/components/ui/display";
+import { Chip, EmptyState, PageHeader } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 function OkChip(props: { ok: boolean; labelOk?: string; labelBad?: string }) {
@@ -15,6 +16,8 @@ function OkChip(props: { ok: boolean; labelOk?: string; labelBad?: string }) {
 }
 
 export default async function SuperAdminMonitoringPage() {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   const snapshot = getApiMonitorSnapshot();
 
   let dbOk = true;
@@ -33,8 +36,8 @@ export default async function SuperAdminMonitoringPage() {
   const configuredDbUrl = !!process.env.DATABASE_URL;
 
   return (
-    <div className="flex flex-col gap-5">
-      <SectionHeading title="Monitoring" />
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Monitoring" description="Health checks and API request stats for this server." />
 
       <AdminPanel title="Health checks">
         <div className="flex flex-col gap-3">

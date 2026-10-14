@@ -1,11 +1,14 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { isNewUserRegistrationEnabled } from "@/lib/instanceSettings";
 import { AccountCreationControl } from "@/components/super-admin/AccountCreationControl";
 import { AdminPanel } from "@/components/super-admin/AdminPanel";
-import { SectionHeading, StatTile } from "@/components/ui/display";
+import { PageHeader, StatTile } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 export default async function SuperAdminAuthPage() {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   const [accountsCount, sessionsCount, tokensCount, accountCreationEnabled] = await Promise.all([
     prisma.account.count(),
     prisma.session.count(),
@@ -42,13 +45,13 @@ export default async function SuperAdminAuthPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-5">
-      <SectionHeading title="Auth" />
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Auth" description="Account creation, sign-in accounts, sessions, and verification tokens." />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatTile label="Accounts" value={accountsCount.toLocaleString()} />
-        <StatTile label="Sessions" value={sessionsCount.toLocaleString()} />
-        <StatTile label="Verification tokens" value={tokensCount.toLocaleString()} />
+        <StatTile className="rounded-2xl" label="Accounts" value={accountsCount.toLocaleString()} />
+        <StatTile className="rounded-2xl" label="Sessions" value={sessionsCount.toLocaleString()} />
+        <StatTile className="rounded-2xl" label="Verification tokens" value={tokensCount.toLocaleString()} />
       </div>
 
       <AccountCreationControl initialEnabled={accountCreationEnabled} />

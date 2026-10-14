@@ -346,6 +346,7 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
   - Bottom: "View public page ↗" and an account card that opens a menu: Account settings, Light/Dark mode, Sign out.
   - Active item: canvas fill with a border, 600 weight, `aria-current="page"`.
   - Below `md`: sidebar collapses to a top bar + menu sheet.
+- **Super-admin chrome:** no sidebar. A light sticky top bar (canvas, bottom border): Yuyu lockup · "Super admin" label · "Back to dashboard" + account menu on the right, and a second row of pill links to each section (Overview, Activity, Monitoring, Operations, Email, Audit log, Organisations, Events, Users, Auth, Security, Settings, Invites, Storage) that scrolls sideways on phones. Each page opens with the standard title + one-line description; panels are `rounded-2xl` bordered canvas cards.
 - **Event/series header:** ← All events · date block + title (h1 32px) + status chip + "Public · Tomorrow, 9:30 AM" · actions (View page ↗ secondary, Open check-in primary) · underline tabs: Overview, Guests, Page & programme, Registration form, Invites, Check-in, Feedback, Settings.
 - Page title pattern: optional greeting/kicker (muted) + h1 + one-line description.
 - Settings pages: left label column (title + helper) / right field column rows separated by dividers; Save/Discard bottom-right.

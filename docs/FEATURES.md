@@ -88,6 +88,7 @@ Only eligible confirmed attendees receive a scannable ticket by default. Organis
 - Instance-wide super-admin area restricted by `SUPER_ADMIN_EMAIL`.
 - Super-admin control to disable new password and Google account creation while preserving existing-user sign-in.
 - Super-admin instance settings for SMTP delivery, Google SSO, and display-only backup posture; instance-managed service secrets are encrypted at rest and never displayed after saving.
+- Read-only super-admin insights: 30-day activity and growth (signups, organisations, events, registrations, check-ins, feedback, broadcasts), email outbox health by message kind and recent broadcasts (subject and audience only), security posture (MFA adoption, owners/admins without MFA, unverified accounts, sign-in methods, sensitive audit actions, machine API clients with credential lifecycle but never secrets), storage breakdowns, and per-user and per-organisation support pages. Tokens, password and credential hashes, registration answers, storage keys, and message bodies are never shown.
 - Separate TOTP step-up verification for super-admin access; verification lasts 10 minutes and requires an enrolled authenticator.
 - Organisation, user, event, invitation, authentication, monitoring, operations, storage, and searchable audit-log views.
 - Public liveness and secret-protected database readiness endpoints.

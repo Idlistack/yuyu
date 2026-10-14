@@ -25,6 +25,8 @@ export function SparklineCard(props: {
   title: string;
   subtitle?: string;
   points: SparkPoint[];
+  /** Show this window total instead of the latest day and its day-on-day change. */
+  total?: number;
 }) {
   const w = 240;
   const h = 56;
@@ -33,13 +35,14 @@ export function SparklineCard(props: {
   const path = buildPath(values, w, h, pad);
   const latest = values.at(-1) ?? 0;
   const prev = values.length >= 2 ? values.at(-2) ?? 0 : null;
-  const delta = prev == null ? null : latest - prev;
+  const delta = props.total != null || prev == null ? null : latest - prev;
+  const headline = props.total ?? latest;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-canvas p-4">
+    <div className="overflow-hidden rounded-2xl border border-line bg-canvas p-4">
       <div className="flex flex-wrap items-baseline gap-2">
         <span className="text-sm text-ink-muted">{props.title}</span>
-        <span className="font-display text-[22px] font-extrabold leading-tight text-ink">{latest.toLocaleString()}</span>
+        <span className="font-display text-[22px] font-extrabold leading-tight text-ink">{headline.toLocaleString()}</span>
         {delta != null ? (
           <span className={cn("text-caption font-semibold", delta === 0 ? "text-ink-muted" : delta > 0 ? "text-success-fg" : "text-warning-fg")}>
             {delta > 0 ? "+" : ""}

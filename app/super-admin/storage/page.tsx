@@ -1,21 +1,13 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { AdminPanel, NameCell } from "@/components/super-admin/AdminPanel";
-import { SectionHeading, StatTile } from "@/components/ui/display";
+import { EmptyState, PageHeader, StatTile } from "@/components/ui/display";
+import { formatBytes } from "@/lib/superAdminInsights";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
-function formatBytes(bytes: number | null): string {
-  if (bytes == null || Number.isNaN(bytes)) return "—";
-  const units = ["B", "KB", "MB", "GB", "TB"] as const;
-  let n = bytes;
-  let i = 0;
-  while (n >= 1024 && i < units.length - 1) {
-    n /= 1024;
-    i += 1;
-  }
-  return `${n.toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
-}
-
 export default async function SuperAdminStoragePage() {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   let dbSizeBytes: number | null = null;
   let tableSizes:
     | Array<{ table_name: string; total_bytes: number; total_pretty: string }>
@@ -77,16 +69,88 @@ export default async function SuperAdminStoragePage() {
     })
     .catch(() => new Map<string, number>());
 
-  return (
-    <div className="flex flex-col gap-5">
-      <SectionHeading title="Storage" />
+  const [assetSummary, assetsByType, recentAssets] = await Promise.all([
+    prisma.asset.aggregate({ _count: { _all: true }, _sum: { byteSize: true } }),
+    prisma.asset.groupBy({ by: ["provider", "contentType"], _count: { _all: true }, _sum: { byteSize: true } }),
+    prisma.asset.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 15,
+      // Object keys and URLs stay private; only type, size, and owner are shown.
+      select: { id: true, contentType: true, byteSize: true, provider: true, createdAt: true, organisation: { select: { id: true, name: true } } },
+    }),
+  ]);
+  const sortedTypes = [...assetsByType].sort((a, b) => Number(b._sum.byteSize ?? 0) - Number(a._sum.byteSize ?? 0));
 
-      <StatTile
-        className="sm:max-w-sm"
-        label="Database size"
-        value={dbSizeBytes == null ? "—" : formatBytes(dbSizeBytes)}
-        hint={dbSizeBytes == null ? "Unavailable (DB functions may be restricted)." : undefined}
-      />
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Storage" description="Database size, largest tables, and each organisation's footprint." />
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <StatTile
+          className="rounded-2xl"
+          label="Database size"
+          value={dbSizeBytes == null ? "—" : formatBytes(dbSizeBytes)}
+          hint={dbSizeBytes == null ? "Unavailable (DB functions may be restricted)." : undefined}
+        />
+        <StatTile className="rounded-2xl" label="Stored files" value={assetSummary._count._all.toLocaleString()} />
+        <StatTile className="rounded-2xl" label="Stored file size" value={formatBytes(assetSummary._sum.byteSize == null ? 0 : Number(assetSummary._sum.byteSize))} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AdminPanel title="Files by provider and type">
+          {sortedTypes.length === 0 ? (
+            <EmptyState mood="sleepy">No tracked files.</EmptyState>
+          ) : (
+            <Table label="Files by provider and type">
+              <THead>
+                <tr>
+                  <TH>Provider</TH>
+                  <TH>Type</TH>
+                  <TH className="text-right">Files</TH>
+                  <TH className="text-right">Size</TH>
+                </tr>
+              </THead>
+              <TBody>
+                {sortedTypes.map((row) => (
+                  <TR key={`${row.provider}:${row.contentType ?? ""}`}>
+                    <TD className="font-mono text-sm">{row.provider}</TD>
+                    <TD className="font-mono text-sm">{row.contentType ?? "unknown"}</TD>
+                    <TD className="text-right tabular-nums">{row._count._all.toLocaleString()}</TD>
+                    <TD className="text-right tabular-nums">{formatBytes(row._sum.byteSize == null ? 0 : Number(row._sum.byteSize))}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          )}
+        </AdminPanel>
+
+        <AdminPanel title="Recent uploads" description="Latest 15 tracked files. Storage keys and URLs are not shown.">
+          {recentAssets.length === 0 ? (
+            <EmptyState mood="sleepy">No tracked files.</EmptyState>
+          ) : (
+            <Table label="Recent uploads">
+              <THead>
+                <tr>
+                  <TH>Organisation</TH>
+                  <TH>Type</TH>
+                  <TH className="text-right">Size</TH>
+                  <TH>Uploaded</TH>
+                </tr>
+              </THead>
+              <TBody>
+                {recentAssets.map((asset) => (
+                  <TR key={asset.id}>
+                    <TD>{asset.organisation ? <NameCell href={`/super-admin/orgs/${asset.organisation.id}`} name={asset.organisation.name} /> : "—"}</TD>
+                    <TD className="font-mono text-sm">{asset.contentType ?? "unknown"}</TD>
+                    <TD className="text-right tabular-nums">{formatBytes(asset.byteSize == null ? null : Number(asset.byteSize))}</TD>
+                    <TD className="whitespace-nowrap text-ink-secondary">{asset.createdAt.toLocaleString()}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          )}
+        </AdminPanel>
+      </div>
 
       <AdminPanel title="Largest tables (top 25)">
         {tableSizes == null ? (
@@ -127,7 +191,7 @@ export default async function SuperAdminStoragePage() {
           <TBody>
             {perOrgCounts.map((o) => (
               <TR key={o.id}>
-                <TD><NameCell name={o.name} sub={`/${o.slug}`} /></TD>
+                <TD><NameCell href={`/super-admin/orgs/${o.id}`} name={o.name} sub={`/${o.slug}`} /></TD>
                 <TD className="text-right tabular-nums">{formatBytes(assetTotals.get(o.id) ?? 0)}</TD>
                 <TD className="text-right tabular-nums">{o._count.memberships}</TD>
                 <TD className="text-right tabular-nums">{o._count.events}</TD>

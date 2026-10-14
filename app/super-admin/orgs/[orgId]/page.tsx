@@ -1,6 +1,11 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { AdminPanel, LinkRow, StatusValue } from "@/components/super-admin/AdminPanel";
-import { Chip, EmptyState, OrgLogo } from "@/components/ui/display";
+import { AdminPanel, LinkRow, NameCell, StatusValue } from "@/components/super-admin/AdminPanel";
+import { AuditTable, auditRowSelect } from "@/components/super-admin/AuditTable";
+import { credentialState, formatBytes } from "@/lib/superAdminInsights";
+import { Chip, EmptyState, OrgLogo, StatTile } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 type Props = {
@@ -8,6 +13,8 @@ type Props = {
 };
 
 export default async function SuperAdminOrgDetailPage({ params }: Props) {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   const { orgId } = await params;
 
   const org = await prisma.organisation.findUnique({
@@ -26,6 +33,31 @@ export default async function SuperAdminOrgDetailPage({ params }: Props) {
   if (!org) {
     return <EmptyState mood="sad">Organisation not found.</EmptyState>;
   }
+
+  const now = new Date();
+  const orgRsvpWhere = { OR: [{ event: { organisationId: org.id } }, { eventInstance: { series: { organisationId: org.id } } }] };
+  const [rsvpCount, checkedInCount, broadcastStats, feedbackCount, assetStats, apiClients, auditEvents] = await Promise.all([
+    prisma.rSVP.count({ where: orgRsvpWhere }),
+    prisma.rSVP.count({ where: { ...orgRsvpWhere, checkedInAt: { not: null } } }),
+    prisma.eventBroadcast.aggregate({ where: { event: { organisationId: org.id } }, _count: { _all: true }, _sum: { recipientCount: true } }),
+    prisma.eventFeedbackResponse.count({ where: { form: { event: { organisationId: org.id } } } }),
+    prisma.asset.aggregate({ where: { organisationId: org.id }, _count: { _all: true }, _sum: { byteSize: true } }),
+    prisma.apiClient.findMany({
+      where: { organisationId: org.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        createdAt: true,
+        scopes: { select: { scope: true }, orderBy: { scope: "asc" } },
+        // Lifecycle timestamps only; the credential digest is never loaded.
+        credentials: { select: { revokedAt: true, expiresAt: true, lastUsedAt: true }, orderBy: { createdAt: "desc" }, take: 50 },
+      },
+    }),
+    prisma.auditEvent.findMany({ where: { organisationId: org.id }, orderBy: { createdAt: "desc" }, take: 25, select: auditRowSelect }),
+  ]);
 
   const [members, events, series, invites] = await Promise.all([
     prisma.membership.findMany({
@@ -86,11 +118,18 @@ export default async function SuperAdminOrgDetailPage({ params }: Props) {
   ]);
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-4">
+        <Link href="/super-admin/orgs" className="inline-flex w-fit items-center gap-1 text-sm text-ink-muted underline-offset-4 hover:text-ink hover:underline">
+          <ArrowLeft aria-hidden className="size-4" />
+          Organisations
+        </Link>
+        <div className="flex items-center gap-4">
           <OrgLogo name={org.name} src={org.logoUrl} size="lg" />
-          <h2 className="text-h2 break-words text-ink">{org.name}</h2>
+          <div className="min-w-0">
+            <h1 className="break-words text-h1 text-ink">{org.name}</h1>
+            <p className="mt-0.5 text-sm text-ink-muted">Created {org.createdAt.toLocaleString()}</p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Chip tone="outline" className="font-mono">{`/${org.slug}`}</Chip>
@@ -98,10 +137,17 @@ export default async function SuperAdminOrgDetailPage({ params }: Props) {
           <Chip tone="outline">{`${org._count.events} events`}</Chip>
           <Chip tone="outline">{`${org._count.eventSeries} series`}</Chip>
         </div>
-        <p className="text-sm text-ink-muted">Created {org.createdAt.toLocaleString()}</p>
         <p className="max-w-[720px] whitespace-pre-wrap text-body-ui text-ink-secondary">{org.description || "—"}</p>
         <LinkRow links={[{ href: `/${org.slug}`, label: "Public page" }, { href: `/dashboard/${org.slug}`, label: "Org dashboard" }]} />
       </header>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <StatTile className="rounded-2xl" label="Registrations" value={rsvpCount.toLocaleString()} />
+        <StatTile className="rounded-2xl" label="Checked in" value={checkedInCount.toLocaleString()} />
+        <StatTile className="rounded-2xl" label="Feedback responses" value={feedbackCount.toLocaleString()} />
+        <StatTile className="rounded-2xl" label="Broadcasts" value={broadcastStats._count._all.toLocaleString()} hint={`${(broadcastStats._sum.recipientCount ?? 0).toLocaleString()} recipients`} />
+        <StatTile className="rounded-2xl" label="Stored files" value={assetStats._count._all.toLocaleString()} hint={formatBytes(assetStats._sum.byteSize == null ? 0 : Number(assetStats._sum.byteSize))} />
+      </div>
 
       <AdminPanel title="Members">
         <Table label="Members">
@@ -116,7 +162,7 @@ export default async function SuperAdminOrgDetailPage({ params }: Props) {
           <TBody>
             {members.map((m) => (
               <TR key={m.id}>
-                <TD className="font-semibold">{m.user?.name ?? "—"}</TD>
+                <TD>{m.user ? <NameCell href={`/super-admin/users/${m.user.id}`} name={m.user.name ?? "—"} /> : "—"}</TD>
                 <TD className="font-mono text-sm">{m.user?.email ?? "—"}</TD>
                 <TD><Chip size="sm" tone={m.role === "OWNER" ? "ink" : "neutral"}>{m.role}</Chip></TD>
                 <TD className="whitespace-nowrap text-ink-secondary">{m.createdAt.toLocaleString()}</TD>
@@ -217,6 +263,47 @@ export default async function SuperAdminOrgDetailPage({ params }: Props) {
             )}
           </TBody>
         </Table>
+      </AdminPanel>
+
+      <AdminPanel title="Machine API clients" description="Scopes and credential lifecycle only. Credential secrets and digests are never shown.">
+        {apiClients.length === 0 ? (
+          <EmptyState mood="sleepy">No API clients.</EmptyState>
+        ) : (
+          <Table label="Machine API clients">
+            <THead>
+              <tr>
+                <TH>Client</TH>
+                <TH>Status</TH>
+                <TH>Scopes</TH>
+                <TH className="text-right">Credentials</TH>
+                <TH>Last used</TH>
+              </tr>
+            </THead>
+            <TBody>
+              {apiClients.map((client) => {
+                const active = client.credentials.filter((credential) => credentialState(credential, now) === "active").length;
+                const lastUsed = client.credentials.reduce<Date | null>((latest, credential) => (credential.lastUsedAt && (!latest || credential.lastUsedAt > latest) ? credential.lastUsedAt : latest), null);
+                return (
+                  <TR key={client.id}>
+                    <TD className="font-semibold">{client.name}</TD>
+                    <TD><Chip size="sm" tone={client.status === "ACTIVE" ? "success" : "neutral"}>{client.status === "ACTIVE" ? "Active" : "Disabled"}</Chip></TD>
+                    <TD>
+                      <span className="flex flex-wrap gap-1">
+                        {client.scopes.length === 0 ? <span className="text-ink-muted">None</span> : client.scopes.map((scope) => <Chip key={scope.scope} size="sm" tone="outline" className="font-mono">{scope.scope}</Chip>)}
+                      </span>
+                    </TD>
+                    <TD className="text-right tabular-nums">{`${active} active / ${client.credentials.length}`}</TD>
+                    <TD className="whitespace-nowrap text-ink-secondary">{lastUsed ? lastUsed.toLocaleString() : "Never"}</TD>
+                  </TR>
+                );
+              })}
+            </TBody>
+          </Table>
+        )}
+      </AdminPanel>
+
+      <AdminPanel title="Recent activity" description="Latest 25 audit events for this organisation. Metadata is redacted.">
+        <AuditTable events={auditEvents} label="Recent organisation activity" empty="No audit events for this organisation." hideOrganisation />
       </AdminPanel>
     </div>
   );

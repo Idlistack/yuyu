@@ -1,6 +1,7 @@
+import { requireSuperAdminMfa } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { AdminPager, AdminSearchForm, LinkRow } from "@/components/super-admin/AdminPanel";
-import { SectionHeading } from "@/components/ui/display";
+import { PageHeader } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 type Props = {
@@ -8,6 +9,8 @@ type Props = {
 };
 
 export default async function SuperAdminOrgsPage({ searchParams }: Props) {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const page = Math.max(0, Number.parseInt(sp.page ?? "0", 10) || 0);
@@ -38,8 +41,8 @@ export default async function SuperAdminOrgsPage({ searchParams }: Props) {
   });
 
   return (
-    <div className="flex flex-col gap-5">
-      <SectionHeading title="Organisations" />
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Organisations" description="Every organisation on this instance, newest first." />
       <AdminSearchForm action="/super-admin/orgs" label="Search by name or slug" defaultValue={q} />
 
       <Table label="Organisations">

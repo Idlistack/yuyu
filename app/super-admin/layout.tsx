@@ -1,9 +1,6 @@
 import { requireSuperAdminMfa } from "@/lib/permissions";
-import { getAppShellData } from "@/lib/appShell";
-import { AppShell } from "@/components/chrome/AppShell";
-import { isSidebarCollapsed } from "@/lib/sidebarServer";
-import { PageHeader } from "@/components/ui/display";
-import { SuperAdminTabs } from "@/components/super-admin/SuperAdminTabs";
+import { prisma } from "@/lib/db";
+import { SuperAdminTopBar } from "@/components/super-admin/SuperAdminTopBar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Super admin", robots: { index: false, follow: false } };
@@ -16,15 +13,17 @@ export default async function SuperAdminLayout(props: {
   children: React.ReactNode;
 }) {
   const session = await requireSuperAdminMfa();
-  const [{ user, organisations }, collapsed] = await Promise.all([getAppShellData(session.user.id), isSidebarCollapsed()]);
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { name: true, email: true, image: true, profileImageUrl: true },
+  });
 
   return (
-    <AppShell user={user} organisations={organisations} initialCollapsed={collapsed}>
-      <div className="flex flex-col gap-6">
-        <PageHeader title="Super admin" description="Instance-wide settings, monitoring, and operations." />
-        <SuperAdminTabs />
-        <div>{props.children}</div>
-      </div>
-    </AppShell>
+    <div className="flex min-h-dvh flex-col">
+      <SuperAdminTopBar user={{ name: user?.name ?? null, email: user?.email ?? null, image: user?.profileImageUrl ?? user?.image ?? null }} />
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1200px] flex-1 px-4 py-6 focus:outline-none sm:px-6 md:py-9">
+        {props.children}
+      </main>
+    </div>
   );
 }
