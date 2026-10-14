@@ -9,6 +9,7 @@ import type { RegistrationFieldDefinition } from "@/components/rsvp/registration
 import { Button } from "@/components/ui/button";
 import { Callout, Chip, OrgLogo, ProgressBar } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { accentStyle } from "@/lib/theme/accent";
 
 type RegistrationState = {
   cancelled: boolean;
@@ -62,8 +63,10 @@ export function RegistrationCard(props: {
   capacity: number | null;
   state: RegistrationState;
   title?: string;
+  /** The event's accent. The sign-up dialog renders in a portal outside the page's accent scope, so it re-applies it. */
+  accentColor?: string | null;
 }) {
-  const { orgSlug, eventSlug, eventInstanceId, eventTitle, organisation, registrationFields, confirmedCount, capacity, state } = props;
+  const { orgSlug, eventSlug, eventInstanceId, eventTitle, organisation, registrationFields, confirmedCount, capacity, state, accentColor } = props;
   const storageKey = eventInstanceId ? `yuyu:rsvp:${orgSlug}:i:${eventInstanceId}` : `yuyu:rsvp:${orgSlug}:e:${eventSlug ?? ""}`;
   const [saved, setSaved] = useSavedRsvp(storageKey);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -148,7 +151,7 @@ export function RegistrationCard(props: {
       ) : null}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent size="md">
+        <DialogContent size="md" style={accentStyle(accentColor)} className="yy-accent-scope">
           <DialogHeader title={`Register for ${eventTitle}`} description="Free to attend. We'll email your ticket." />
           <DialogBody className="pb-6">
             <RsvpForm
