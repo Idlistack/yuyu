@@ -22,7 +22,7 @@ import {
   describeBroadcastAudience,
 } from "@/lib/broadcastTemplate";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
+import { SendConfirmDialog } from "./SendConfirmDialog";
 import { recipientDots, recipientSummary, sendBarLabel } from "@/components/event-dashboard/emails/recipients";
 import { BroadcastEmailEditor } from "./BroadcastEmailEditor";
 import { BroadcastPreviewFrame } from "./BroadcastPreviewFrame";
@@ -76,6 +76,9 @@ function StepHeading({ step, id, title, aside }: { step: number; id: string; tit
 
 const cardClass = "flex min-w-0 flex-col gap-4 rounded-xl border border-line bg-canvas p-4 sm:p-5";
 
+const UNDO_SECONDS = 5;
+type SendPayload = { statuses: RsvpStatus[]; attendance: BroadcastAttendanceFilter; subject: string; body: string; count: number };
+
 export function EventBroadcastPanel(props: {
   organisationSlug: string;
   eventId: string;
@@ -97,6 +100,9 @@ export function EventBroadcastPanel(props: {
   const [preview, setPreview] = useState<{ key: string; subject: string; html: string; error: string | null }>({ key: "", subject: "", html: "", error: null });
   const [previewWidth, setPreviewWidth] = useState<"desktop" | "mobile">("desktop");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // After confirming, sending waits UNDO_SECONDS so a mistake can still be undone.
+  const [countdown, setCountdown] = useState<{ left: number; count: number } | null>(null);
+  const sendTimer = useRef<{ interval: ReturnType<typeof setInterval>; payload: SendPayload } | null>(null);
   const [pending, startTransition] = useTransition();
   const subjectRef = useRef<HTMLInputElement | null>(null);
 
@@ -189,6 +195,37 @@ export function EventBroadcastPanel(props: {
   }
 
   const canSend = !pending && statuses.length > 0 && hasContent && (recipientCount ?? 0) > 0;
+  function startCountdown(payload: SendPayload) {
+    let left = UNDO_SECONDS;
+    setCountdown({ left, count: payload.count });
+    const interval = setInterval(() => {
+      left -= 1;
+      if (left > 0) return setCountdown({ left, count: payload.count });
+      clearInterval(interval);
+      sendTimer.current = null;
+      setCountdown(null);
+      startTransition(async () => {
+        const result = await sendEventBroadcast({ organisationSlug, eventId, statuses: payload.statuses, attendance: payload.attendance, subject: payload.subject, body: payload.body });
+        if (!result.ok) return showToast(result.error, "error");
+        showToast(`Queued for ${result.data?.recipientCount ?? 0} recipients`, "success");
+        router.refresh();
+      });
+    }, 1000);
+    sendTimer.current = { interval, payload };
+  }
+
+  function undoSend() {
+    if (sendTimer.current) clearInterval(sendTimer.current.interval);
+    sendTimer.current = null;
+    setCountdown(null);
+    showToast("Sending cancelled. Nothing was sent.", "success");
+  }
+
+  // Leaving the page during the countdown cancels the send rather than firing it unseen.
+  useEffect(() => () => {
+    if (sendTimer.current) clearInterval(sendTimer.current.interval);
+  }, []);
+
   const sendLabel = recipientCount && recipientCount > 0 ? `Send to ${recipientCount} ${recipientCount === 1 ? "person" : "people"}` : "Send";
 
   const templateCard = (template: (typeof BROADCAST_STARTER_TEMPLATES)[number]) => {
@@ -383,6 +420,16 @@ export function EventBroadcastPanel(props: {
         </div>
       </div>
 
+      {countdown !== null ? (
+        <div role="status" className="yy-dark-band sticky bottom-4 z-10 flex items-center gap-3 rounded-full bg-[var(--yy-inverse-surface)] py-2.5 pl-6 pr-3 text-ink shadow-float">
+          <p className="flex-1 text-sm text-ink">
+            Sending to {countdown.count} {countdown.count === 1 ? "person" : "people"} in <span className="font-bold tabular-nums">{countdown.left}</span>…
+          </p>
+          <Button variant="primary" onClick={undoSend}>
+            Undo
+          </Button>
+        </div>
+      ) : (
       <div className="yy-dark-band sticky bottom-4 z-10 flex flex-col gap-2 rounded-2xl bg-[var(--yy-inverse-surface)] p-3 text-ink shadow-float sm:flex-row sm:items-center sm:rounded-full sm:py-2.5 sm:pl-6 sm:pr-3">
         <p aria-live="polite" className="flex-1 px-1 text-sm text-ink-secondary sm:px-0">
           {sendBarLabel({ count: recipientCount, hasStatuses: statuses.length > 0, hasContent })}
@@ -408,23 +455,18 @@ export function EventBroadcastPanel(props: {
           </Button>
         </div>
       </div>
+      )}
 
-      <ConfirmationDialog
+      <SendConfirmDialog
         open={confirmOpen}
-        title="Send this email?"
-        message={`“${preview.subject || subject}” will be queued for ${recipientCount ?? 0} ${recipientCount === 1 ? "person" : "people"} (${audienceText}). This cannot be recalled once delivery starts.`}
-        confirmLabel="Send email"
-        destructive={false}
-        loading={pending}
+        recipientCount={recipientCount ?? 0}
+        audienceText={audienceText}
+        subject={preview.subject || subject}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
-          startTransition(async () => {
-            const result = await sendEventBroadcast({ organisationSlug, eventId, statuses, attendance, subject, body });
-            setConfirmOpen(false);
-            if (!result.ok) return showToast(result.error, "error");
-            showToast(`Queued for ${result.data?.recipientCount ?? 0} recipients`, "success");
-            router.refresh();
-          });
+          setConfirmOpen(false);
+          // Snapshot what was reviewed; later edits during the countdown don't change it.
+          startCountdown({ statuses, attendance, subject, body, count: recipientCount ?? 0 });
         }}
       />
     </div>
