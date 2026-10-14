@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import type { RsvpStatus } from "@prisma/client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, CloudCheck, CloudOff, Download, Info, Printer, RefreshCw, Search, X } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
@@ -617,9 +616,7 @@ export function EventCheckInClient(props: {
               <h1 className="break-words font-display text-[26px] font-extrabold leading-tight tracking-[-0.02em] text-ink">{eventTitle}</h1>
             </>
           ) : (
-            <Link href={`/dashboard/${organisationSlug}/event/${eventId}`} className="inline-flex min-h-9 items-center text-sm font-semibold text-ink-secondary underline underline-offset-4 hover:text-ink">
-              Back to event
-            </Link>
+            <h2 className="text-h4 text-ink">Check-in desk</h2>
           )}
         </div>
         <div className="flex items-center gap-4">
@@ -689,7 +686,7 @@ export function EventCheckInClient(props: {
         <div className="flex flex-col gap-5">
           <section aria-labelledby="scan-title" className="flex flex-col gap-3">
             <div>
-              <h2 id="scan-title" className="text-h3 text-ink">Scan QR</h2>
+              <h2 id="scan-title" className="text-h4 text-ink">Scan QR</h2>
               <p className="text-sm text-ink-muted">Point the camera at an attendee ticket QR. Codes contain only a secret ticket link — no personal data in the barcode.</p>
             </div>
             <CheckInQrScanner onScan={onScan} disabled={pending} />
@@ -697,7 +694,7 @@ export function EventCheckInClient(props: {
 
           <section aria-labelledby="manual-title" className="flex flex-col gap-3 rounded-lg border border-line bg-canvas p-4">
             <div>
-              <h2 id="manual-title" className="text-h4 text-ink">Manual code</h2>
+              <h2 id="manual-title" className="text-title text-ink">Manual code</h2>
               <p className="text-sm text-ink-muted">Paste a ticket URL or the opaque code from the attendee&apos;s phone.</p>
             </div>
             <form onSubmit={onManualSubmit} className="flex flex-col gap-2.5">
@@ -743,7 +740,7 @@ export function EventCheckInClient(props: {
           ) : null}
 
           <section aria-labelledby="search-title" className="flex flex-col gap-3 rounded-lg border border-line bg-canvas p-4">
-            <h2 id="search-title" className="text-h4 text-ink">Search attendees</h2>
+            <h2 id="search-title" className="text-title text-ink">Search attendees</h2>
             <div className="flex gap-2">
               <label htmlFor="check-in-search" className="sr-only">Name or email</label>
               <Input
@@ -878,7 +875,7 @@ export function EventCheckInClient(props: {
       <section aria-labelledby="recent-title" className="flex flex-col gap-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 id="recent-title" className="text-h3 text-ink">Recent check-ins</h2>
+            <h2 id="recent-title" className="text-h4 text-ink">Recent check-ins</h2>
             {!stationMode ? <p className="text-caption text-ink-muted">Export includes the list on this page (up to 200). This page refreshes automatically while it is open.</p> : null}
           </div>
           <Button size="sm" variant="secondary" startIcon={<Download />} onClick={downloadCsv} disabled={recent.length === 0}>

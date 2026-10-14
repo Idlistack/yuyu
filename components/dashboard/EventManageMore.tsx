@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { EventClientDto } from "@/lib/eventDto";
-import { Copy, CopyPlus, Link2 } from "lucide-react";
+import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, Chip, DangerZone } from "@/components/ui/display";
 import { Field, Input } from "@/components/ui/field";
@@ -119,7 +119,7 @@ export function EventManageMore(props: {
     <div className="flex flex-col gap-5">
       <Card>
         <CardHeader
-          title={<span className="inline-flex items-center gap-2"><CopyPlus aria-hidden className="size-5 text-ink-muted" />Clone event</span>}
+          title="Clone event"
           description="Create a new event with the same information as this one. RSVP guest list and invites won’t be copied."
           className="mb-3"
         />
@@ -130,7 +130,7 @@ export function EventManageMore(props: {
 
       <Card>
         <CardHeader
-          title={<span className="inline-flex items-center gap-2"><Link2 aria-hidden className="size-5 text-ink-muted" />Event page</span>}
+          title="Event page"
           description="Change your public URL. If you’ve already shared the old link, it may stop working."
           className="mb-3"
         />

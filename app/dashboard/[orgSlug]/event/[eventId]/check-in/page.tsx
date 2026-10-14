@@ -6,6 +6,7 @@ import { canAccessEvent } from "@/lib/eventAccess";
 import { EventCheckInClient } from "@/components/checkin/EventCheckInClient";
 import { CheckInStationSettings } from "@/components/checkin/CheckInStationSettings";
 import { getRequestOrigin } from "@/lib/publicUrl";
+import { EventManageHeader } from "@/components/dashboard/EventManageHeader";
 
 type Props = {
   params: Promise<{ orgSlug: string; eventId: string }>;
@@ -31,6 +32,7 @@ export default async function EventCheckInPage({ params }: Props) {
   const [event, organisationBrand] = await Promise.all([
     prisma.event.findFirst({
       where: { id: eventId, organisationId: organisation.id },
+      include: { page: { select: { accentColor: true } } },
     }),
     prisma.organisation.findUnique({
       where: { id: organisation.id },
@@ -76,7 +78,10 @@ export default async function EventCheckInPage({ params }: Props) {
   const stationUrl = `${origin}/${organisation.slug}/${event.slug}/check-in`;
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-h1 break-words text-ink">Check-in · {event.title}</h1>
+      <EventManageHeader
+        back={{ href: `/dashboard/${organisation.slug}/event/${event.id}`, label: "Back to event" }}
+        event={{ title: event.title, status: event.status, privacyType: event.privacyType, startDateTime: event.startDateTime, timezone: event.timezone, accentColor: event.page?.accentColor }}
+      />
       <EventCheckInClient
         organisationSlug={organisation.slug}
         organisationName={organisation.name}

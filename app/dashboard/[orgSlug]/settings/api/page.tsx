@@ -28,7 +28,7 @@ export default async function ApiAccessPage({ params }: { params: Promise<{ orgS
     },
   });
   return (
-    <div className="flex max-w-[880px] flex-col gap-8 pb-6">
+    <div className="flex flex-col gap-8 pb-6">
       <PageHeader title="API access" description="Create tenant-bound machine identities and rotate their credentials." />
       <ApiClientManagement
         organisationSlug={organisation.slug}

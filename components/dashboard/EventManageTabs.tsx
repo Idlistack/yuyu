@@ -6,7 +6,7 @@ import type { EventPermission } from "@prisma/client";
 import type { EventClientDto } from "@/lib/eventDto";
 import { ArrowRight, Download, QrCode, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Callout, Card } from "@/components/ui/display";
+import { Callout, Card, SectionHeading } from "@/components/ui/display";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EditEventForm } from "@/components/event/EditEventForm";
 import { AttendeeTable, type AttendeeRow } from "@/components/attendees/AttendeeTable";
@@ -106,10 +106,11 @@ export function EventManageTabs(props: {
       </TabsContent>
 
       <TabsContent value="page" className="flex flex-col gap-6">
+        <SectionHeading title="Page & programme" />
         {canManageSchedule ? (
           <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-h4 text-ink">Programme schedule</h2>
+              <h2 className="text-title text-ink">Programme schedule</h2>
               <p className="mt-1 text-body-ui text-ink-muted">Add sessions, adjust planned times, and apply live cascading delays from the dedicated schedule workspace.</p>
             </div>
             <Button asChild variant="secondary" className="shrink-0">
@@ -123,7 +124,8 @@ export function EventManageTabs(props: {
         {canEditDetails ? <EventWebsiteManager organisationSlug={organisationSlug} eventId={event.id} eventSlug={event.slug} {...website} /> : <NoPermission>You do not have permission to edit the event page.</NoPermission>}
       </TabsContent>
 
-      <TabsContent value="details">
+      <TabsContent value="details" className="flex flex-col gap-6">
+        <SectionHeading title="Details" />
         {canEditDetails ? <EditEventForm organisationSlug={organisationSlug} event={event} page={website.page} /> : <NoPermission>You do not have permission to edit event details.</NoPermission>}
       </TabsContent>
 
@@ -131,17 +133,22 @@ export function EventManageTabs(props: {
         {!canManageRegistrations ? <NoPermission>You do not have permission to view or manage attendee registrations.</NoPermission> : null}
         {canManageRegistrations ? <>
           {attendeesTruncated ? <Callout tone="warning">Only the 250 most recent registrations are loaded in this browser view, and its email export is limited to those records. Download the full attendee CSV for the complete list.</Callout> : null}
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="primary" startIcon={<UserPlus />} onClick={() => setManualRsvpOpen(true)}>
-              Add attendee
-            </Button>
-            <Button asChild variant="secondary">
-              <a href={`/api/exports/events/${event.id}/attendees`}>
-                <Download aria-hidden className="size-[18px]" />
-                Download full CSV
-              </a>
-            </Button>
-          </div>
+          <SectionHeading
+            title="Guests"
+            action={
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="secondary">
+                  <a href={`/api/exports/events/${event.id}/attendees`}>
+                    <Download aria-hidden className="size-[18px]" />
+                    Download full CSV
+                  </a>
+                </Button>
+                <Button variant="primary" startIcon={<UserPlus />} onClick={() => setManualRsvpOpen(true)}>
+                  Add attendee
+                </Button>
+              </div>
+            }
+          />
           {manualRsvpOpen ? (
             <ManualRsvpDialog
               organisationSlug={organisationSlug}
@@ -175,7 +182,8 @@ export function EventManageTabs(props: {
         />
       </TabsContent>
 
-      <TabsContent value="emails">
+      <TabsContent value="emails" className="flex flex-col gap-6">
+        <SectionHeading title="Emails" />
         {canManageRegistrations ? (
           <EventBroadcastPanel organisationSlug={organisationSlug} eventId={event.id} history={broadcasts} />
         ) : <NoPermission>You do not have permission to email attendees.</NoPermission>}
@@ -196,22 +204,23 @@ export function EventManageTabs(props: {
 
       <TabsContent value="check-in">
         {!canCheckIn ? <NoPermission>You do not have permission to operate check-in.</NoPermission> : (
-          <Card padding="lg" className="flex flex-col items-start gap-3">
-            <span aria-hidden className="flex size-12 items-center justify-center rounded-lg bg-muted text-ink"><QrCode className="size-6" /></span>
-            <h2 className="text-h3 text-ink">Check-in station</h2>
-            <p className="max-w-[560px] text-body-ui text-ink-secondary">
-              Scan attendee QR codes from their ticket page, paste ticket URLs,
-              search by name, and export who arrived. Use override for waitlist
-              or pending approvals at the door.
-            </p>
-            <Button asChild variant="primary" size="lg">
-              <Link href={`/dashboard/${organisationSlug}/event/${event.id}/check-in`}>Open check-in page</Link>
-            </Button>
-          </Card>
+          <SectionHeading
+            title="Check-in station"
+            description="Scan attendee QR codes from their ticket page, paste ticket URLs, search by name, and export who arrived. Use override for waitlist or pending approvals at the door."
+            action={
+              <Button asChild variant="primary">
+                <Link href={`/dashboard/${organisationSlug}/event/${event.id}/check-in`}>
+                  <QrCode aria-hidden className="size-[18px]" />
+                  Open check-in page
+                </Link>
+              </Button>
+            }
+          />
         )}
       </TabsContent>
 
       <TabsContent value="settings" className="flex flex-col gap-5">
+        <SectionHeading title="Settings" />
         {canManageCollaborators ? <CollaboratorInvitePanel organisationSlug={organisationSlug} eventId={event.id} collaborators={collaborators} pendingInvites={pendingCollaboratorInvites} /> : null}
         <EventManageMore organisationSlug={organisationSlug} event={event} />
       </TabsContent>

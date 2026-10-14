@@ -6,7 +6,7 @@ import { RegistrationFieldType as RegistrationFieldTypeEnum } from "@prisma/clie
 import { ArrowDown, ArrowUp, Eye, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
 import { CheckboxField, Radio, RadioGroup } from "@/components/ui/choice";
-import { Chip, EmptyState } from "@/components/ui/display";
+import { Chip, EmptyState, SectionHeading } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
 
@@ -236,22 +236,21 @@ export function EventRegistrationFormEditor(props: {
 
   return (
     <div className="flex flex-col gap-8">
-      {/* ── HEADER ── */}
-      <div className="flex flex-col gap-4 border-b border-line pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-h2 text-ink">Registration Form Editor</h1>
-          <p className="mt-1 text-body-ui text-ink-muted">Add custom input fields to collect guest information. Name and Email are always collected.</p>
-        </div>
-        <Button variant="primary" startIcon={<Plus />} onClick={openCreate} disabled={pending} className="self-start sm:self-auto">
-          Add Custom Field
-        </Button>
-      </div>
+      <SectionHeading
+        title="Registration Form Editor"
+        description="Add custom input fields to collect guest information. Name and Email are always collected."
+        action={
+          <Button variant="primary" startIcon={<Plus />} onClick={openCreate} disabled={pending}>
+            Add Custom Field
+          </Button>
+        }
+      />
 
       {/* ── TWO COLUMN BUILDER / PREVIEW LAYOUT ── */}
       <div className="grid gap-8 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         {/* Left Column: Visual Builder Cards */}
         <section aria-labelledby="form-structure-title" className="flex flex-col gap-4">
-          <h2 id="form-structure-title" className="text-h4 text-ink">Form Structure</h2>
+          <h3 id="form-structure-title" className="text-title text-ink">Form Structure</h3>
 
           {/* Default Fields Panel */}
           <div className="rounded-lg border border-line bg-subtle p-4">
@@ -303,10 +302,10 @@ export function EventRegistrationFormEditor(props: {
 
         {/* Right Column: Live Interactive Preview */}
         <section aria-labelledby="form-preview-title" className="flex flex-col gap-4 md:sticky md:top-6 md:self-start">
-          <h2 id="form-preview-title" className="flex items-center gap-2 text-h4 text-ink">
+          <h3 id="form-preview-title" className="flex items-center gap-2 text-title text-ink">
             <Eye aria-hidden className="size-5 text-ink-muted" />
             Live Form Preview
-          </h2>
+          </h3>
           <div className="rounded-xl border border-line bg-canvas p-6 shadow-raised">
             <p className="text-h4 text-ink">Register for Event</p>
             <p className="mb-5 mt-1 text-caption text-ink-muted">Fill out the form below to secure your spot.</p>

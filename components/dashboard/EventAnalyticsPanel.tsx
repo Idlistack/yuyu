@@ -1,7 +1,7 @@
 "use client";
 
-import { Ban, CheckCircle2, Hourglass, ListPlus, QrCode, TrendingUp, Users } from "lucide-react";
-import { Card, Chip, StatTile } from "@/components/ui/display";
+import { Ban, CheckCircle2, Hourglass, ListPlus, QrCode, Users } from "lucide-react";
+import { Card, Chip, StatTile, SectionHeading } from "@/components/ui/display";
 import { cn } from "@/lib/cn";
 
 type Analytics = {
@@ -124,19 +124,16 @@ export function EventAnalyticsPanel(props: { analytics: Analytics }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-2.5">
-          <TrendingUp aria-hidden className="mt-1 size-5 text-ink-muted" />
-          <div>
-            <h2 className="text-h3 text-ink">Analytics</h2>
-            <p className="text-body-ui text-ink-muted">Live snapshot of RSVPs and check-ins.</p>
+      <SectionHeading
+        title="Analytics"
+        description="Live snapshot of RSVPs and check-ins."
+        action={
+          <div className="flex flex-wrap gap-1.5">
+            <Chip tone="outline" icon={<Users />}>{analytics.total} responses</Chip>
+            <Chip tone="outline" icon={<QrCode />}>{analytics.confirmed > 0 ? `${fmtPct(checkInRate)} check-in rate` : "— check-in rate"}</Chip>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Chip tone="outline" icon={<Users />}>{analytics.total} responses</Chip>
-          <Chip tone="outline" icon={<QrCode />}>{analytics.confirmed > 0 ? `${fmtPct(checkInRate)} check-in rate` : "— check-in rate"}</Chip>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Total responses" value={analytics.total} hint="RSVP submissions so far" />
@@ -147,7 +144,7 @@ export function EventAnalyticsPanel(props: { analytics: Analytics }) {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <Card>
-          <h3 className="text-h4 text-ink">RSVP pipeline</h3>
+          <h3 className="text-title text-ink">RSVP pipeline</h3>
           <p className="mt-1 text-body-ui text-ink-muted">Confirmed, waiting, pending, and rejected at a glance.</p>
           <div className="mt-4 flex flex-col gap-3.5 border-t border-line pt-4">
             <PipelineRow label="Confirmed" value={analytics.confirmed} total={analytics.total} series="confirmed" />
@@ -159,7 +156,7 @@ export function EventAnalyticsPanel(props: { analytics: Analytics }) {
 
         <Card className="flex flex-col gap-4">
           <div>
-            <h3 className="text-h4 text-ink">Distribution</h3>
+            <h3 className="text-title text-ink">Distribution</h3>
             <p className="mt-1 text-body-ui text-ink-muted">Breakdown of responses by status.</p>
           </div>
           <div className="flex flex-col items-center gap-5 sm:flex-row lg:flex-col">

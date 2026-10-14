@@ -170,7 +170,7 @@ export function ApiDeveloperReference({ apiBaseUrl }: { apiBaseUrl: string }) {
   return (
     <section aria-labelledby="api-reference-title" className="flex flex-col gap-4">
       <div>
-        <h2 id="api-reference-title" className="text-h4 text-ink">Developer reference</h2>
+        <h2 id="api-reference-title" className="text-title text-ink">Developer reference</h2>
         <p className="mt-1 text-body-ui text-ink-muted">Use this tenant-bound REST API from your backend service or automation.</p>
       </div>
       <Callout tone="warning">Credentials are shown only when created. Keep them in a secret manager; never expose them in browser code, URLs, source control, or logs.</Callout>

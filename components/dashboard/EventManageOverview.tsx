@@ -209,7 +209,7 @@ export function EventManageOverview(props: {
         <div className="flex min-w-0 flex-col gap-6">
           <section aria-labelledby="latest-registrations">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 id="latest-registrations" className="text-h3 text-ink">Latest registrations</h2>
+              <h2 id="latest-registrations" className="text-h4 text-ink">Latest registrations</h2>
               <button type="button" onClick={() => onOpenTab("guests")} className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-ink underline underline-offset-4">
                 All guests <ArrowRight aria-hidden className="size-4" />
               </button>
@@ -240,7 +240,7 @@ export function EventManageOverview(props: {
           <Card as="section" aria-labelledby="overview-invites">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 id="overview-invites" className="text-h4 text-ink">Invites</h2>
+                <h2 id="overview-invites" className="text-title text-ink">Invites</h2>
                 <p className="mt-1 text-body-ui text-ink-muted">Invite subscribers and contacts by email. Track outreach from the Invites tab.</p>
                 <p className="mt-2 text-body-ui text-ink"><strong>{invites.length}</strong> email invites sent</p>
               </div>
@@ -266,7 +266,7 @@ export function EventManageOverview(props: {
 
         <aside className="flex flex-col gap-6">
           <section aria-labelledby="at-a-glance">
-            <h2 id="at-a-glance" className="mb-3 text-h3 text-ink">At a glance</h2>
+            <h2 id="at-a-glance" className="mb-3 text-h4 text-ink">At a glance</h2>
             <Card padding="md">
               <DetailList
                 className="sm:grid-cols-[max-content_minmax(0,1fr)]"
@@ -282,7 +282,7 @@ export function EventManageOverview(props: {
           </section>
 
           <section aria-labelledby="manage-shortcuts">
-            <h2 id="manage-shortcuts" className="mb-3 text-h3 text-ink">Manage this event</h2>
+            <h2 id="manage-shortcuts" className="mb-3 text-h4 text-ink">Manage this event</h2>
             <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-canvas">
               {shortcuts.map((shortcut) => {
                 const Icon = shortcut.icon;

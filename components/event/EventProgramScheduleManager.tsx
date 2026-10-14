@@ -162,7 +162,7 @@ export function EventProgramScheduleManager({ organisationSlug, eventId, eventSt
       {warning ? <Callout tone="warning" action={<Button size="sm" variant="quiet" onClick={() => setWarning("")}>Dismiss</Button>}>{warning}</Callout> : null}
       <section className="flex flex-col gap-4 rounded-lg border border-line bg-canvas p-4 sm:p-6">
         <div>
-          <h2 className="text-h3 text-ink">Programme tracks</h2>
+          <h2 className="text-title text-ink">Programme tracks</h2>
           <p className="mt-1 text-body-ui text-ink-muted">Each track is an independent room, stage, or stream. Delays shift only later sessions in that track.</p>
         </div>
         <form className="flex flex-col gap-2.5 sm:flex-row sm:items-end" onSubmit={(event) => saveTrack(event)}>
@@ -197,7 +197,7 @@ export function EventProgramScheduleManager({ organisationSlug, eventId, eventSt
             <section key={track.id} className="flex h-full flex-col gap-3 rounded-lg border border-line bg-canvas p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-h4 text-ink">{track.name}</h3>
+                  <h3 className="text-title text-ink">{track.name}</h3>
                   <p className="text-sm text-ink-muted">{sessionsInTrack.length} session{sessionsInTrack.length === 1 ? "" : "s"} · delays stay in this track</p>
                 </div>
                 <Button variant="primary" size="sm" startIcon={<Plus />} disabled={pending || addingTrackId !== null} onClick={() => { setSelectedSpeakerIds([]); setAddingTrackId(track.id); }}>Add session</Button>

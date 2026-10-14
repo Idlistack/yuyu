@@ -298,7 +298,7 @@ function ContentCollection({
     <Card as="section" aria-label={title}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-h4 text-ink">{title}</h3>
+          <h3 className="text-title text-ink">{title}</h3>
           <p className="text-sm text-ink-muted">{rows.length} added</p>
         </div>
         <Button
@@ -498,7 +498,7 @@ export function EventWebsiteManager(props: Props) {
         <form data-event-page-form="true" onSubmit={savePage} className="flex flex-col gap-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-h3 text-ink">Event page</h2>
+              <h2 className="text-title text-ink">Event page</h2>
               <p className="mt-1 max-w-[560px] text-body-ui text-ink-muted">
                 Choose what visitors see, arrange the sections, and preview the
                 result. Edit the event introduction in Details.
@@ -546,7 +546,7 @@ export function EventWebsiteManager(props: Props) {
             </div>
           </div>
           <div className="border-t border-line pt-5">
-            <h3 className="text-h4 text-ink">Page sections</h3>
+            <h3 className="text-title text-ink">Page sections</h3>
             <p className="mt-1 text-body-ui text-ink-muted">
               Turn sections on or off, then arrange them in the order guests
               should see.

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/display";
+import { EmptyState, SectionHeading } from "@/components/ui/display";
 import { Input } from "@/components/ui/field";
 import { addEventInvite, removeEventInvite } from "@/app/actions/invites";
 import { useToast } from "@/components/feedback/ToastProvider";
@@ -28,11 +28,12 @@ export function EventInvitePanel(props: {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-body-ui text-ink-muted">
-        {eventHasEnded
+      <SectionHeading
+        title="Invites"
+        description={eventHasEnded
           ? "This event has ended, so no new invites can be sent."
           : "Required for invite-only events. Emails are matched case-insensitively."}
-      </p>
+      />
       <form
         className="flex flex-col gap-2.5 sm:flex-row"
         onSubmit={(e) => {

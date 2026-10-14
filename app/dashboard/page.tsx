@@ -120,7 +120,7 @@ export default async function DashboardPage() {
       {coOrganizedEvents.length ? (
         <section aria-labelledby="co-organized-title" className="flex flex-col gap-3">
           <div>
-            <h2 id="co-organized-title" className="text-h3 text-ink">Co-organized events</h2>
+            <h2 id="co-organized-title" className="text-h4 text-ink">Co-organized events</h2>
             <p className="mt-1 text-body-ui text-ink-muted">Events you can manage without organisation membership</p>
           </div>
           <ul className="grid gap-3 md:grid-cols-2">
@@ -140,7 +140,7 @@ export default async function DashboardPage() {
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section aria-labelledby="orgs-title" className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <h2 id="orgs-title" className="text-h3 text-ink">Organisations</h2>
+            <h2 id="orgs-title" className="text-h4 text-ink">Organisations</h2>
             <p className="text-body-ui text-ink-muted">Your workspaces</p>
           </div>
 
@@ -191,7 +191,7 @@ export default async function DashboardPage() {
           <StatTile label="Active Events" value={totalEventsCount} hint="Published across your workspaces" />
 
           <section aria-labelledby="activity-title" className="flex flex-col gap-3">
-            <h2 id="activity-title" className="text-h3 text-ink">Activity</h2>
+            <h2 id="activity-title" className="text-h4 text-ink">Activity</h2>
             {recentRsvps.length === 0 ? (
               <p className="text-body-ui text-ink-muted">No recent registrations.</p>
             ) : (

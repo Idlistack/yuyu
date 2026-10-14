@@ -126,7 +126,7 @@ export function CollaboratorInvitePanel({
 
   return (
     <Card as="section" aria-labelledby="co-organizers-title">
-      <h2 id="co-organizers-title" className="text-h4 text-ink">Co-organizers</h2>
+      <h2 id="co-organizers-title" className="text-title text-ink">Co-organizers</h2>
       <p className="mt-1 text-body-ui text-ink-muted">
         Invite someone to manage only this event. They do not become an
         organisation member.

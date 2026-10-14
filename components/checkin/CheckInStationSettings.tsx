@@ -35,7 +35,7 @@ export function CheckInStationSettings({ organisationSlug, eventId, stationUrl, 
   return (
     <section aria-labelledby="station-title" className="flex flex-col gap-3 rounded-lg border border-line bg-canvas p-5">
       <div>
-        <h2 id="station-title" className="text-h4 text-ink">Venue check-in station</h2>
+        <h2 id="station-title" className="text-title text-ink">Venue check-in station</h2>
         <p className="mt-1 text-body-ui text-ink-secondary">Give trusted door staff the station link and PIN. It permits online check-in only; roster and CSV exports stay in this dashboard.</p>
       </div>
       {enabled ? (

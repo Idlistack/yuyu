@@ -21,7 +21,7 @@ export function FeedbackResponsesPanel(props: {
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-h3 text-ink">Feedback responses</h2>
+          <h2 className="text-h4 text-ink">Feedback responses</h2>
           <p className="mt-1 text-body-ui text-ink-muted">Responses are shown without attendee identity or certificate information.</p>
         </div>
         <div className="flex items-center gap-2">

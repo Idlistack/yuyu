@@ -194,7 +194,7 @@ export default async function OrgDashboardPage({
       </div>
 
       <section aria-labelledby="events-title" className="flex flex-col gap-4">
-        <h2 id="events-title" className="text-h3 text-ink">Events</h2>
+        <h2 id="events-title" className="text-h4 text-ink">Events</h2>
         <NavTabs
           label="Filter events"
           items={(["upcoming", "past", "draft", "all"] as const).map((option) => ({
@@ -265,7 +265,7 @@ export default async function OrgDashboardPage({
       </section>
 
       <section id="series" aria-labelledby="series-title" className="flex scroll-mt-6 flex-col gap-4">
-        <h2 id="series-title" className="text-h3 text-ink">Event series</h2>
+        <h2 id="series-title" className="text-h4 text-ink">Event series</h2>
         {seriesList.length === 0 ? (
           <EmptyState>No recurring series yet. Create one to keep a regular event rhythm.</EmptyState>
         ) : (

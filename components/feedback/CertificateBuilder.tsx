@@ -64,7 +64,7 @@ export function CertificateBuilder(props: Props) {
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-line bg-subtle p-4 md:p-6">
       <div>
-        <h3 className="text-h4 text-ink">Certificate designer</h3>
+        <h3 className="text-title text-ink">Certificate designer</h3>
         <p className="mt-1 text-body-ui text-ink-secondary">Upload your finished certificate artwork with a blank space for the attendee name. Drag the name area or resize it from the corner. Names are automatically reduced to fit.</p>
       </div>
       <div className="flex flex-wrap gap-2">

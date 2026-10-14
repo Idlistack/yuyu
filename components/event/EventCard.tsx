@@ -90,7 +90,7 @@ export function EventCard(props: {
       ) : null}
       <div className="flex flex-1 flex-col gap-2 p-5">
         {chips}
-        <h3 className="break-words text-h4 text-ink">{event.title}</h3>
+        <h3 className="break-words text-title text-ink">{event.title}</h3>
         <p className="text-sm text-ink-muted">{formatEventRange(event.startDateTime, event.endDateTime, event.timezone)}</p>
         {desc ? <p className="text-sm text-ink-secondary">{desc}</p> : null}
       </div>

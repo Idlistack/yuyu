@@ -57,7 +57,7 @@ export function CardHeader({ title, description, action, className, titleAs: Tit
   return (
     <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-3", className)}>
       <div className="min-w-0">
-        <Title className="text-h4 text-ink">{title}</Title>
+        <Title className="text-title text-ink">{title}</Title>
         {description ? <p className="mt-1 text-body-ui text-ink-muted">{description}</p> : null}
       </div>
       {action ? <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div> : null}
@@ -94,7 +94,7 @@ export function Callout({ tone = "info", title, children, action, className, rol
 
 export function EmptyState({ title, children, action, className, icon }: { title?: ReactNode; children?: ReactNode; action?: ReactNode; className?: string; icon?: ReactNode }) {
   return (
-    <div className={cn("flex flex-col items-center gap-2 rounded-lg border-[1.5px] border-dashed border-line-strong px-6 py-8 text-center", className)}>
+    <div className={cn("flex flex-col items-center gap-2 rounded-lg border border-line bg-canvas px-6 py-7 text-center", className)}>
       {icon ? <span aria-hidden className="text-ink-muted [&_svg]:size-7">{icon}</span> : null}
       {title ? <p className="text-label text-ink">{title}</p> : null}
       {children ? <div className="max-w-md text-body-ui text-ink-muted">{children}</div> : null}
@@ -262,8 +262,8 @@ export function PageHeader({ kicker, title, description, actions, className }: {
   return (
     <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="min-w-0">
-        {kicker ? <p className="mb-1 text-body-ui text-ink-muted">{kicker}</p> : null}
-        <h1 className="text-h1 text-ink">{title}</h1>
+        {kicker ? <p className="mb-1.5 text-body-ui text-ink-muted">{kicker}</p> : null}
+        <h1 className="break-words text-h1 text-ink">{title}</h1>
         {description ? <p className="mt-2 max-w-[640px] text-body-ui text-ink-secondary">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2.5">{actions}</div> : null}

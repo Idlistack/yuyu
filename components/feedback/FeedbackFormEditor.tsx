@@ -134,7 +134,7 @@ export function FeedbackFormEditor(props: {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-h3 text-ink">Feedback form</h2>
+          <h2 className="text-h4 text-ink">Feedback form</h2>
           <p className="mt-1 text-body-ui text-ink-muted">Share this link manually. It never sends system email.</p>
         </div>
         <Button variant="secondary" startIcon={<Copy />} onClick={() => void navigator.clipboard.writeText(props.feedbackUrl).then(() => { setMessageIsError(false); setMessage("Feedback link copied."); }, () => { setMessageIsError(true); setMessage("Could not copy the feedback link."); })}>Copy feedback link</Button>
@@ -142,7 +142,7 @@ export function FeedbackFormEditor(props: {
       {message ? <Callout tone={messageIsError ? "danger" : "info"} role={messageIsError ? "alert" : "status"} action={<Button size="sm" variant="quiet" onClick={() => setMessage(null)}>Dismiss</Button>}>{message}</Callout> : null}
       <section className="flex flex-col items-start gap-3 rounded-lg border border-line bg-canvas p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-h4 text-ink">Start with a template</h3>
+          <h3 className="text-title text-ink">Start with a template</h3>
           <p className="mt-1 text-body-ui text-ink-muted">Use a ready-made question set, then tailor it to this event. Applying a template replaces unanswered questions and closes the form for review.</p>
         </div>
         <Button variant="secondary" startIcon={<LayoutTemplate />} onClick={() => setTemplateDialog(true)} disabled={pending} className="shrink-0">Browse feedback templates</Button>

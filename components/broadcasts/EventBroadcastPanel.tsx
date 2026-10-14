@@ -156,7 +156,7 @@ export function EventBroadcastPanel(props: {
 
       <Card className="flex flex-col gap-4 md:flex-row md:items-center">
         <div className="flex-1">
-          <h2 className="text-h4 text-ink">Start from a template</h2>
+          <h2 className="text-title text-ink">Start from a template</h2>
           <p className="mt-1 text-body-ui text-ink-muted">
             Reminders, agenda updates, speaker news, logistics, thank-yous, and more. Each one fills in the subject, message, and a suggested audience; everything stays editable.
           </p>
@@ -185,7 +185,7 @@ export function EventBroadcastPanel(props: {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <Card className="flex flex-col gap-5">
-          <h2 className="text-h4 text-ink">Who receives it</h2>
+          <h2 className="text-title text-ink">Who receives it</h2>
           <fieldset className="flex flex-col gap-2.5">
             <legend className="mb-2 text-label text-ink">Registration status</legend>
             {BROADCAST_STATUS_OPTIONS.map((option) => (
@@ -221,7 +221,7 @@ export function EventBroadcastPanel(props: {
         </Card>
 
         <Card className="flex flex-col gap-4">
-          <h2 className="text-h4 text-ink">Message</h2>
+          <h2 className="text-title text-ink">Message</h2>
           <Field label="Subject" required helperText={`${subject.length}/${BROADCAST_SUBJECT_MAX}`}>
             <Input ref={subjectRef} value={subject} onChange={(e) => setSubject(e.target.value)} disabled={pending} maxLength={BROADCAST_SUBJECT_MAX} />
           </Field>
@@ -247,7 +247,7 @@ export function EventBroadcastPanel(props: {
       <Card className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-h4 text-ink">Preview</h2>
+            <h2 className="text-title text-ink">Preview</h2>
             <p className="mt-1 max-w-[640px] text-caption text-ink-muted">
               Rendered by the server with example values, exactly as it will arrive. Each attendee sees their own name and, when confirmed, their own ticket link.
             </p>
@@ -330,7 +330,7 @@ export function EventBroadcastPanel(props: {
       />
 
       <section aria-labelledby="broadcast-history" className="flex flex-col gap-3">
-        <h2 id="broadcast-history" className="text-h3 text-ink">Previously sent</h2>
+        <h2 id="broadcast-history" className="text-h4 text-ink">Previously sent</h2>
         {history.length === 0 ? (
           <Card>
             <p className="text-body-ui text-ink-muted">No emails have been sent for this event yet.</p>

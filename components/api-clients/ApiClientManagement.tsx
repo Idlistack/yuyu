@@ -125,7 +125,7 @@ function ClientPanel(props: {
     <Card as="section" padding="none" className="divide-y divide-line">
       <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-h4 text-ink">{props.client.name}</h3>
+          <h3 className="text-title text-ink">{props.client.name}</h3>
           <Chip size="sm" tone={props.client.status === "ACTIVE" ? "success" : "neutral"}>
             {props.client.status.toLowerCase()}
           </Chip>
@@ -340,7 +340,7 @@ export function ApiClientManagement(props: {
           }}
         >
           <div>
-            <h2 className="text-h4 text-ink">Create API client</h2>
+            <h2 className="text-title text-ink">Create API client</h2>
             <p className="mt-1 text-body-ui text-ink-muted">The first credential is shown once after creation.</p>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -381,7 +381,7 @@ export function ApiClientManagement(props: {
         </form>
       </Card>
       <section aria-labelledby="api-clients-title" className="flex flex-col gap-3">
-        <h2 id="api-clients-title" className="text-h4 text-ink">Clients</h2>
+        <h2 id="api-clients-title" className="text-title text-ink">Clients</h2>
         {props.clients.length === 0 ? (
           <EmptyState>No machine clients have been created.</EmptyState>
         ) : (

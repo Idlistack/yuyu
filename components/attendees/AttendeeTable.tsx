@@ -2,13 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import type { RsvpStatus } from "@prisma/client";
-import { ChevronLeft, ChevronRight, MessageSquareText, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, MessageSquareText, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
 import { Callout, Chip, EmptyState, type ChipTone } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { NativeSelect, SearchInput } from "@/components/ui/field";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { CopyTicketButton } from "@/components/attendees/CopyTicketButton";
+import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { deleteRsvp, restoreRsvp } from "@/app/actions/rsvp-admin";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import {
@@ -208,23 +208,21 @@ export function AttendeeTable(props: {
           <ExportEmailsButton eventTitle={eventTitle} attendees={rows} />
         ) : null}
       </div>
-      <Table label="Attendees" className="sm:min-w-[760px]">
+      <Table label="Attendees" className="sm:min-w-[720px]">
         <THead>
           <tr>
             <TH>Name</TH>
-            <TH className="hidden sm:table-cell">Email</TH>
             <TH className="hidden sm:table-cell">Answers</TH>
             <TH className="hidden sm:table-cell">Status</TH>
             <TH className="hidden sm:table-cell">Check-in</TH>
             <TH className="hidden sm:table-cell">RSVP time</TH>
-            {canManage ? <TH className="hidden text-center sm:table-cell">Ticket</TH> : null}
             {canManage ? <TH className="text-right">Actions</TH> : null}
           </tr>
         </THead>
         <TBody>
           {rows.length === 0 ? (
             <TR>
-              <TD colSpan={canManage ? 8 : 6} className="text-ink-muted">
+              <TD colSpan={canManage ? 6 : 5} className="text-ink-muted">
                 No matches.
               </TD>
             </TR>
@@ -236,29 +234,31 @@ export function AttendeeTable(props: {
                 (a.guestEmail ? a.guestEmail.split("@")[0] : "") ||
                 "Guest";
               const name = a.user?.name ?? (a.user ? "—" : guestDisplayName);
-              const ts = new Date(a.createdAt).toLocaleString();
+              const ts = new Date(a.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
               const answerCount = a.answers?.length ?? 0;
               const statusChip = <Chip size="sm" tone={statusTones[a.status] ?? "neutral"}>{statusLabel(a.status)}</Chip>;
               return (
                 <TR key={a.id}>
-                  <TD className="max-w-[140px] sm:max-w-none">
+                  <TD className="max-w-[160px] sm:max-w-[240px]">
                     <p className="truncate font-semibold">{name}</p>
+                    <p className="truncate text-caption text-ink-muted">{email}</p>
                     <div className="mt-1 sm:hidden">{statusChip}</div>
                   </TD>
-                  <TD className="hidden text-ink-secondary sm:table-cell">{email}</TD>
                   <TD className="hidden sm:table-cell">
                     {answerCount > 0 ? (
                       <Button
                         size="sm"
                         variant="quiet"
                         startIcon={<MessageSquareText />}
+                        aria-label={`View answers (${answerCount})`}
+                        title={`View answers (${answerCount})`}
                         onClick={() => {
                           setAnswersTitle(name);
                           setAnswersRows(a.answers ?? []);
                           setAnswersOpen(true);
                         }}
                       >
-                        View ({answerCount})
+                        {answerCount}
                       </Button>
                     ) : (
                       <span className="text-ink-muted">—</span>
@@ -276,13 +276,8 @@ export function AttendeeTable(props: {
                   </TD>
                   <TD className="hidden whitespace-nowrap text-ink-secondary sm:table-cell">{ts}</TD>
                   {canManage ? (
-                    <TD className="hidden text-center sm:table-cell">
-                      <CopyTicketButton ticketUrl={a.ticketUrl} />
-                    </TD>
-                  ) : null}
-                  {canManage ? (
                     <TD className="text-right">
-                      <div className="flex flex-col flex-wrap items-end justify-end gap-1 sm:flex-row sm:items-center">
+                      <div className="flex flex-col items-end justify-end gap-1 sm:flex-row sm:flex-nowrap sm:items-center">
                         {a.status === "PENDING_APPROVAL" ? (
                           <>
                             <Button size="sm" variant="secondary" disabled={pending} onClick={() => runLifecycle(() => approveRsvp({ organisationSlug, rsvpId: a.id, ...targetPayload() }), "Approved")}>
@@ -303,19 +298,35 @@ export function AttendeeTable(props: {
                             </Button>
                           </>
                         ) : null}
-                        <div className="flex">
-                          <IconButton
-                            size="sm"
-                            label={a.user ? "View registration" : "Edit registration or transfer ticket"}
-                            disabled={pending}
-                            onClick={() => setEditAttendee(a)}
-                          >
-                            <Pencil />
-                          </IconButton>
-                          <IconButton size="sm" variant="danger" label="Remove RSVP" disabled={pending} onClick={() => setDeleteConfirmAttendee(a)}>
-                            <Trash2 />
-                          </IconButton>
-                        </div>
+                        <Menu>
+                          <MenuTrigger asChild>
+                            <IconButton size="sm" label={`More actions for ${name}`} disabled={pending}>
+                              <MoreHorizontal />
+                            </IconButton>
+                          </MenuTrigger>
+                          <MenuContent>
+                            <MenuItem
+                              icon={<Copy />}
+                              onSelect={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(a.ticketUrl);
+                                  showToast("Ticket link copied", "success");
+                                } catch {
+                                  showToast("Could not copy", "error");
+                                }
+                              }}
+                            >
+                              Copy ticket link
+                            </MenuItem>
+                            <MenuItem icon={<Pencil />} onSelect={() => setEditAttendee(a)}>
+                              {a.user ? "View registration" : "Edit registration or transfer ticket"}
+                            </MenuItem>
+                            <MenuSeparator />
+                            <MenuItem danger icon={<Trash2 />} onSelect={() => setDeleteConfirmAttendee(a)}>
+                              Remove RSVP
+                            </MenuItem>
+                          </MenuContent>
+                        </Menu>
                       </div>
                     </TD>
                   ) : null}

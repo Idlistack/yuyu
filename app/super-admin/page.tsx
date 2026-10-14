@@ -187,7 +187,7 @@ export default async function SuperAdminOverviewPage() {
         </AdminPanel>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid gap-5">
         <AdminPanel title="Recent organisations">
           <Table label="Recent organisations">
             <TBody>

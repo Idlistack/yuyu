@@ -85,7 +85,7 @@ export default async function SeriesManagePage({ params }: Props) {
   }));
 
   return (
-    <div className="flex max-w-[960px] flex-col gap-8">
+    <div className="flex flex-col gap-8">
       <PageHeader title={series.title} description="Manage this recurring event and its upcoming occurrences." />
 
       <Card as="section" padding="lg" aria-labelledby="series-details-title">
@@ -103,7 +103,7 @@ export default async function SeriesManagePage({ params }: Props) {
       </Card>
 
       <section aria-labelledby="series-invites-title" className="flex flex-col gap-3">
-        <h2 id="series-invites-title" className="text-h3 text-ink">Invites</h2>
+        <h2 id="series-invites-title" className="text-h4 text-ink">Invites</h2>
         <SeriesInvitePanel
           organisationSlug={organisation.slug}
           eventSeriesId={series.id}
@@ -117,7 +117,7 @@ export default async function SeriesManagePage({ params }: Props) {
       <ScheduleManager organisationSlug={organisation.slug} eventSeriesId={series.id} items={series.scheduleItems.map((item) => ({ ...item, startDateTime: item.startDateTime.toISOString(), endDateTime: item.endDateTime.toISOString() }))} defaultDate={series.instances[0] ? eventDateInput(series.instances[0].startDateTime, series.timezone) : ""} />
 
       <section aria-labelledby="series-instances-title" className="flex flex-col gap-3">
-        <h2 id="series-instances-title" className="text-h3 text-ink">Upcoming instances</h2>
+        <h2 id="series-instances-title" className="text-h4 text-ink">Upcoming instances</h2>
         <Table label="Upcoming instances">
           <THead>
             <tr>
@@ -143,7 +143,7 @@ export default async function SeriesManagePage({ params }: Props) {
 
       {canDownloadReports ? (
         <section aria-labelledby="series-reports-title" className="flex flex-col gap-3">
-          <h2 id="series-reports-title" className="text-h3 text-ink">Reports</h2>
+          <h2 id="series-reports-title" className="text-h4 text-ink">Reports</h2>
           <Card>
             {finishedInstances.length ? (
               <ul className="flex flex-col divide-y divide-line">
@@ -163,7 +163,7 @@ export default async function SeriesManagePage({ params }: Props) {
 
       {firstInstanceId && canManageRegistrations ? (
         <section aria-labelledby="series-attendees-title" className="flex flex-col gap-3">
-          <h2 id="series-attendees-title" className="text-h3 text-ink">Attendees (first upcoming occurrence)</h2>
+          <h2 id="series-attendees-title" className="text-h4 text-ink">Attendees (first upcoming occurrence)</h2>
           <AttendeeTable
             organisationSlug={organisation.slug}
             eventInstanceId={firstInstanceId}

@@ -36,7 +36,7 @@ export function OrgInviteLinkPanel(props: {
     <Card as="section" className="flex flex-col gap-4">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-h4 text-ink">Invite link</h2>
+          <h2 className="text-title text-ink">Invite link</h2>
           <Chip size="sm" tone="outline">Single-use</Chip>
         </div>
         <p className="mt-1 text-body-ui text-ink-muted">
