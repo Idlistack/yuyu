@@ -37,7 +37,8 @@ try {
         'EventCollaborator', 'EventCollaboratorInvite', 'EventScheduleItem',
         'EventPage', 'EventPageSection', 'EventHighlight', 'EventVenue',
         'EventVenueRoom', 'EventSession', 'EventSpeaker',
-        'EventSessionSpeaker', 'EventSponsor', 'EventFaq', 'EventResource'
+        'EventSessionSpeaker', 'EventSponsor', 'EventFaq', 'EventResource',
+        'EventBroadcast'
       )
     `,
     prisma.$queryRaw`

@@ -29,6 +29,7 @@ import { ManualRsvpDialog } from "@/components/attendees/ManualRsvpDialog";
 import { useRouter } from "next/navigation";
 import { CollaboratorInvitePanel } from "@/components/event/CollaboratorInvitePanel";
 import { EventWebsiteManager } from "@/components/event/EventWebsiteManager";
+import { EventBroadcastPanel, type BroadcastHistoryRow } from "@/components/broadcasts/EventBroadcastPanel";
 
 type InviteRow = { id: string; email: string; createdAt: string };
 
@@ -61,8 +62,9 @@ export function EventManageTabs(props: {
   canCheckIn: boolean;
   canEditDetails: boolean;
   canManageSchedule: boolean;
+  broadcasts: BroadcastHistoryRow[];
 }) {
-  const { organisationSlug, event, attendees, attendeesTruncated, invites, analytics, registrationFields, feedbackUrl, feedbackForm, feedbackFields, feedbackResponses, feedbackResponsesTruncated, referenceTime, website, canManageCollaborators, canManageRegistrations, canCheckIn, canEditDetails, canManageSchedule, collaborators, pendingCollaboratorInvites } = props;
+  const { organisationSlug, event, attendees, attendeesTruncated, invites, analytics, registrationFields, feedbackUrl, feedbackForm, feedbackFields, feedbackResponses, feedbackResponsesTruncated, referenceTime, website, canManageCollaborators, canManageRegistrations, canCheckIn, canEditDetails, canManageSchedule, collaborators, pendingCollaboratorInvites, broadcasts } = props;
   const [tab, setTab] = useState(0);
   const [manualRsvpOpen, setManualRsvpOpen] = useState(false);
   const router = useRouter();
@@ -82,6 +84,7 @@ export function EventManageTabs(props: {
         <Tab label="Attendees" />
         <Tab label="Analytics" />
         <Tab label="Invites" />
+        <Tab label="Emails" />
         <Tab label="Registration form" />
         <Tab label="Feedback" />
         <Tab label="Check-in" />
@@ -149,19 +152,24 @@ export function EventManageTabs(props: {
         />
       ) : null}
       {tab === 6 ? (
+        canManageRegistrations ? (
+          <EventBroadcastPanel organisationSlug={organisationSlug} eventId={event.id} history={broadcasts} />
+        ) : <Typography color="text.secondary">You do not have permission to email attendees.</Typography>
+      ) : null}
+      {tab === 7 ? (
         <EventRegistrationFormEditor
           organisationSlug={organisationSlug}
           eventId={event.id}
           fields={registrationFields}
         />
       ) : null}
-      {tab === 7 ? (
+      {tab === 8 ? (
         <Stack spacing={3}>
           <FeedbackFormEditor organisationSlug={organisationSlug} eventId={event.id} feedbackUrl={feedbackUrl} form={feedbackForm} fields={feedbackFields} />
           {canEditDetails ? <FeedbackResponsesPanel responses={feedbackResponses} truncated={feedbackResponsesTruncated} exportHref={feedbackForm ? `/api/exports/events/${event.id}/feedback` : undefined} /> : <Typography color="text.secondary">You do not have permission to view feedback responses.</Typography>}
         </Stack>
       ) : null}
-      {tab === 8 ? (
+      {tab === 9 ? (
         <Stack spacing={2}>
           {!canCheckIn ? <Typography color="text.secondary">You do not have permission to operate check-in.</Typography> : null}
           {canCheckIn ? (
@@ -189,7 +197,7 @@ export function EventManageTabs(props: {
           ) : null}
         </Stack>
       ) : null}
-      {tab === 9 ? (
+      {tab === 10 ? (
         <Stack spacing={2}>{canManageCollaborators ? <CollaboratorInvitePanel organisationSlug={organisationSlug} eventId={event.id} collaborators={collaborators} pendingInvites={pendingCollaboratorInvites} /> : null}<EventManageMore organisationSlug={organisationSlug} event={event} /></Stack>
       ) : null}
     </>

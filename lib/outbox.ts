@@ -2,7 +2,9 @@ import "server-only";
 
 import { OutboxStatus, Prisma, RsvpStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { sendApprovalNotification, sendCollaboratorInvitation, sendEventInvitation, sendRSVPConfirmation } from "@/lib/email";
+import { sendApprovalNotification, sendCollaboratorInvitation, sendEventBroadcast, sendEventInvitation, sendRSVPConfirmation } from "@/lib/email";
+import { broadcastHtmlToText, formatBroadcastEventDate, renderBroadcastHtml, renderBroadcastTemplate, sampleBroadcastVariables } from "@/lib/broadcastTemplate";
+import { broadcastEventUrl, broadcastFeedbackUrl, broadcastScheduleUrl, broadcastTicketUrl, rsvpMatchesBroadcastAudience } from "@/lib/eventBroadcast";
 import { sendPasswordResetEmail } from "@/lib/email/passwordReset";
 import { sendEmailVerificationEmail } from "@/lib/email/emailVerification";
 import { describeOperationalError } from "@/lib/redactSensitiveText";
@@ -45,6 +47,22 @@ type EmailVerificationPayload = {
   expiresAt: string;
 };
 type CollaboratorInvitePayload = { to: string; eventTitle: string; inviteUrl: string; expiresAt?: string };
+
+/** Per-recipient broadcast row. The template and ticket link are resolved at send time, so the queue never stores capabilities. */
+type EventBroadcastPayload = { to: string; broadcastId: string; rsvpId: string };
+
+type EventBroadcastTestPayload = { to: string; eventId: string; subject: string; body: string; recipientName?: string };
+
+export async function enqueueEventBroadcastRecipients(client: OutboxClient, recipients: EventBroadcastPayload[]) {
+  if (recipients.length === 0) return { count: 0 };
+  return client.outboxMessage.createMany({
+    data: recipients.map((payload) => ({ kind: "event-broadcast", payload: payload as Prisma.InputJsonValue })),
+  });
+}
+
+export async function enqueueEventBroadcastTest(client: OutboxClient, payload: EventBroadcastTestPayload) {
+  return client.outboxMessage.create({ data: { kind: "event-broadcast-test", payload: payload as Prisma.InputJsonValue } });
+}
 
 export async function enqueueCollaboratorInvite(client: OutboxClient, payload: CollaboratorInvitePayload) { return client.outboxMessage.create({ data: { kind: "collaborator-invite", payload: payload as Prisma.InputJsonValue } }); }
 
@@ -245,6 +263,61 @@ function asEmailVerificationPayload(value: Prisma.JsonValue): EmailVerificationP
   if (!isEmail(payload.to) || !isSafeMessageUrl(payload.verificationUrl) || !isIsoDate(payload.expiresAt)) return null;
   return payload as EmailVerificationPayload;
 }
+function asEventBroadcastPayload(value: Prisma.JsonValue): EventBroadcastPayload | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const payload = value as Record<string, unknown>;
+  if (!isEmail(payload.to) || !isBoundedString(payload.broadcastId, 64) || !isBoundedString(payload.rsvpId, 64)) return null;
+  return payload as EventBroadcastPayload;
+}
+
+function asEventBroadcastTestPayload(value: Prisma.JsonValue): EventBroadcastTestPayload | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const payload = value as Record<string, unknown>;
+  if (
+    !isEmail(payload.to) ||
+    !isBoundedString(payload.eventId, 64) ||
+    !isBoundedString(payload.subject, 150) ||
+    !isBoundedString(payload.body, 20000) ||
+    (payload.recipientName !== undefined && !isBoundedString(payload.recipientName, 200))
+  ) return null;
+  return payload as EventBroadcastTestPayload;
+}
+
+const broadcastEventSelect = {
+  title: true,
+  slug: true,
+  startDateTime: true,
+  timezone: true,
+  location: true,
+  isOnline: true,
+  organisation: { select: { name: true, slug: true } },
+} as const;
+
+type BroadcastEvent = {
+  title: string;
+  slug: string;
+  startDateTime: Date;
+  timezone: string;
+  location: string;
+  isOnline: boolean;
+  organisation: { name: string; slug: string };
+};
+
+function broadcastVariablesFor(event: BroadcastEvent, recipient: { name?: string | null; ticketUrl?: string | null }) {
+  const eventUrl = broadcastEventUrl(event.organisation.slug, event.slug);
+  return {
+    name: recipient.name,
+    event: event.title,
+    eventDate: formatBroadcastEventDate(event.startDateTime, event.timezone),
+    location: event.isOnline ? "Online" : (event.location.trim() || "the venue"),
+    eventUrl,
+    ticketLink: recipient.ticketUrl ?? eventUrl,
+    feedbackUrl: broadcastFeedbackUrl(event.organisation.slug, event.slug),
+    scheduleUrl: broadcastScheduleUrl(event.organisation.slug, event.slug),
+    organisation: event.organisation.name,
+  };
+}
+
 function asCollaboratorInvitePayload(value: Prisma.JsonValue): CollaboratorInvitePayload | null { if (!value || typeof value !== "object" || Array.isArray(value)) return null; const p = value as Record<string, unknown>; return isEmail(p.to) && isBoundedString(p.eventTitle, 200) && isSafeMessageUrl(p.inviteUrl) && (p.expiresAt === undefined || isIsoDate(p.expiresAt)) ? p as CollaboratorInvitePayload : null; }
 
 /** Deliver a small batch. Run this from a protected scheduler, never a request path. */
@@ -344,6 +417,67 @@ export async function deliverOutboxBatch(limit = 20) {
           continue;
         }
         await sendCollaboratorInvitation({ ...payload, messageId: stableMessageId });
+      } else if (message.kind === "event-broadcast") {
+        const payload = asEventBroadcastPayload(message.payload);
+        if (!payload) throw new PermanentOutboxError();
+        const [broadcast, rsvp] = await Promise.all([
+          prisma.eventBroadcast.findUnique({
+            where: { id: payload.broadcastId },
+            select: { subject: true, body: true, statuses: true, attendance: true, eventId: true, event: { select: broadcastEventSelect } },
+          }),
+          prisma.rSVP.findUnique({
+            where: { id: payload.rsvpId },
+            select: { eventId: true, status: true, checkedInAt: true, checkInToken: true, guestName: true, user: { select: { name: true } } },
+          }),
+        ]);
+        // The broadcast or registration was removed, or the registration no
+        // longer belongs to the audience it was selected for. Drop silently
+        // rather than sending wording that no longer applies.
+        if (!broadcast || !rsvp || rsvp.eventId !== broadcast.eventId || !rsvpMatchesBroadcastAudience(rsvp, broadcast)) {
+          await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });
+          continue;
+        }
+        const variables = broadcastVariablesFor(broadcast.event, {
+          name: rsvp.user?.name?.trim() || rsvp.guestName?.trim() || null,
+          ticketUrl: rsvp.status === RsvpStatus.CONFIRMED ? broadcastTicketUrl(rsvp.checkInToken) : null,
+        });
+        const bodyHtml = renderBroadcastHtml(broadcast.body, variables);
+        await sendEventBroadcast({
+          to: payload.to,
+          subject: renderBroadcastTemplate(broadcast.subject, variables),
+          bodyHtml,
+          bodyText: broadcastHtmlToText(bodyHtml),
+          eventTitle: broadcast.event.title,
+          organisationName: broadcast.event.organisation.name,
+          messageId: stableMessageId,
+        });
+      } else if (message.kind === "event-broadcast-test") {
+        const payload = asEventBroadcastTestPayload(message.payload);
+        if (!payload) throw new PermanentOutboxError();
+        const event = await prisma.event.findUnique({ where: { id: payload.eventId }, select: broadcastEventSelect });
+        if (!event) {
+          await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });
+          continue;
+        }
+        const variables = sampleBroadcastVariables({
+          title: event.title,
+          startDateTime: event.startDateTime,
+          timezone: event.timezone,
+          location: event.location,
+          isOnline: event.isOnline,
+          eventUrl: broadcastEventUrl(event.organisation.slug, event.slug),
+          organisationName: event.organisation.name,
+        }, payload.recipientName ?? null);
+        const bodyHtml = renderBroadcastHtml(payload.body, variables);
+        await sendEventBroadcast({
+          to: payload.to,
+          subject: `[Test] ${renderBroadcastTemplate(payload.subject, variables)}`,
+          bodyHtml,
+          bodyText: broadcastHtmlToText(bodyHtml),
+          eventTitle: event.title,
+          organisationName: event.organisation.name,
+          messageId: stableMessageId,
+        });
       } else {
         throw new PermanentOutboxError();
       }

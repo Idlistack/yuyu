@@ -13,6 +13,7 @@ export type Bucket =
   | "feedback"
   | "upload"
   | "invite"
+  | "broadcast"
   | "checkin"
   | "checkinStationPin"
   | "search"
@@ -31,6 +32,7 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   feedback: { max: 8, windowMs: 60_000 },
   upload: { max: 12, windowMs: 60 * 60_000 },
   invite: { max: 30, windowMs: 60 * 60_000 },
+  broadcast: { max: 10, windowMs: 60 * 60_000 },
   checkin: { max: 180, windowMs: 60_000 },
   checkinStationPin: { max: 5, windowMs: 60_000 },
   search: { max: 60, windowMs: 60_000 },

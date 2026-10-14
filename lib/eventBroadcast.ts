@@ -1,0 +1,103 @@
+import "server-only";
+
+import type { BroadcastAttendanceFilter, Prisma, RsvpStatus } from "@prisma/client";
+import sanitizeHtml from "sanitize-html";
+import { prisma } from "@/lib/db";
+
+type BroadcastClient = Prisma.TransactionClient | typeof prisma;
+
+export type BroadcastAudience = {
+  statuses: readonly RsvpStatus[];
+  attendance: BroadcastAttendanceFilter;
+};
+
+/** Database predicate for every registration that belongs to a broadcast audience. */
+export function broadcastRecipientWhere(eventId: string, audience: BroadcastAudience): Prisma.RSVPWhereInput {
+  return {
+    eventId,
+    status: { in: [...audience.statuses] },
+    ...(audience.attendance === "CHECKED_IN" ? { checkedInAt: { not: null } } : {}),
+    ...(audience.attendance === "NOT_CHECKED_IN" ? { checkedInAt: null } : {}),
+  };
+}
+
+/** Re-evaluated at delivery time so a registration that changed after queuing is not emailed with stale wording. */
+export function rsvpMatchesBroadcastAudience(
+  rsvp: { status: RsvpStatus; checkedInAt: Date | null },
+  audience: BroadcastAudience,
+): boolean {
+  if (!audience.statuses.includes(rsvp.status)) return false;
+  if (audience.attendance === "CHECKED_IN") return rsvp.checkedInAt !== null;
+  if (audience.attendance === "NOT_CHECKED_IN") return rsvp.checkedInAt === null;
+  return true;
+}
+
+export type BroadcastRecipient = { rsvpId: string; email: string };
+
+/**
+ * One recipient per email address. A person who registered as a guest and
+ * again with an account would otherwise receive the message twice.
+ */
+export async function resolveBroadcastRecipients(
+  client: BroadcastClient,
+  eventId: string,
+  audience: BroadcastAudience,
+): Promise<BroadcastRecipient[]> {
+  const rsvps = await client.rSVP.findMany({
+    where: broadcastRecipientWhere(eventId, audience),
+    select: { id: true, guestEmail: true, user: { select: { email: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  const seen = new Set<string>();
+  const recipients: BroadcastRecipient[] = [];
+  for (const rsvp of rsvps) {
+    const email = (rsvp.user?.email ?? rsvp.guestEmail ?? "").trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    recipients.push({ rsvpId: rsvp.id, email });
+  }
+  return recipients;
+}
+
+export function getBroadcastBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+}
+
+export function broadcastEventUrl(orgSlug: string, eventSlug: string): string {
+  return `${getBroadcastBaseUrl()}/${encodeURIComponent(orgSlug)}/${encodeURIComponent(eventSlug)}`;
+}
+
+export function broadcastTicketUrl(checkInToken: string): string {
+  return `${getBroadcastBaseUrl()}/ticket/${encodeURIComponent(checkInToken)}`;
+}
+
+export function broadcastFeedbackUrl(orgSlug: string, eventSlug: string): string {
+  return `${broadcastEventUrl(orgSlug, eventSlug)}/feedback`;
+}
+
+export function broadcastScheduleUrl(orgSlug: string, eventSlug: string): string {
+  return `${broadcastEventUrl(orgSlug, eventSlug)}/schedule`;
+}
+
+const HREF_PLACEHOLDER = /href="\{\{\s*(ticketLink|eventUrl|feedbackUrl|scheduleUrl)\s*\}\}"/g;
+const HREF_SENTINEL = /href="https:\/\/placeholder\.invalid\/(ticketLink|eventUrl|feedbackUrl|scheduleUrl)"/g;
+
+/**
+ * Reduce editor output to the small HTML subset the email template supports.
+ * Link placeholders are swapped for a sentinel URL while sanitising so the
+ * allowed-scheme check keeps them, then restored for delivery-time rendering.
+ */
+export function sanitizeBroadcastHtml(html: string): string {
+  const protectedHtml = html.replace(HREF_PLACEHOLDER, (_match, key: string) => `href="https://placeholder.invalid/${key}"`);
+  const clean = sanitizeHtml(protectedHtml, {
+    allowedTags: ["p", "br", "strong", "em", "s", "u", "h2", "h3", "ul", "ol", "li", "blockquote", "a"],
+    allowedAttributes: { a: ["href", "class"] },
+    allowedClasses: { a: ["cta"] },
+    allowedSchemes: ["http", "https", "mailto"],
+  }).trim();
+  return clean
+    .replace(HREF_SENTINEL, (_match, key: string) => `href="{{${key}}}"`)
+    // sanitize-html keeps relative targets; a typo like {{nope}} would become a broken relative link.
+    .replace(/<a\b([^>]*?)\s*href="([^"]*)"([^>]*)>/g, (match, before: string, href: string, after: string) =>
+      /^(https?:\/\/|mailto:|\{\{(ticketLink|eventUrl|feedbackUrl|scheduleUrl)\}\})/.test(href) ? match : `<a${before}${after}>`);
+}
