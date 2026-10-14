@@ -93,6 +93,15 @@ export function EventRegistrationFormEditor(props: { organisationSlug: string; e
 
   const [editing, setEditing] = useState<Editing | null>(null);
   const [addOpen, setAddOpen] = useState(props.fields.length === 0);
+  // The picker opens where it was asked for: under the header, or at the end of the list.
+  const [addAt, setAddAt] = useState<"top" | "bottom">("top");
+  const addPanel = useRef<HTMLDivElement>(null);
+  const openAdd = (at: "top" | "bottom") => {
+    setAddAt(at);
+    setAddOpen(true);
+    revealAddPanel.current = true;
+  };
+  const revealAddPanel = useRef(false);
   const [deleteTarget, setDeleteTarget] = useState<RegistrationFieldRow | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   // Focus moves after the render that shows its target (e.g. the new question's text box).
@@ -117,6 +126,15 @@ export function EventRegistrationFormEditor(props: { organisationSlug: string; e
     node.focus();
     node.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   });
+
+  // Bring a newly opened picker into view and put focus on its first choice.
+  useEffect(() => {
+    if (!addOpen || !revealAddPanel.current || !addPanel.current) return;
+    revealAddPanel.current = false;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    addPanel.current.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+    addPanel.current.querySelector<HTMLElement>("[role='tabpanel'] button:not([disabled]):not([tabindex='-1'])")?.focus({ preventScroll: true });
+  }, [addOpen]);
 
   const problems = useMemo(() => findLogicProblems(fields), [fields]);
   const requiredCount = fields.filter((field) => field.required).length;
@@ -428,14 +446,18 @@ export function EventRegistrationFormEditor(props: { organisationSlug: string; e
                 startIcon={addOpen ? <X /> : <Plus />}
                 aria-expanded={addOpen}
                 aria-controls={addOpen ? addPanelId : undefined}
-                onClick={() => setAddOpen((open) => !open)}
+                onClick={() => (addOpen ? setAddOpen(false) : openAdd("top"))}
                 className="shrink-0"
               >
                 {addOpen ? "Close" : "Add question"}
               </Button>
             </div>
 
-            {addOpen ? <AddQuestionPanel id={addPanelId} fields={fields} pending={pending} onPickType={pickType} onAddTemplate={addTemplate} /> : null}
+            {addOpen && addAt === "top" ? (
+              <div ref={addPanel} className="scroll-mt-20">
+                <AddQuestionPanel id={addPanelId} fields={fields} pending={pending} onPickType={pickType} onAddTemplate={addTemplate} />
+              </div>
+            ) : null}
 
             {fields.length === 0 && editing?.id !== NEW_ID && !addOpen ? (
               <EmptyState>No extra questions yet. Use “Add question” to ask about dietary needs, sizes, or anything else.</EmptyState>
@@ -490,8 +512,17 @@ export function EventRegistrationFormEditor(props: { organisationSlug: string; e
               </ol>
             ) : null}
 
+            {addOpen && addAt === "bottom" ? (
+              <div ref={addPanel} className="flex scroll-mt-20 flex-col gap-2">
+                <AddQuestionPanel id={addPanelId} fields={fields} pending={pending} onPickType={pickType} onAddTemplate={addTemplate} />
+                <Button variant="quiet" size="sm" startIcon={<X />} onClick={() => setAddOpen(false)} className="self-start">
+                  Cancel
+                </Button>
+              </div>
+            ) : null}
+
             {fields.length > 0 && !addOpen && editing?.id !== NEW_ID ? (
-              <Button variant="secondary" size="sm" startIcon={<Plus />} onClick={() => setAddOpen(true)} className="self-start" aria-expanded={false}>
+              <Button variant="secondary" size="sm" startIcon={<Plus />} onClick={() => openAdd("bottom")} className="self-start" aria-expanded={false}>
                 Add another question
               </Button>
             ) : null}
