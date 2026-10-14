@@ -32,9 +32,9 @@ import {
 } from "./shared";
 
 const TEMPLATES = [
-  { key: "classic", label: "Classic", hint: "Framed, balanced" },
-  { key: "bold", label: "Bold", hint: "Black side band" },
-  { key: "minimal", label: "Minimal", hint: "No frame, airy" },
+  { key: "classic", label: "Classic", hint: "Thin frame, hairline under the heading" },
+  { key: "bold", label: "Bold", hint: "Heading on a black band, name in capitals" },
+  { key: "minimal", label: "Minimal", hint: "No lines, just the name" },
 ] as const;
 
 type Sample = "short" | "long" | "attendee";
@@ -144,6 +144,7 @@ export function IdCardDesigner({
                     type="button"
                     role="radio"
                     aria-checked={active}
+                    title={template.hint}
                     onClick={() => update({ template: template.key, ...layoutForPaper(template.key, settings.widthMm, settings.heightMm) })}
                     className={cn("flex flex-col items-center gap-1.5 rounded-xl border bg-canvas p-2 text-center transition-colors hover:bg-subtle", active ? "border-ink shadow-[inset_0_0_0_0.5px_var(--color-ink)]" : "border-line")}
                   >
@@ -305,18 +306,42 @@ function ToggleField({ label, checked, onCheckedChange, children }: { label: str
   );
 }
 
+/** A tiny drawing of each template: the frame, band or bare page, a big name bar and the QR corner. */
 function TemplateThumb({ template }: { template: IdCardPrintSettings["template"] }) {
   return (
-    <span
-      aria-hidden
-      className="relative block h-[52px] w-[38px] bg-white p-[5px]"
-      style={{ border: template === "minimal" ? "1px solid #ddd" : template === "bold" ? "2px solid #111" : "1.5px solid #111" }}
-    >
-      {template === "bold" ? <span className="absolute inset-y-0 left-0 w-[5px] bg-[#111]" /> : null}
-      <span className={cn("block h-[3px] w-[80%] bg-[#111]", template === "bold" && "ml-[3px]")} />
-      <span className={cn("mt-[3px] block h-px w-[90%] bg-[#111]", template === "minimal" && "opacity-0")} />
-      <span className={cn("mt-[6px] block h-[4px] w-[70%] bg-[#111]", template === "bold" && "ml-[3px]")} />
-      <span className="absolute bottom-[5px] right-[5px] block size-[11px] border-[1.5px] border-dotted border-[#111]" />
+    <span aria-hidden className="relative block h-[52px] w-[38px] overflow-hidden bg-white outline outline-1 outline-[#ddd]">
+      {template === "classic" ? (
+        <>
+          <span className="absolute inset-[2px] rounded-[1.5px] border border-[#111]" />
+          <span className="absolute left-[6px] top-[6px] block h-[1.5px] w-[9px] bg-[#111]" />
+          <span className="absolute left-[6px] top-[9px] block h-[2.5px] w-[18px] bg-[#111]" />
+          <span className="absolute left-[6px] top-[13.5px] block h-px w-[20px] bg-[#111]" />
+          <span className="absolute left-[6px] top-[18px] block h-[5px] w-[24px] bg-[#111]" />
+          <span className="absolute left-[6px] top-[25px] block h-[1.5px] w-[15px] bg-[#111]" />
+        </>
+      ) : null}
+      {template === "bold" ? (
+        <>
+          <span className="absolute inset-x-[2px] top-[2px] block h-[12px] rounded-[1.5px] bg-[#111]" />
+          <span className="absolute left-[5px] top-[5px] block h-[1.5px] w-[8px] bg-white" />
+          <span className="absolute left-[5px] top-[8.5px] block h-[2.5px] w-[18px] bg-white" />
+          <span className="absolute left-[5px] top-[17px] block h-[5px] w-[26px] bg-[#111]" />
+          <span className="absolute left-[5px] top-[24px] block h-[1.5px] w-[15px] bg-[#111]" />
+        </>
+      ) : null}
+      {template === "minimal" ? (
+        <>
+          <span className="absolute left-[5px] top-[5px] block h-[1.5px] w-[11px] bg-[#111]" />
+          <span className="absolute left-[5px] top-[19px] block h-[5px] w-[26px] bg-[#111]" />
+          <span className="absolute left-[5px] top-[26px] block h-[1.5px] w-[14px] bg-[#111]" />
+        </>
+      ) : null}
+      <span
+        className={cn(
+          "absolute block border-[1.5px] border-dotted border-[#111]",
+          template === "minimal" ? "bottom-[5px] right-[5px] size-[9px]" : "bottom-[5px] right-[5px] size-[11px]",
+        )}
+      />
     </span>
   );
 }

@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   A6_LANDSCAPE,
   A6_PORTRAIT,
+  badgeLabelPt,
+  estimateHeaderHeightMm,
+  ID_CARD_LINE_HEIGHT,
+  ID_CARD_PAPER_PRESETS,
+  idCardTemplateDecor,
+  layoutForPaper,
+  nameBlockHeightMm,
   normalizeIdCardPrintSettings,
+  PT_TO_MM,
 } from "@/lib/idCardPrint";
 
 describe("ID card print settings", () => {
@@ -18,8 +26,8 @@ describe("ID card print settings", () => {
       printFieldKeys: [],
       printFieldLabels: {},
       elementPositions: {
-        header: { xMm: 9, yMm: 9 },
-        qr: { xMm: 73, yMm: 116 },
+        header: { xMm: 10, yMm: 10 },
+        qr: { xMm: 70, yMm: 113 },
       },
       gridSizeMm: 5,
       showGrid: true,
@@ -118,5 +126,115 @@ describe("ID card layout on real badge stock", () => {
     expect(importIdCardDesign("not json", "Open House")).toBeNull();
     // Old saved designs without the new options get the defaults.
     expect(normalizeIdCardPrintSettings({ template: "classic" }, "Open House")).toMatchObject({ nameAutoFit: true, showBadgeLabel: true, showFooter: true });
+  });
+});
+
+const TEMPLATES = ["classic", "bold", "minimal"] as const;
+type Box = { x: number; y: number; w: number; h: number };
+const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Every preset, both ways round. */
+const papers = ID_CARD_PAPER_PRESETS.flatMap((preset) => [
+  { id: preset.id, widthMm: preset.widthMm, heightMm: preset.heightMm },
+  { id: `${preset.id} turned`, widthMm: preset.heightMm, heightMm: preset.widthMm },
+]);
+
+/** Estimated boxes of the default layout: one line of heading and footer, one answer row, a two-line name. */
+function defaultBoxes(template: (typeof TEMPLATES)[number], widthMm: number, heightMm: number) {
+  const { elementPositions: at, elementSizes: size, elementTextSizes: pt } = layoutForPaper(template, widthMm, heightMm);
+  const line = (points: number) => points * PT_TO_MM * ID_CARD_LINE_HEIGHT.body;
+  const box = (element: keyof typeof at, h: number, w = size[element]): Box => ({ x: at[element].xMm, y: at[element].yMm, w, h });
+  return {
+    pt,
+    boxes: {
+      header: box("header", estimateHeaderHeightMm(template, pt.header, widthMm, heightMm)),
+      name: box("name", nameBlockHeightMm(pt.name)),
+      email: box("email", line(pt.email)),
+      details: box("details", 1.5 + line(pt.details)),
+      footer: box("footer", line(pt.footer)),
+      // The QR and logo blocks include their white padding.
+      qr: box("qr", size.qr + 2, size.qr + 2),
+      logo: box("logo", size.logo, size.logo),
+    },
+  };
+}
+
+describe("ID card templates on every badge stock", () => {
+  for (const paper of papers) {
+    for (const template of TEMPLATES) {
+      it(`${template} on ${paper.id} keeps every item on the card without collisions`, () => {
+        const { widthMm, heightMm } = paper;
+        const { boxes, pt } = defaultBoxes(template, widthMm, heightMm);
+        for (const [element, b] of Object.entries(boxes)) {
+          expect(b.x, `${element} left`).toBeGreaterThanOrEqual(0);
+          expect(b.y, `${element} top`).toBeGreaterThanOrEqual(0);
+          expect(b.x + b.w, `${element} right`).toBeLessThanOrEqual(widthMm);
+          expect(b.y + b.h, `${element} bottom`).toBeLessThanOrEqual(heightMm);
+        }
+        expect(overlaps(boxes.name, boxes.header), "name / heading").toBe(false);
+        expect(overlaps(boxes.name, boxes.qr), "name / QR").toBe(false);
+        expect(overlaps(boxes.name, boxes.logo), "name / logo").toBe(false);
+        expect(overlaps(boxes.name, boxes.email), "name / email").toBe(false);
+        expect(overlaps(boxes.header, boxes.logo), "heading / logo").toBe(false);
+        expect(overlaps(boxes.footer, boxes.qr), "footer / QR").toBe(false);
+        expect(overlaps(boxes.footer, boxes.logo), "footer / logo").toBe(false);
+        expect(overlaps(boxes.details, boxes.qr), "answers / QR").toBe(false);
+        // The name is read from a distance: it is always the largest type.
+        for (const element of ["header", "email", "details", "footer"] as const) {
+          expect(pt.name, `name larger than ${element}`).toBeGreaterThan(pt[element]);
+        }
+        expect(pt.name).toBeGreaterThan(badgeLabelPt(pt.header));
+      });
+    }
+  }
+
+  it("keeps the QR at least 20 mm on A6", () => {
+    for (const template of TEMPLATES) {
+      for (const [w, h] of [[105, 148], [148, 105]]) {
+        expect(layoutForPaper(template, w, h).elementSizes.qr, template).toBeGreaterThanOrEqual(20);
+      }
+    }
+  });
+
+  it("survives normalisation unchanged, so a fresh layout is exactly what prints", () => {
+    for (const paper of papers) {
+      for (const template of TEMPLATES) {
+        const layout = layoutForPaper(template, paper.widthMm, paper.heightMm);
+        const normalised = normalizeIdCardPrintSettings({ ...paper, template, ...layout }, "Open House");
+        expect(normalised.elementPositions, `${template} ${paper.id}`).toEqual(layout.elementPositions);
+        expect(normalised.elementSizes, `${template} ${paper.id}`).toEqual(layout.elementSizes);
+        expect(normalised.elementTextSizes, `${template} ${paper.id}`).toEqual(layout.elementTextSizes);
+      }
+    }
+  });
+
+  it("still accepts designs saved with the earlier templates", () => {
+    const saved = {
+      ...A6_PORTRAIT,
+      template: "bold",
+      elementPositions: {
+        header: { xMm: 16, yMm: 9 }, name: { xMm: 16, yMm: 45 }, email: { xMm: 16, yMm: 57 }, details: { xMm: 16, yMm: 68 },
+        qr: { xMm: 73, yMm: 8 }, footer: { xMm: 16, yMm: 139 }, logo: { xMm: 81, yMm: 120 },
+      },
+      elementSizes: { header: 65, name: 49, email: 49, details: 49, qr: 22, footer: 80, logo: 13 },
+      elementTextSizes: { header: 28, name: 17, email: 10, details: 8.5, footer: 8 },
+    };
+    const normalised = normalizeIdCardPrintSettings(saved, "Open House");
+    expect(normalised.template).toBe("bold");
+    expect(normalised.elementPositions).toEqual(saved.elementPositions);
+    expect(normalised.elementSizes).toMatchObject(saved.elementSizes);
+    expect(normalised.elementTextSizes).toMatchObject(saved.elementTextSizes);
+  });
+
+  it("draws the bold heading on a black band and the classic one under a hairline", () => {
+    const bold = idCardTemplateDecor("bold", 105, 148);
+    expect(bold.band).not.toBeNull();
+    expect(bold.frame).toBeNull();
+    expect(bold.nameUppercase).toBe(true);
+    const classic = idCardTemplateDecor("classic", 105, 148);
+    expect(classic.headerRule).not.toBeNull();
+    expect(classic.frame?.insetMm).toBeGreaterThanOrEqual(4);
+    const minimal = idCardTemplateDecor("minimal", 105, 148);
+    expect([minimal.band, minimal.frame, minimal.headerRule]).toEqual([null, null, null]);
   });
 });

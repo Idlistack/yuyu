@@ -1,17 +1,30 @@
 "use client";
 
-import { badgeLabelPt, fitTextSizePt, type IdCardLayoutElement, type IdCardPrintSettings } from "@/lib/idCardPrint";
+import {
+  badgeLabelPt,
+  fitTextSizePt,
+  ID_CARD_LINE_HEIGHT,
+  idCardTemplateDecor,
+  type IdCardLayoutElement,
+  type IdCardPrintSettings,
+} from "@/lib/idCardPrint";
 import { printableFields, safeLogoUrl, type IdCardAttendee, type PrintableField } from "./shared";
 
 function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-/** The name's point size after auto-fit (the bold template prints names in capitals, so it fits as bold). */
+/**
+ * The name's point size after auto-fit. The bold template prints names in
+ * capitals, which run about 15% wider than mixed case, so it fits them in a
+ * slightly narrower measure.
+ */
 export function nameSizePt(settings: IdCardPrintSettings, name: string) {
   const size = settings.elementTextSizes.name;
   if (!settings.nameAutoFit) return size;
-  return fitTextSizePt(settings.template === "bold" ? name.toUpperCase() : name, settings.elementSizes.name, size, settings.elementBold.name || settings.template === "bold");
+  const uppercase = idCardTemplateDecor(settings.template, settings.widthMm, settings.heightMm).nameUppercase;
+  const widthMm = uppercase ? settings.elementSizes.name / 1.15 : settings.elementSizes.name;
+  return fitTextSizePt(name, widthMm, size, settings.elementBold.name || uppercase);
 }
 
 function position(settings: IdCardPrintSettings, element: IdCardLayoutElement) {
@@ -62,6 +75,7 @@ export async function printCard(params: { settings: IdCardPrintSettings; attende
   const logo = logoUrl
     ? `<img id="badge-logo" class="logo" style="${position(settings, "logo")}width:${settings.elementSizes.logo}mm;height:${settings.elementSizes.logo}mm;" src="${escapeHtml(logoUrl)}" alt="">`
     : "";
+  const decor = idCardTemplateDecor(settings.template, settings.widthMm, settings.heightMm);
   const label = settings.showBadgeLabel && settings.badgeLabel.trim()
     ? `<p class="label" style="font-size:${badgeLabelPt(settings.elementTextSizes.header)}pt;font-weight:${settings.elementBold.header ? 800 : 400}">${escapeHtml(settings.badgeLabel)}</p>`
     : "";
@@ -71,38 +85,41 @@ export async function printCard(params: { settings: IdCardPrintSettings; attende
   const footer = settings.showFooter && settings.footerText.trim()
     ? `<p class="footer" style="${textStyle(settings, "footer")}">${escapeHtml(settings.footerText)}</p>`
     : "";
+  const header = label || heading
+    ? `<div class="top" style="${textStyle(settings, "header")}">${label}${heading}</div>`
+    : "";
+  const frame = decor.frame ? '<span class="frame" aria-hidden="true"></span>' : "";
+  // Same rules, frame and band as the on-screen card (BadgeCanvas).
+  const templateCss = [
+    decor.frame ? `.frame { position: absolute; inset: ${decor.frame.insetMm}mm; border: ${decor.frame.ruleMm}mm solid #000; border-radius: ${decor.frame.radiusMm}mm; }` : "",
+    decor.headerRule ? `.top { padding-bottom: ${decor.headerRule.gapMm}mm; border-bottom: ${decor.headerRule.ruleMm}mm solid #000; }` : "",
+    // The band is a solid black background, which browsers drop in economy mode: print it exactly.
+    decor.band ? `.top { padding: ${decor.band.padYMm}mm ${decor.band.padXMm}mm; background: #000; color: #fff; border-radius: ${decor.band.radiusMm}mm; } .top, .top * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }` : "",
+    decor.nameUppercase ? ".name { text-transform: uppercase; }" : "",
+  ].filter(Boolean).join("\n  ");
 
   printWindow.document.write(`<!doctype html>
 <html><head><meta charset="utf-8"><title>${name} badge</title><style>
   @page { size: ${settings.widthMm}mm ${settings.heightMm}mm; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: economy; print-color-adjust: economy; }
   html, body { width: ${settings.widthMm}mm; height: ${settings.heightMm}mm; margin: 0; }
-  body { color: #000; font-family: Inter, Arial, Helvetica, sans-serif; }
-  .card { width: 100%; height: 100%; position: relative; background: #fff; border: 0.6mm solid #000; overflow: hidden; }
-  .top { position: absolute; margin: 0; }
-  .logo { position: absolute; border-radius: 3mm; object-fit: contain; background: #fff; padding: 1mm; filter: grayscale(1) contrast(1.8); }
-  .label { margin: 0 0 2.5mm; font-size: 8pt; letter-spacing: 0.16em; }
-  .heading { margin: 0; line-height: 1.08; letter-spacing: -0.025em; overflow-wrap: anywhere; }
-  .name { position: absolute; margin: 0; line-height: 1.12; letter-spacing: -0.015em; overflow-wrap: anywhere; }
-  .email { position: absolute; margin: 0; overflow-wrap: anywhere; }
-  .details { position: absolute; margin: 0; padding: 3mm 0 0; border-top: 0.3mm solid #000; }
+  body { color: #000; font-family: Inter, Arial, Helvetica, sans-serif; line-height: ${ID_CARD_LINE_HEIGHT.body}; }
+  .card { width: 100%; height: 100%; position: relative; background: #fff; overflow: hidden; }
+  .top, .name, .email, .details, .footer { position: absolute; z-index: 1; margin: 0; }
+  .logo { position: absolute; z-index: 2; border-radius: 3mm; object-fit: contain; background: #fff; padding: 1mm; filter: grayscale(1) contrast(1.8); }
+  .label { margin: 0 0 ${decor.labelGapMm}mm; line-height: ${ID_CARD_LINE_HEIGHT.label}; letter-spacing: 0.16em; }
+  .heading { margin: 0; line-height: ${ID_CARD_LINE_HEIGHT.heading}; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .name { line-height: ${ID_CARD_LINE_HEIGHT.name}; letter-spacing: ${decor.nameTrackingEm}em; overflow-wrap: anywhere; }
+  .email, .footer { line-height: ${ID_CARD_LINE_HEIGHT.body}; overflow-wrap: anywhere; }
+  .details { line-height: ${ID_CARD_LINE_HEIGHT.body}; }
   .details div { display: flex; justify-content: space-between; gap: 4mm; margin-top: 1.5mm; }
   .details .label-free { justify-content: flex-start; }
-  .details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
-  .details.is-regular dd { font-weight: 400; } .details.is-bold dd { font-weight: 700; }
+  .details dt, .details dd { margin: 0; font-weight: inherit; }
+  .details dd { text-align: right; overflow-wrap: anywhere; }
   .qr-block { position: absolute; z-index: 2; background: #fff; padding: 1mm; }
   .qr { width: ${settings.elementSizes.qr}mm; height: ${settings.elementSizes.qr}mm; display: block; image-rendering: pixelated; }
-  .footer { position: absolute; margin: 0; }
-  .classic .top { padding-bottom: 2mm; border-bottom: 0.3mm solid #000; }
-  .card.bold { border: 1.2mm solid #000; }
-  .bold::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6mm; background: #000; }
-  .bold .top { padding-top: 4mm; border-top: 0.6mm solid #000; }
-  .bold .name { text-transform: uppercase; letter-spacing: -0.02em; }
-  .bold .details { border-top-width: 0.6mm; } .bold .footer { font-weight: 700; }
-  .card.minimal { border: 0; }
-  .minimal .top { padding-top: 4mm; border-top: 0.3mm solid #000; }
-  .minimal .details { border-top: 0; padding-top: 0; }
-</style></head><body><main class="card ${settings.template}"><div class="top" style="${textStyle(settings, "header")}">${label}${heading}</div>${logo}<p class="name" style="${textStyle(settings, "name", nameSizePt(settings, attendee.displayName))}">${name}</p>${email}${detailsHtml(printableFields(settings, attendee), settings)}<div class="qr-block" style="${position(settings, "qr")}"><img id="badge-qr" class="qr" src="${escapeHtml(qrDataUrl)}" alt="Check-in QR code"></div>${footer}</main></body></html>`);
+  ${templateCss}
+</style></head><body><main class="card ${settings.template}">${frame}${header}${logo}<p class="name" style="${textStyle(settings, "name", nameSizePt(settings, attendee.displayName))}">${name}</p>${email}${detailsHtml(printableFields(settings, attendee), settings)}<div class="qr-block" style="${position(settings, "qr")}"><img id="badge-qr" class="qr" src="${escapeHtml(qrDataUrl)}" alt="Check-in QR code"></div>${footer}</main></body></html>`);
   printWindow.document.close();
   printWindow.focus();
 

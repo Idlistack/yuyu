@@ -2,11 +2,16 @@
 
 import { useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import QRCode from "react-qr-code";
-import { badgeLabelPt, type IdCardLayoutElement, type IdCardPrintSettings } from "@/lib/idCardPrint";
+import {
+  badgeLabelPt,
+  ID_CARD_LINE_HEIGHT,
+  idCardTemplateDecor,
+  PT_TO_MM,
+  type IdCardLayoutElement,
+  type IdCardPrintSettings,
+} from "@/lib/idCardPrint";
 import { nameSizePt } from "./printCards";
 import { ELEMENT_LABELS, printableFields, SAFE_MARGIN_MM, type IdCardAttendee } from "./shared";
-
-const PT_TO_MM = 0.3528;
 
 export type CanvasInteraction = {
   selected: IdCardLayoutElement | null;
@@ -94,7 +99,9 @@ export function BadgeCanvas({
     };
   };
 
-  const template = settings.template;
+  const decor = idCardTemplateDecor(settings.template, settings.widthMm, settings.heightMm);
+  // Rules stay at least one screen pixel wide so they never vanish in the preview.
+  const rule = (mm: number) => `${Math.max(1, mm * pxPerMm)}px solid #000`;
   const cardStyle: CSSProperties = {
     width: px(settings.widthMm),
     height: px(settings.heightMm),
@@ -103,7 +110,9 @@ export function BadgeCanvas({
     color: "#000",
     overflow: "hidden",
     fontFamily: "Inter, Arial, Helvetica, sans-serif",
-    border: template === "minimal" ? "1px solid #e5e5e5" : `${Math.max(1, (template === "bold" ? 1.2 : 0.6) * pxPerMm)}px solid #000`,
+    lineHeight: ID_CARD_LINE_HEIGHT.body,
+    // The paper edge, on screen only: an outline takes no room, so items sit exactly where they print.
+    outline: "1px solid #e5e5e5",
     backgroundImage: interaction?.showGrid
       ? "linear-gradient(to right, rgb(37 99 235 / 9%) 1px, transparent 1px), linear-gradient(to bottom, rgb(37 99 235 / 9%) 1px, transparent 1px)"
       : undefined,
@@ -111,25 +120,27 @@ export function BadgeCanvas({
   };
 
   const showHeader = (settings.showBadgeLabel && settings.badgeLabel.trim()) || settings.heading.trim();
-  let headerRule: CSSProperties = {};
-  if (template === "classic") headerRule = { paddingBottom: px(2), borderBottom: `${Math.max(1, 0.3 * pxPerMm)}px solid #000` };
-  else if (template === "bold") headerRule = { paddingTop: px(4), borderTop: `${Math.max(1, 0.6 * pxPerMm)}px solid #000` };
-  else headerRule = { paddingTop: px(4), borderTop: `${Math.max(1, 0.3 * pxPerMm)}px solid #000` };
+  let headerDecor: CSSProperties = {};
+  if (decor.headerRule) headerDecor = { paddingBottom: px(decor.headerRule.gapMm), borderBottom: rule(decor.headerRule.ruleMm) };
+  // Bold: the heading block is its own solid black band, so its white text stays legible wherever it is dragged.
+  if (decor.band) headerDecor = { padding: `${px(decor.band.padYMm)} ${px(decor.band.padXMm)}`, background: "#000", color: "#fff", borderRadius: px(decor.band.radiusMm) };
 
   let content: ReactNode = (
     <>
-      {template === "bold" ? <span aria-hidden style={{ position: "absolute", inset: 0, right: "auto", width: px(6), background: "#000" }} /> : null}
+      {decor.frame ? (
+        <span aria-hidden style={{ position: "absolute", inset: px(decor.frame.insetMm), border: rule(decor.frame.ruleMm), borderRadius: px(decor.frame.radiusMm), pointerEvents: "none" }} />
+      ) : null}
       {interaction ? (
         <span aria-hidden style={{ position: "absolute", inset: px(SAFE_MARGIN_MM), border: "1px dashed rgb(37 99 235 / 35%)", pointerEvents: "none" }} />
       ) : null}
 
       {showHeader ? (
-        <div {...itemProps("header")} style={itemStyle("header", { width: px(settings.elementSizes.header), ...headerRule })}>
+        <div {...itemProps("header")} style={itemStyle("header", { width: px(settings.elementSizes.header), ...headerDecor })}>
           {settings.showBadgeLabel && settings.badgeLabel.trim() ? (
-            <p style={{ margin: `0 0 ${px(2.5)}`, fontSize: ptPx(badgeLabelPt(settings.elementTextSizes.header)), letterSpacing: "0.16em", fontWeight: bold.header ? 800 : 400 }}>{settings.badgeLabel}</p>
+            <p style={{ margin: `0 0 ${px(decor.labelGapMm)}`, fontSize: ptPx(badgeLabelPt(settings.elementTextSizes.header)), lineHeight: ID_CARD_LINE_HEIGHT.label, letterSpacing: "0.16em", fontWeight: bold.header ? 800 : 400 }}>{settings.badgeLabel}</p>
           ) : null}
           {settings.heading.trim() ? (
-            <p style={{ margin: 0, fontSize: ptPx(settings.elementTextSizes.header), fontWeight: bold.header ? 700 : 400, lineHeight: 1.08, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>{settings.heading}</p>
+            <p style={{ margin: 0, fontSize: ptPx(settings.elementTextSizes.header), fontWeight: bold.header ? 700 : 400, lineHeight: ID_CARD_LINE_HEIGHT.heading, letterSpacing: "-0.01em", overflowWrap: "anywhere" }}>{settings.heading}</p>
           ) : null}
         </div>
       ) : null}
@@ -141,7 +152,7 @@ export function BadgeCanvas({
           src={logoUrl}
           alt=""
           draggable={false}
-          style={itemStyle("logo", { width: px(settings.elementSizes.logo), height: px(settings.elementSizes.logo), objectFit: "contain", padding: px(1), borderRadius: px(3), filter: "grayscale(1) contrast(1.8)" })}
+          style={itemStyle("logo", { width: px(settings.elementSizes.logo), height: px(settings.elementSizes.logo), objectFit: "contain", padding: px(1), borderRadius: px(3), background: "#fff", filter: "grayscale(1) contrast(1.8)", zIndex: interaction?.selected === "logo" ? 3 : 2 })}
         />
       ) : null}
 
@@ -152,9 +163,9 @@ export function BadgeCanvas({
           width: px(settings.elementSizes.name),
           fontSize: ptPx(nameSizePt(settings, attendee.displayName)),
           fontWeight: bold.name ? 700 : 400,
-          lineHeight: 1.12,
-          letterSpacing: "-0.015em",
-          textTransform: template === "bold" ? "uppercase" : undefined,
+          lineHeight: ID_CARD_LINE_HEIGHT.name,
+          letterSpacing: `${decor.nameTrackingEm}em`,
+          textTransform: decor.nameUppercase ? "uppercase" : undefined,
           overflowWrap: "anywhere",
         })}
       >
@@ -162,7 +173,7 @@ export function BadgeCanvas({
       </p>
 
       {settings.showEmail && attendee.email ? (
-        <p {...itemProps("email")} style={itemStyle("email", { margin: 0, width: px(settings.elementSizes.email), fontSize: ptPx(settings.elementTextSizes.email), fontWeight: bold.email ? 700 : 400, overflowWrap: "anywhere" })}>
+        <p {...itemProps("email")} style={itemStyle("email", { margin: 0, width: px(settings.elementSizes.email), fontSize: ptPx(settings.elementTextSizes.email), lineHeight: ID_CARD_LINE_HEIGHT.body, fontWeight: bold.email ? 700 : 400, overflowWrap: "anywhere" })}>
           {attendee.email}
         </p>
       ) : null}
@@ -170,11 +181,7 @@ export function BadgeCanvas({
       {fields.length > 0 ? (
         <div
           {...itemProps("details")}
-          style={itemStyle("details", {
-            width: px(settings.elementSizes.details),
-            paddingTop: template === "minimal" ? 0 : px(3),
-            borderTop: template === "minimal" ? 0 : `${Math.max(1, (template === "bold" ? 0.6 : 0.3) * pxPerMm)}px solid #000`,
-          })}
+          style={itemStyle("details", { width: px(settings.elementSizes.details), lineHeight: ID_CARD_LINE_HEIGHT.body })}
         >
           {fields.map((detail) => {
             const label = settings.printFieldLabels[detail.key] ?? detail.label;
@@ -193,7 +200,7 @@ export function BadgeCanvas({
       </div>
 
       {settings.showFooter && settings.footerText.trim() ? (
-        <p {...itemProps("footer")} style={itemStyle("footer", { margin: 0, width: px(settings.elementSizes.footer), fontSize: ptPx(settings.elementTextSizes.footer), fontWeight: bold.footer || template === "bold" ? 700 : 400, overflowWrap: "anywhere" })}>
+        <p {...itemProps("footer")} style={itemStyle("footer", { margin: 0, width: px(settings.elementSizes.footer), fontSize: ptPx(settings.elementTextSizes.footer), lineHeight: ID_CARD_LINE_HEIGHT.body, fontWeight: bold.footer || settings.template === "bold" ? 700 : 400, overflowWrap: "anywhere" })}>
           {settings.footerText}
         </p>
       ) : null}
