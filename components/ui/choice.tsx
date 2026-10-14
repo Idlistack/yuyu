@@ -122,6 +122,23 @@ export function Radio({
   );
 }
 
+/** Compact option card (e.g. a 1–5 rating); use inside RadioGroup with a row/grid className. */
+export function RadioCard({ value, label, description, disabled, className }: { value: string; label: ReactNode; description?: ReactNode; disabled?: boolean; className?: string }) {
+  return (
+    <RadioGroupPrimitive.Item
+      value={value}
+      disabled={disabled}
+      className={cn(
+        "flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-canvas px-3 py-3 text-center transition-colors duration-[180ms] ease-yy hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-[1.5px] data-[state=checked]:border-accent data-[state=checked]:bg-accent-soft",
+        className,
+      )}
+    >
+      <span className="break-words text-[17px] font-bold leading-tight text-ink">{label}</span>
+      {description ? <span className="text-caption text-ink-muted">{description}</span> : null}
+    </RadioGroupPrimitive.Item>
+  );
+}
+
 /* ---------- Switch ---------- */
 
 export const Switch = forwardRef<ElementRef<typeof SwitchPrimitive.Root>, ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>>(function Switch(

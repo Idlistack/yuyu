@@ -153,7 +153,7 @@ test("a confirmed attendee can download a QR ticket", async ({ page }) => {
   expect([...pixels.subarray(0, 3)].every((channel) => channel >= 250)).toBe(true);
 
   const download = page.waitForEvent("download");
-  await page.getByRole("link", { name: "Download ticket" }).click();
+  await page.getByRole("link", { name: "Save ticket" }).click();
   expect((await download).suggestedFilename()).toBe("downloadable-ticket-test-ticket.jpg");
   expect(browserErrors, browserErrors.join("\n")).toEqual([]);
 });
@@ -162,7 +162,7 @@ test("a waitlisted attendee cannot obtain a scannable ticket", async ({ page, re
   await page.goto(`/ticket/${waitlistedToken}`);
   const main = page.locator("#main-content");
   await expect(main.getByText("available after this registration is confirmed")).toBeVisible();
-  await expect(main.getByRole("link", { name: "Download ticket" })).toHaveCount(0);
+  await expect(main.getByRole("link", { name: "Save ticket" })).toHaveCount(0);
   expect((await request.get(`/api/ticket/${waitlistedToken}/download`)).status()).toBe(404);
 });
 
@@ -170,9 +170,9 @@ test("a confirmed attendee can submit feedback and download a white JPEG certifi
   await page.goto(`/e2e-test-${suffix}/download-ticket-${suffix}/feedback`);
   const main = page.locator("#main-content");
   await expect(main.getByRole("heading", { name: "Tell us what you thought" })).toBeVisible();
-  await main.getByLabel("Registered email").fill(feedbackEmail);
+  await main.getByLabel("Email you registered with").fill(feedbackEmail);
   await main.getByLabel("Your feedback").fill("Very useful event.");
-  await main.getByRole("button", { name: "Submit feedback & get certificate" }).click();
+  await main.getByRole("button", { name: "Send feedback & get certificate" }).click();
   const certificate = main.getByRole("link", { name: "Download certificate (JPG)" });
   await expect(certificate).toBeVisible();
   const href = await certificate.getAttribute("href");
