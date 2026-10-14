@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { OrganiserChrome } from "@/components/chrome/OrganiserChrome";
 
@@ -13,5 +14,7 @@ export default async function OrganiserLayout({ children, params }: { children: 
     where: { slug: orgSlug },
     select: { name: true, slug: true, logoUrl: true },
   });
+  // Resolve before anything streams so unknown addresses get a real 404 status.
+  if (!organisation) notFound();
   return <OrganiserChrome organisation={organisation}>{children}</OrganiserChrome>;
 }
