@@ -1,30 +1,26 @@
 /**
- * Pure helpers for the event Analytics tab's dot charts. Free of Prisma and
- * React so they can be unit-tested. Every number comes from real counts.
+ * Pure helpers for the event Analytics tab. Free of Prisma and React so they
+ * can be unit-tested. Every number comes from real counts.
  */
-import { intervalCounts, toDotLevels } from "@/lib/dashboardHomeMetrics";
 import { formatDate } from "@/lib/format/datetime";
 
 const DAY_MS = 86_400_000;
 
-/** People per dot so the largest value fits in `maxDots` (1 when it already fits). */
-export function peoplePerDot(largest: number, maxDots: number): number {
-  if (largest <= maxDots) return 1;
-  return Math.ceil(largest / maxDots);
-}
-
-/** Dots for a count at `perDot` people per dot; any non-zero count shows at least one. */
-export function dotsFor(value: number, perDot: number): number {
-  if (value <= 0) return 0;
-  return Math.max(1, Math.round(value / perDot));
+/** Whole percentage of `part` in `whole`, or null when `whole` is empty. */
+export function percentOf(part: number, whole: number): number | null {
+  if (whole <= 0) return null;
+  return Math.round((part / whole) * 100);
 }
 
 export type FunnelStep = {
   key: "responded" | "going" | "checkedIn" | "feedback";
   label: string;
+  /** What the step means, in plain words. */
+  hint: string;
   /** Null when the step only happens after the event and nothing is recorded yet. */
   value: number | null;
-  dots: number;
+  /** Bar length as a share of everyone who responded, 0..1. */
+  share: number;
   /** Share of the previous step, as a whole percentage (never over 100). */
   percent: number | null;
   /** What the percentage is a share of, e.g. "responses", "going". */
@@ -33,86 +29,112 @@ export type FunnelStep = {
   note: string | null;
 };
 
+const HINTS: Record<FunnelStep["key"], string> = {
+  responded: "Everyone who registered or asked to join",
+  going: "Have a confirmed place",
+  checkedIn: "Were checked in at the event",
+  feedback: "Sent the feedback form",
+};
 /** How each step's share is described, relative to the step before it. */
 const SHARE_OF: Record<FunnelStep["key"], string> = { responded: "", going: "responses", checkedIn: "going", feedback: "checked in" };
 /** Feedback can come from anyone with the link, so it may outnumber check-ins. */
 const OVERFLOW_NOTE: Partial<Record<FunnelStep["key"], string>> = { feedback: "includes people who didn't check in", checkedIn: "includes door overrides" };
 
 /** "From sign-up to thank-you": responded → going → checked in → gave feedback. */
-export function funnelSteps(input: { responded: number; going: number; checkedIn: number; feedback: number; ended: boolean }, maxDots = 60): { steps: FunnelStep[]; perDot: number; total: number } {
-  const perDot = peoplePerDot(input.responded, maxDots);
+export function funnelSteps(input: { responded: number; going: number; checkedIn: number; feedback: number; ended: boolean }): FunnelStep[] {
   const later = (value: number) => (input.ended || value > 0 ? value : null);
-  const raw: Array<Omit<FunnelStep, "dots" | "percent" | "of" | "note">> = [
+  const raw: Array<Pick<FunnelStep, "key" | "label" | "value">> = [
     { key: "responded", label: "Responded", value: input.responded },
     { key: "going", label: "Going", value: input.going },
     { key: "checkedIn", label: "Checked in", value: later(input.checkedIn) },
     { key: "feedback", label: "Gave feedback", value: later(input.feedback) },
   ];
-  const steps = raw.map((step, index) => {
+  return raw.map((step, index) => {
     const previous = index > 0 ? raw[index - 1]! : null;
     const comparable = previous && step.value != null && previous.value != null && previous.value > 0;
     const overflow = Boolean(comparable && step.value! > previous!.value!);
     const percent = comparable && !overflow ? Math.round((step.value! / previous!.value!) * 100) : null;
     return {
       ...step,
-      dots: step.value == null ? 0 : dotsFor(step.value, perDot),
+      hint: HINTS[step.key],
+      share: step.value == null || input.responded <= 0 ? 0 : Math.min(1, step.value / input.responded),
       percent,
       of: percent != null ? SHARE_OF[step.key] : null,
       note: overflow ? OVERFLOW_NOTE[step.key] ?? null : null,
     };
   });
-  return { steps, perDot, total: Math.max(1, Math.ceil(input.responded / perDot)) };
+}
+
+/** One plain sentence that reads the funnel aloud, e.g. "Of 80 responses, 62 are going and 40 checked in." */
+export function funnelSentence(input: { responded: number; going: number; checkedIn: number | null; ended: boolean }): string {
+  const { responded, going, checkedIn, ended } = input;
+  const noun = responded === 1 ? "response" : "responses";
+  const goingPart = `${going} ${ended ? (going === 1 ? "had a place" : "had places") : going === 1 ? "is going" : "are going"}`;
+  if (checkedIn == null) return `Of ${responded} ${noun}, ${goingPart}.`;
+  const turnout = percentOf(checkedIn, going);
+  const tail = turnout != null && checkedIn <= going ? ` (${turnout}% turnout)` : "";
+  return `Of ${responded} ${noun}, ${goingPart} and ${checkedIn} checked in${tail}.`;
+}
+
+/** Places left and how full the event is, or null when there is no capacity limit. */
+export function capacityStatus(going: number, capacity: number | null): { left: number; percent: number; full: boolean } | null {
+  if (capacity == null || capacity <= 0) return null;
+  return { left: Math.max(0, capacity - going), percent: Math.min(100, Math.round((going / capacity) * 100)), full: going >= capacity };
+}
+
+export type TimelineColumn = { label: string; count: number };
+export type SignupTimeline = {
+  columns: TimelineColumn[];
+  /** Calendar days per column (1 = one column per day). */
+  intervalDays: number;
+  /** Calendar days from the first sign-up to the cut-off, inclusive. */
+  spanDays: number;
+  total: number;
+  largest: number;
+};
+
+/** Days since the epoch for the calendar date of `date` in `timeZone`. */
+function localDay(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const pick = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return Date.UTC(pick("year"), pick("month") - 1, pick("day")) / DAY_MS;
+}
+
+/** "14 Oct" for a local day index. */
+function dayLabel(day: number): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(day * DAY_MS));
 }
 
 /**
- * Splits `cells` dots between parts in proportion to their values (largest
- * remainder), one dot per person when everyone fits. Returns the part key
- * for each cell in order.
+ * Sign-ups per calendar day (in the event's timezone) from the first sign-up
+ * to `until` (now, or the event's end if earlier). Long spans group days so
+ * there are at most `maxColumns` columns; the last column always ends on
+ * `until`'s day. Null when nobody signed up.
  */
-export function waffleCells<K extends string>(parts: Array<{ key: K; value: number }>, cells = 100): K[] {
-  const total = parts.reduce((sum, part) => sum + Math.max(0, part.value), 0);
-  if (total === 0) return [];
-  if (total <= cells) return parts.flatMap((part) => Array.from({ length: Math.max(0, part.value) }, () => part.key));
-  const exact = parts.map((part) => (Math.max(0, part.value) / total) * cells);
-  const counts = exact.map((value, index) => {
-    const floor = Math.floor(value);
-    // Keep every non-empty status visible.
-    return parts[index]!.value > 0 ? Math.max(1, floor) : 0;
-  });
-  let remaining = cells - counts.reduce((sum, count) => sum + count, 0);
-  const order = exact.map((value, index) => ({ index, remainder: value - Math.floor(value) })).sort((a, b) => b.remainder - a.remainder);
-  for (let i = 0; remaining > 0 && order.length > 0; i = (i + 1) % order.length) {
-    const { index } = order[i]!;
-    if (parts[index]!.value > 0) {
-      counts[index]! += 1;
-      remaining -= 1;
-    }
-  }
-  while (remaining < 0) {
-    const largest = counts.indexOf(Math.max(...counts));
-    counts[largest]! -= 1;
-    remaining += 1;
-  }
-  return parts.flatMap((part, index) => Array.from({ length: counts[index]! }, () => part.key));
-}
-
-export type SignupTimeline = { counts: number[]; levels: number[]; start: Date; end: Date; intervalDays: number; total: number };
-
-/**
- * Sign-ups over time in at most `maxBuckets` columns, from the first sign-up
- * to `until` (now, or the event's end if earlier). Null when nobody signed up.
- */
-export function signupTimeline(dates: Date[], until: Date, maxBuckets = 14, maxDots = 6): SignupTimeline | null {
+export function signupTimeline(dates: Date[], until: Date, timeZone: string, maxColumns = 14): SignupTimeline | null {
   const inRange = dates.filter((date) => date.getTime() <= until.getTime());
   if (inRange.length === 0) return null;
-  const first = Math.min(...inRange.map((date) => date.getTime()));
-  const spanDays = Math.max(1, Math.ceil((until.getTime() - first + 1) / DAY_MS));
-  const intervalDays = Math.max(1, Math.ceil(spanDays / maxBuckets));
-  const buckets = Math.max(1, Math.ceil(spanDays / intervalDays));
-  // Align the last bucket to end at `until` so the newest sign-ups are in the last column.
-  const start = new Date(until.getTime() - buckets * intervalDays * DAY_MS + 1);
-  const counts = intervalCounts(inRange, start, intervalDays * DAY_MS, buckets);
-  return { counts, levels: toDotLevels(counts, maxDots), start, end: until, intervalDays, total: inRange.length };
+  const days = inRange.map((date) => localDay(date, timeZone));
+  const lastDay = localDay(until, timeZone);
+  const firstDay = Math.min(...days);
+  const spanDays = lastDay - firstDay + 1;
+  const intervalDays = Math.max(1, Math.ceil(spanDays / maxColumns));
+  const buckets = Math.ceil(spanDays / intervalDays);
+  const startDay = lastDay - buckets * intervalDays + 1;
+  const counts = Array.from({ length: buckets }, () => 0);
+  for (const day of days) counts[Math.floor((day - startDay) / intervalDays)]! += 1;
+  const columns = counts.map((count, index) => {
+    const from = startDay + index * intervalDays;
+    const to = from + intervalDays - 1;
+    return { count, label: intervalDays === 1 ? dayLabel(from) : `${dayLabel(from)} – ${dayLabel(to)}` };
+  });
+  return { columns, intervalDays, spanDays, total: inRange.length, largest: Math.max(...counts) };
+}
+
+/** Sign-ups in the seven days up to `until` (inclusive of today in the event's timezone). */
+export function signupsLastWeek(dates: Date[], until: Date, timeZone: string): number {
+  const lastDay = localDay(until, timeZone);
+  return dates.filter((date) => date.getTime() <= until.getTime() && localDay(date, timeZone) > lastDay - 7).length;
 }
 
 /** The calendar day (in the event's timezone) with the most sign-ups; earliest wins a tie. */

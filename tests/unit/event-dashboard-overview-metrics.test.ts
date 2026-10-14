@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eventPhase, readinessHeading, readinessItems, signupTrend, type ReadinessInput } from "@/components/event-dashboard/overview/readiness";
-import { busiestDay, dotsFor, funnelSteps, peoplePerDot, signupTimeline, waffleCells } from "@/components/event-dashboard/analytics/metrics";
+import { busiestDay, capacityStatus, funnelSentence, funnelSteps, percentOf, signupsLastWeek, signupTimeline } from "@/components/event-dashboard/analytics/metrics";
 
 const DAY = 86_400_000;
 const admin = { isAdmin: true, canEditDetails: true, canManageSchedule: true, canManageRegistrations: true };
@@ -115,62 +115,69 @@ describe("signupTrend", () => {
   });
 });
 
-describe("dot scaling", () => {
-  it("uses one dot per person until the row is full", () => {
-    expect(peoplePerDot(44, 60)).toBe(1);
-    expect(peoplePerDot(130, 60)).toBe(3);
-    expect(dotsFor(0, 3)).toBe(0);
-    expect(dotsFor(1, 3)).toBe(1);
-    expect(dotsFor(31, 3)).toBe(10);
+describe("percentOf", () => {
+  it("rounds to a whole percentage and is null for an empty whole", () => {
+    expect(percentOf(62, 80)).toBe(78);
+    expect(percentOf(3, 0)).toBeNull();
   });
 });
 
 describe("funnelSteps", () => {
   it("shows after-the-event steps as pending before the event ends", () => {
-    const { steps, perDot, total } = funnelSteps({ responded: 44, going: 34, checkedIn: 0, feedback: 0, ended: false });
-    expect(perDot).toBe(1);
-    expect(total).toBe(44);
+    const steps = funnelSteps({ responded: 44, going: 34, checkedIn: 0, feedback: 0, ended: false });
     expect(steps.map((step) => step.value)).toEqual([44, 34, null, null]);
-    expect(steps[1]).toMatchObject({ percent: 77, of: "responses", dots: 34 });
-    expect(steps[2]).toMatchObject({ percent: null, dots: 0 });
+    expect(steps[0]).toMatchObject({ share: 1, percent: null });
+    expect(steps[1]).toMatchObject({ percent: 77, of: "responses" });
+    expect(steps[1]!.share).toBeCloseTo(34 / 44);
+    expect(steps[2]).toMatchObject({ percent: null, share: 0 });
   });
 
   it("uses real zeros once the event has ended", () => {
-    const { steps } = funnelSteps({ responded: 10, going: 8, checkedIn: 6, feedback: 0, ended: true });
+    const steps = funnelSteps({ responded: 10, going: 8, checkedIn: 6, feedback: 0, ended: true });
     expect(steps.map((step) => step.value)).toEqual([10, 8, 6, 0]);
     expect(steps[2]).toMatchObject({ percent: 75, of: "going" });
     expect(steps[3]).toMatchObject({ percent: 0, of: "checked in" });
   });
 
   it("never shows a share over 100% — feedback can outnumber check-ins", () => {
-    const { steps } = funnelSteps({ responded: 54, going: 5, checkedIn: 2, feedback: 15, ended: true });
+    const steps = funnelSteps({ responded: 54, going: 5, checkedIn: 2, feedback: 15, ended: true });
     expect(steps[1]).toMatchObject({ value: 5, percent: 9, of: "responses", note: null });
     expect(steps[2]).toMatchObject({ value: 2, percent: 40, of: "going" });
     expect(steps[3]).toMatchObject({ value: 15, percent: null, of: null, note: "includes people who didn't check in" });
   });
 
+  it("caps bar length at everyone who responded", () => {
+    const steps = funnelSteps({ responded: 4, going: 4, checkedIn: 4, feedback: 9, ended: true });
+    expect(steps[3]!.share).toBe(1);
+  });
+
   it("shows check-ins already recorded during a live event", () => {
-    const { steps } = funnelSteps({ responded: 10, going: 8, checkedIn: 3, feedback: 0, ended: false });
+    const steps = funnelSteps({ responded: 10, going: 8, checkedIn: 3, feedback: 0, ended: false });
     expect(steps[2]?.value).toBe(3);
     expect(steps[3]?.value).toBeNull();
   });
 });
 
-describe("waffleCells", () => {
-  it("draws one dot per person when everyone fits", () => {
-    const cells = waffleCells([{ key: "a", value: 3 }, { key: "b", value: 2 }, { key: "c", value: 0 }]);
-    expect(cells).toEqual(["a", "a", "a", "b", "b"]);
+describe("funnelSentence", () => {
+  it("reads the live funnel in plain words", () => {
+    expect(funnelSentence({ responded: 80, going: 62, checkedIn: null, ended: false })).toBe("Of 80 responses, 62 are going.");
+    expect(funnelSentence({ responded: 1, going: 1, checkedIn: null, ended: false })).toBe("Of 1 response, 1 is going.");
   });
 
-  it("scales to the cell count and keeps small groups visible", () => {
-    const cells = waffleCells([{ key: "a", value: 990 }, { key: "b", value: 9 }, { key: "c", value: 1 }], 100);
-    expect(cells).toHaveLength(100);
-    expect(cells.filter((key) => key === "c")).toHaveLength(1);
-    expect(cells.filter((key) => key === "b").length).toBeGreaterThanOrEqual(1);
+  it("adds turnout once people check in", () => {
+    expect(funnelSentence({ responded: 80, going: 62, checkedIn: 40, ended: true })).toBe("Of 80 responses, 62 had places and 40 checked in (65% turnout).");
+    expect(funnelSentence({ responded: 5, going: 2, checkedIn: 3, ended: true })).toBe("Of 5 responses, 2 had places and 3 checked in.");
+  });
+});
+
+describe("capacityStatus", () => {
+  it("is null without a limit", () => {
+    expect(capacityStatus(10, null)).toBeNull();
   });
 
-  it("is empty when nobody responded", () => {
-    expect(waffleCells([{ key: "a", value: 0 }])).toEqual([]);
+  it("reports places left and fullness", () => {
+    expect(capacityStatus(30, 40)).toEqual({ left: 10, percent: 75, full: false });
+    expect(capacityStatus(45, 40)).toEqual({ left: 0, percent: 100, full: true });
   });
 });
 
@@ -178,29 +185,46 @@ describe("signupTimeline", () => {
   const until = new Date("2026-10-14T12:00:00Z");
 
   it("is null without sign-ups", () => {
-    expect(signupTimeline([], until)).toBeNull();
+    expect(signupTimeline([], until, "UTC")).toBeNull();
   });
 
-  it("uses daily columns for a short span and puts the newest in the last column", () => {
-    const timeline = signupTimeline([new Date(until.getTime() - 2 * DAY - 1000), until], until)!;
+  it("uses one column per calendar day and ends on today", () => {
+    const timeline = signupTimeline([new Date("2026-10-12T23:00:00Z"), new Date("2026-10-14T01:00:00Z"), until], until, "UTC")!;
     expect(timeline.intervalDays).toBe(1);
-    expect(timeline.counts).toHaveLength(3);
-    expect(timeline.counts[timeline.counts.length - 1]).toBe(1);
-    expect(timeline.total).toBe(2);
-    expect(timeline.counts.reduce((sum, count) => sum + count, 0)).toBe(2);
+    expect(timeline.columns).toEqual([
+      { label: "12 Oct", count: 1 },
+      { label: "13 Oct", count: 0 },
+      { label: "14 Oct", count: 2 },
+    ]);
+    expect(timeline).toMatchObject({ total: 3, largest: 2, spanDays: 3 });
+  });
+
+  it("buckets by the event's timezone", () => {
+    // 20:00 UTC on 13 Oct is 01:30 on 14 Oct in Kolkata.
+    const timeline = signupTimeline([new Date("2026-10-13T20:00:00Z")], until, "Asia/Kolkata")!;
+    expect(timeline.columns).toEqual([{ label: "14 Oct", count: 1 }]);
   });
 
   it("groups days to stay within the column limit", () => {
     const dates = Array.from({ length: 60 }, (_, index) => new Date(until.getTime() - index * DAY));
-    const timeline = signupTimeline(dates, until, 14)!;
-    expect(timeline.counts.length).toBeLessThanOrEqual(14);
+    const timeline = signupTimeline(dates, until, "UTC", 14)!;
+    expect(timeline.columns.length).toBeLessThanOrEqual(14);
     expect(timeline.intervalDays).toBe(5);
-    expect(timeline.counts.reduce((sum, count) => sum + count, 0)).toBe(60);
+    expect(timeline.columns.at(-1)!.label).toBe("10 Oct – 14 Oct");
+    expect(timeline.columns.reduce((sum, column) => sum + column.count, 0)).toBe(60);
   });
 
   it("ignores sign-ups after the cut-off", () => {
-    const timeline = signupTimeline([until, new Date(until.getTime() + DAY)], until)!;
+    const timeline = signupTimeline([until, new Date(until.getTime() + DAY)], until, "UTC")!;
     expect(timeline.total).toBe(1);
+  });
+});
+
+describe("signupsLastWeek", () => {
+  it("counts the seven calendar days up to today", () => {
+    const until = new Date("2026-10-14T12:00:00Z");
+    const dates = [new Date("2026-10-08T00:30:00Z"), new Date("2026-10-07T23:30:00Z"), until, new Date("2026-10-15T00:00:00Z")];
+    expect(signupsLastWeek(dates, until, "UTC")).toBe(2);
   });
 });
 
