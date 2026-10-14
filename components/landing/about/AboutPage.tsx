@@ -13,7 +13,7 @@ import { MakerSection } from "./MakerSection";
 const story = [
   "Community events run on goodwill. The person at the door is usually a volunteer, the budget is usually zero, and the guest list often lives in a spreadsheet.",
   "Yuyu brings the whole event into one place, from the event page and registrations to the door and the thank-you, and keeps it free for everyone involved. No tickets to sell, no fees to take, nothing to upsell.",
-  "And because communities deserve to own their own data, Yuyu runs on your server, not ours.",
+  "Yuyu can run on your own server, not anyone else's, so you protect your own data.",
 ];
 
 const principles: Array<{ title: string; body: string; face: DotFaceMood }> = [
