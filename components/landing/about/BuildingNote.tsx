@@ -51,6 +51,7 @@ const ENVELOPE_SIDES = "linear-gradient(115deg, #EBDDBF, #D7BF96)";
 const LINER = "radial-gradient(circle, rgba(240, 160, 40, 0.38) 1.4px, transparent 1.6px) 0 0 / 11px 11px, linear-gradient(180deg, #FFF6E6, #F6E3C4)";
 const ENVELOPE_RATIO = 1.62;
 const FLAP_CLIP = "polygon(0 0, 100% 0, 50% 100%)";
+const FLAP_BACK_CLIP = "polygon(0 100%, 100% 100%, 50% 0)";
 
 const LAYOUT_ID = "building-note-envelope";
 type Phase = "closed" | "opening" | "reading";
@@ -343,7 +344,9 @@ function OpeningScene({ onDone }: { onDone: () => void }) {
           <div className="absolute inset-0 rounded-t-[10px] [backface-visibility:hidden]" style={{ background: ENVELOPE_FLAP, clipPath: FLAP_CLIP, filter: "drop-shadow(0 2px 2px rgba(110, 80, 30, 0.25))" }}>
             <motion.div data-flap-shade className="absolute inset-0 bg-[#5a3d14]" style={{ opacity: 0, clipPath: FLAP_CLIP }} />
           </div>
-          <div className="absolute inset-0 rounded-t-[10px] [backface-visibility:hidden] [transform:rotateX(180deg)]" style={{ background: LINER, clipPath: FLAP_CLIP }} />
+          {/* The lining is on the flipped back face, so its triangle is drawn upside down here to
+              land the right way up once the flap is open: wide along the fold, point outward. */}
+          <div className="absolute inset-0 rounded-b-[10px] [backface-visibility:hidden] [transform:rotateX(180deg)]" style={{ background: LINER, clipPath: FLAP_BACK_CLIP }} />
         </motion.div>
       </motion.div>
 
