@@ -22,6 +22,7 @@ describe("event browser DTO", () => {
       capacity: null,
       status: EventStatus.PUBLISHED,
       privacyType: EventPrivacyType.PUBLIC,
+      listedPublicly: false,
       registrationClosesAt: null,
       registrationLeadMinutes: null,
       checkInStationPinHash: "bcrypt-secret",

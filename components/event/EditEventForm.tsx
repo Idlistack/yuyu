@@ -13,6 +13,7 @@ import { Field, Input, Dropdown } from "@/components/ui/field";
 import { updateEvent, uploadEventCoverImage } from "@/app/actions/event";
 import { uploadEventPageLogo } from "@/app/actions/media";
 import { CoverImagePicker } from "@/components/event/CoverImagePicker";
+import { PublishingSection } from "@/components/event/PublishingSection";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
 import { useToast } from "@/components/feedback/ToastProvider";
@@ -93,6 +94,7 @@ export function EditEventForm(props: {
   const [privacyType, setPrivacyType] = useState<EventPrivacyType>(
     event.privacyType,
   );
+  const [listedPublicly, setListedPublicly] = useState(event.listedPublicly);
   // Remounts the form (uncontrolled fields, pickers, rich text) when changes are discarded.
   const [formKey, setFormKey] = useState(0);
 
@@ -110,6 +112,7 @@ export function EditEventForm(props: {
     setEnd(zonedInputValue(event.endDateTime, event.timezone));
     setStatus(event.status);
     setPrivacyType(event.privacyType);
+    setListedPublicly(event.listedPublicly);
     setError(null);
     setDirty(false);
     setFormKey((key) => key + 1);
@@ -200,6 +203,7 @@ export function EditEventForm(props: {
         ),
         status,
         privacyType,
+        listedPublicly,
         pageTagline: String(fd.get("pageTagline") ?? ""),
         pageLogoUrl,
         pageAboutHtml: String(fd.get("pageAboutHtml") ?? ""),
@@ -349,49 +353,24 @@ export function EditEventForm(props: {
           </div>
         </FormCard>
 
-        <FormCard title="Publishing" description="Control visibility, audience, and RSVP limits.">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Status" helperText="Published events make the website public and open registration.">
-              <Dropdown name="status" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)}>
-                <option value={EventStatus.DRAFT}>Draft</option>
-                <option value={EventStatus.PUBLISHED}>Published</option>
-                <option value={EventStatus.HIDDEN}>Hidden</option>
-              </Dropdown>
-            </Field>
-            <Field label="Audience" helperText="Applies when the event is published.">
-              <Dropdown name="privacyType" value={privacyType} onChange={(e) => setPrivacyType(e.target.value as EventPrivacyType)}>
-                <option value={EventPrivacyType.PUBLIC}>Public (discoverable)</option>
-                <option value={EventPrivacyType.HIDDEN_LINK}>Hidden link (not listed)</option>
-                <option value={EventPrivacyType.APPROVAL_REQUIRED}>Approval required</option>
-                <option value={EventPrivacyType.INVITE_ONLY}>Invite only</option>
-              </Dropdown>
-            </Field>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Field label="Capacity" optional helperText="Leave empty for unlimited RSVPs.">
-              <Input name="capacity" type="number" min={1} defaultValue={event.capacity ?? ""} />
-            </Field>
-            <Field label="Registration closes at" helperText="Use this or a lead time, not both.">
-              <Input
-                name="registrationClosesAt"
-                type="datetime-local"
-                defaultValue={event.registrationClosesAt ? zonedDatetimeLocalValue(new Date(event.registrationClosesAt), event.timezone) : ""}
-              />
-            </Field>
-            <Field label="Close before start (minutes)" helperText="Relative cutoff; updates when the start time changes.">
-              <Input name="registrationLeadMinutes" type="number" min={0} defaultValue={event.registrationLeadMinutes ?? ""} />
-            </Field>
-          </div>
-          <SwitchRow
-            name="showRegistrationCount"
-            label="Show registration count on public page"
-            description="Displays confirmed and total responses to guests."
-            checked={showRegistrationCountPreview}
-            onCheckedChange={(checked) => {
-              setShowRegistrationCountPreview(checked);
-              setDirty(true);
+        <FormCard title="Publishing" description="Who can see this event, who can join, and how sign-ups work.">
+          <PublishingSection
+            status={status}
+            onStatusChange={setStatus}
+            privacyType={privacyType}
+            listedPublicly={listedPublicly}
+            onAudienceChange={(audience) => {
+              setPrivacyType(audience.privacyType);
+              setListedPublicly(audience.listedPublicly);
             }}
-            className="rounded-xl border border-line p-3.5"
+            initialCapacity={event.capacity ?? null}
+            initialClosesAt={event.registrationClosesAt ? zonedDatetimeLocalValue(new Date(event.registrationClosesAt), event.timezone) : ""}
+            initialLeadMinutes={event.registrationLeadMinutes ?? null}
+            showCount={showRegistrationCountPreview}
+            onShowCountChange={setShowRegistrationCountPreview}
+            start={start}
+            timeZone={timezone}
+            onDirty={() => setDirty(true)}
           />
         </FormCard>
 

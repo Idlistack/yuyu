@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: event.title,
     description,
     alternates: { canonical: `/${org!.slug}/${event.slug}` },
-    robots: shouldIndexPublicEvent(event.status, event.privacyType)
+    robots: shouldIndexPublicEvent(event.status, event.privacyType, event.listedPublicly)
       ? undefined
       : { index: false, follow: false },
     openGraph: {

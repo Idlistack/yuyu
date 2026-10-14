@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Callout, Chip, EmptyState, OrgLogo } from "@/components/ui/display";
 
 import type { Metadata } from "next";
+import { listedEventAudienceWhere } from "@/lib/eventVisibility";
 
 type Props = { params: Promise<{ orgSlug: string }> };
 const PUBLIC_COLLECTION_LIMIT = 250;
@@ -53,14 +54,15 @@ export default async function OrganisationPage({ params }: Props) {
   const windowStart = new Date(now.getTime() - PUBLIC_HISTORY_MS);
   const windowEnd = new Date(now.getTime() + PUBLIC_FUTURE_MS);
 
-  // Only fully public, published events belong on an organisation's public
-  // listing. Hidden-link, approval-required, and invite-only events remain
-  // reachable only through their intended access paths.
+  // Only published events with a listed audience belong on an organisation's
+  // public listing: fully public, or approval-required with listing turned on.
+  // Hidden-link, unlisted approval and invite-only events stay reachable only
+  // through their intended access paths.
   const eventQuery = prisma.event.findMany({
     where: {
       organisationId: org.id,
       status: EventStatus.PUBLISHED,
-      privacyType: EventPrivacyType.PUBLIC,
+      AND: listedEventAudienceWhere,
       page: { is: { isPublished: true } },
       endDateTime: { gte: windowStart },
       startDateTime: { lte: windowEnd },

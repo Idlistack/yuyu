@@ -294,6 +294,11 @@ export const updateEventSchema = z
     }, z.number().int().positive().optional()),
     status: z.nativeEnum(EventStatus),
     privacyType: z.nativeEnum(EventPrivacyType),
+    /** Only meaningful with APPROVAL_REQUIRED: list the event publicly while approving each sign-up. */
+    listedPublicly: z
+      .preprocess((v) => v === true || v === "true" || v === "on", z.boolean())
+      .optional()
+      .default(false),
     pageTagline: z.string().trim().max(240).optional(),
     pageLogoUrl: eventPageLogoUrlSchema,
     pageAboutHtml: z.string().max(50_000).optional(),

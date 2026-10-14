@@ -284,6 +284,8 @@ model Event {
   capacity              Int?
   status                EventStatus      @default(DRAFT)
   privacyType           EventPrivacyType @default(PUBLIC)
+  /// APPROVAL_REQUIRED only: also list it on the organisation page, Discover and search.
+  listedPublicly        Boolean          @default(false)
   registrationClosesAt  DateTime?
   registrationLeadMinutes Int?
   /// bcrypt hash for the public venue check-in station PIN. Incrementing the

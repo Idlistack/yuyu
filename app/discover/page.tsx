@@ -15,6 +15,7 @@ import { INK_ACCENT } from "@/lib/theme/accent";
 import { describeRecurrence, recurrenceChip } from "@/lib/format/recurrence";
 import { parseDiscoveryDateRange } from "@/lib/dateFilter";
 import { paginationWindow } from "@/lib/pagination";
+import { listedEventAudienceWhere } from "@/lib/eventVisibility";
 
 export const metadata: Metadata = {
   title: "Discover Events",
@@ -75,7 +76,7 @@ export default async function DiscoverPage({
 
   const eventWhere = {
     status: EventStatus.PUBLISHED,
-    privacyType: EventPrivacyType.PUBLIC,
+    AND: listedEventAudienceWhere,
     page: { is: { isPublished: true } },
     endDateTime: { gte: new Date() },
     ...(q
@@ -130,7 +131,7 @@ export default async function DiscoverPage({
   const searchPattern = `%${q}%`;
   const eventFilters = [
     Prisma.sql`e."status" = ${EventStatus.PUBLISHED}::"EventStatus"`,
-    Prisma.sql`e."privacyType" = ${EventPrivacyType.PUBLIC}::"EventPrivacyType"`,
+    Prisma.sql`(e."privacyType" = ${EventPrivacyType.PUBLIC}::"EventPrivacyType" OR (e."privacyType" = ${EventPrivacyType.APPROVAL_REQUIRED}::"EventPrivacyType" AND e."listedPublicly" = TRUE))`,
     Prisma.sql`EXISTS (SELECT 1 FROM "EventPage" ep WHERE ep."eventId" = e."id" AND ep."isPublished" = TRUE)`,
     Prisma.sql`e."endDateTime" >= NOW()`,
     ...(q ? [Prisma.sql`(e."title" ILIKE ${searchPattern} OR e."description" ILIKE ${searchPattern})`] : []),
