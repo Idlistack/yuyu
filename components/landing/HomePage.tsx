@@ -124,7 +124,7 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
                     <span className="font-display text-[22px] font-extrabold leading-[1.35] text-ink">6</span>
                   </span>
                   <span className="flex min-w-0 flex-col">
-                    <span className="text-label text-ink">Saturday, 6 June · 9:30 AM</span>
+                    <span className="text-label text-ink">Sunday, 6 June · 9:30 AM</span>
                     <span className="text-body-ui text-ink-muted">Kochi, Kerala</span>
                   </span>
                 </div>
