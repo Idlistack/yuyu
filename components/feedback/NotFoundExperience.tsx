@@ -123,10 +123,9 @@ export function NotFoundExperience() {
   const shortPath = pathname.length > 38 ? `${pathname.slice(0, 36)}…` : pathname;
 
   const content = (
-    <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[1160px] flex-col items-center gap-12 px-4 pb-28 pt-14 sm:px-6 sm:pt-20 lg:pb-[140px] lg:pt-[120px] xl:px-0">
+    <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[1160px] flex-col items-center gap-12 px-4 pb-28 pt-8 sm:px-6 sm:pt-10 lg:pb-[140px] lg:pt-14 xl:px-0">
       <NotFoundPet />
       <div className="flex flex-col items-center gap-5 text-center">
-        <p className="text-overline text-ink-muted">Error 404 · Lost &amp; found</p>
         <h1 className="max-w-[760px] text-display-m text-ink">This page isn’t on the programme</h1>
         <p className="max-w-[560px] text-body-l text-ink-secondary">
           We scanned the ticket for <span className="font-mono text-[0.92em] text-ink">{shortPath}</span> and couldn’t find a match. It may have moved, expired, or never existed.
