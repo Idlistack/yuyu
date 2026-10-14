@@ -257,27 +257,41 @@
 }
 
 /* Colour-mode switch (components/providers.tsx). The new mode is revealed as a
-   circle from the toggle; the old snapshot stays still underneath. */
+   soft-edged circle growing from the toggle; the old snapshot stays still. */
+@property --yy-reveal {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 .yy-theme-reveal::view-transition-old(root),
-.yy-theme-reveal::view-transition-new(root) {
+.yy-theme-reveal::view-transition-new(root),
+.yy-theme-reveal-soft::view-transition-old(root),
+.yy-theme-reveal-soft::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
 }
 
-.yy-theme-reveal::view-transition-new(root) {
+.yy-theme-reveal::view-transition-new(root),
+.yy-theme-reveal-soft::view-transition-new(root) {
   z-index: 1;
 }
 
-/* Fallback when View Transitions aren't available: a brief colour cross-fade. */
+.yy-theme-reveal-soft::view-transition-new(root) {
+  -webkit-mask-image: radial-gradient(circle at var(--yy-reveal-x) var(--yy-reveal-y), #000 calc(var(--yy-reveal) - 160px), transparent var(--yy-reveal));
+  mask-image: radial-gradient(circle at var(--yy-reveal-x) var(--yy-reveal-y), #000 calc(var(--yy-reveal) - 160px), transparent var(--yy-reveal));
+}
+
+/* Fallback when View Transitions aren't available: a gentle colour cross-fade. */
 .yy-theme-fade,
 .yy-theme-fade *,
 .yy-theme-fade *::before,
 .yy-theme-fade *::after {
   transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
-  transition-duration: 280ms !important;
-  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  transition-duration: 420ms !important;
+  transition-timing-function: cubic-bezier(0.45, 0, 0.2, 1) !important;
 }
 
 .yy-mode-icon {
-  transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease-out;
+  transition: transform 520ms cubic-bezier(0.34, 1.4, 0.64, 1), opacity 320ms ease-out;
 }

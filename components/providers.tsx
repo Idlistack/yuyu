@@ -62,33 +62,56 @@ function prefersReducedMotion() {
  * toggle where View Transitions are supported, otherwise a short colour
  * cross-fade. Reduced-motion users get an instant switch.
  */
+function supportsFeatheredReveal() {
+  // The feathered edge animates a registered custom property (see globals.css).
+  return typeof CSS !== "undefined" && typeof CSS.registerProperty === "function" && CSS.supports("mask-image", "radial-gradient(circle, #000, transparent)");
+}
+
+/**
+ * Switch modes in a single frame, then animate: a soft-edged circle grows from
+ * the toggle where View Transitions are supported, otherwise a gentle colour
+ * cross-fade. Reduced-motion users get an instant switch.
+ */
 function transitionColorMode(commit: () => void, origin?: ColorModeOrigin) {
   const root = document.documentElement;
   if (prefersReducedMotion()) {
     commit();
     return;
   }
-  type ViewTransitionDocument = Document & { startViewTransition?: (update: () => void) => { ready: Promise<void> } };
+  type ViewTransitionDocument = Document & { startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> } };
   const doc = document as ViewTransitionDocument;
   if (typeof doc.startViewTransition !== "function") {
     root.classList.add("yy-theme-fade");
     commit();
-    window.setTimeout(() => root.classList.remove("yy-theme-fade"), 320);
+    window.setTimeout(() => root.classList.remove("yy-theme-fade"), 460);
     return;
   }
   const x = origin?.x ?? window.innerWidth - 40;
   const y = origin?.y ?? 32;
-  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
-  root.classList.add("yy-theme-reveal");
+  const feather = 160;
+  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y)) + feather;
+  const feathered = supportsFeatheredReveal();
+  root.style.setProperty("--yy-reveal-x", `${x}px`);
+  root.style.setProperty("--yy-reveal-y", `${y}px`);
+  root.classList.add(feathered ? "yy-theme-reveal-soft" : "yy-theme-reveal");
+  const cleanUp = () => {
+    root.classList.remove("yy-theme-reveal", "yy-theme-reveal-soft");
+    root.style.removeProperty("--yy-reveal-x");
+    root.style.removeProperty("--yy-reveal-y");
+  };
   const transition = doc.startViewTransition(commit);
+  const timing = { duration: 720, easing: "cubic-bezier(0.45, 0, 0.2, 1)", pseudoElement: "::view-transition-new(root)" };
   transition.ready
     .then(() => {
       root.animate(
-        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-        { duration: 480, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", pseudoElement: "::view-transition-new(root)" },
-      ).finished.finally(() => root.classList.remove("yy-theme-reveal"));
+        feathered
+          ? { "--yy-reveal": ["0px", `${radius}px`] }
+          : { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        timing,
+      );
     })
-    .catch(() => root.classList.remove("yy-theme-reveal"));
+    .catch(cleanUp);
+  transition.finished.finally(cleanUp);
 }
 
 export function useAppColorMode() {
