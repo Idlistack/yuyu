@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TICKET_MAX_STREAM_FAILURES,
   TICKET_POLL_INTERVAL_MS,
+  TICKET_SAFETY_CHECK_MS,
   ticketReconnectDelay,
   watchTicketCheckIn,
   type TicketCheckInWatcherEnv,
@@ -121,6 +122,29 @@ describe("watchTicketCheckIn", () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(onCheckedIn).toHaveBeenCalledTimes(1);
     expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it("catches a check-in the stream missed with the periodic safety check", async () => {
+    const { env, fetchMock } = makeEnv();
+    const onCheckedIn = vi.fn();
+    watchTicketCheckIn(TOKEN, onCheckedIn, env);
+    const source = FakeEventSource.latest();
+    source.open();
+    source.emit("state", { checkedIn: false, checkedInAt: null });
+
+    // The stream stays open but its checked-in message never arrives.
+    await vi.advanceTimersByTimeAsync(TICKET_SAFETY_CHECK_MS);
+    expect(fetchMock).toHaveBeenCalledWith(`/api/ticket/${TOKEN}/status`, expect.anything());
+    expect(onCheckedIn).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValueOnce(statusResponse({ checkedIn: true, checkedInAt: "2026-10-15T09:30:00.000Z" }));
+    await vi.advanceTimersByTimeAsync(TICKET_SAFETY_CHECK_MS);
+    expect(onCheckedIn).toHaveBeenCalledWith("2026-10-15T09:30:00.000Z");
+    expect(source.closed).toBe(true);
+
+    const calls = fetchMock.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(TICKET_SAFETY_CHECK_MS * 4);
+    expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
   it("treats a checked-in state on connect as the check-in", () => {

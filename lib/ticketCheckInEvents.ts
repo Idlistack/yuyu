@@ -27,7 +27,13 @@ export type TicketCheckInUnsubscribe = (() => void) & {
 const CHANNEL_PREFIX = "yuyu:ticket-checkin:";
 const RSVP_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
-const emitter = new EventEmitter();
+// Shared through globalThis: Next.js can load this module more than once in
+// one process (e.g. separate server-action and route-handler bundles), and
+// without Redis a check-in published in one copy must reach streams held by
+// another.
+const EMITTER_KEY = Symbol.for("yuyu.ticketCheckInEmitter");
+const globalScope = globalThis as typeof globalThis & { [EMITTER_KEY]?: EventEmitter };
+const emitter: EventEmitter = globalScope[EMITTER_KEY] ?? (globalScope[EMITTER_KEY] = new EventEmitter());
 // One listener per open ticket stream; the process-wide stream cap bounds it.
 emitter.setMaxListeners(0);
 

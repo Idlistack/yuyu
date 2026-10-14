@@ -32,6 +32,12 @@ export type TicketCheckInWatcherEnv = {
 
 /** Poll interval when EventSource is unavailable or keeps failing. */
 export const TICKET_POLL_INTERVAL_MS = 4_000;
+/**
+ * While the live stream is open, also confirm the status this often. A safety
+ * net for a missed message (proxy buffering, a replica without Redis, a stale
+ * deployment): the ticket still tears within this window.
+ */
+export const TICKET_SAFETY_CHECK_MS = 15_000;
 /** First reconnect delay; doubles per consecutive failure up to the cap. */
 export const TICKET_RECONNECT_BASE_MS = 1_000;
 export const TICKET_RECONNECT_MAX_MS = 30_000;
@@ -86,12 +92,30 @@ export function watchTicketCheckIn(
   let failures = 0;
   let mode: "stream" | "poll" = env.EventSource ? "stream" : "poll";
   let fetching = false;
+  let safetyTimer: unknown = null;
 
   const visible = () => !doc || doc.visibilityState !== "hidden";
 
   const clearTimer = () => {
     if (timer !== null) env.clearTimeout(timer);
     timer = null;
+  };
+
+  const clearSafety = () => {
+    if (safetyTimer !== null) env.clearTimeout(safetyTimer);
+    safetyTimer = null;
+  };
+
+  // Periodic status check alongside the stream (polling mode already checks often).
+  const armSafety = () => {
+    clearSafety();
+    if (stopped) return;
+    safetyTimer = env.setTimeout(() => {
+      safetyTimer = null;
+      if (stopped) return;
+      if (visible() && mode === "stream") void checkStatus();
+      armSafety();
+    }, TICKET_SAFETY_CHECK_MS);
   };
 
   const closeSource = () => {
@@ -105,6 +129,7 @@ export function watchTicketCheckIn(
   const stop = () => {
     stopped = true;
     clearTimer();
+    clearSafety();
     closeSource();
     doc?.removeEventListener("visibilitychange", onVisibilityChange);
   };
@@ -209,11 +234,13 @@ export function watchTicketCheckIn(
     if (!visible()) {
       // Pause while hidden; nothing runs in a background tab.
       clearTimer();
+      clearSafety();
       closeSource();
       return;
     }
     // Back in view: refresh immediately, then resume the live connection.
     clearTimer();
+    armSafety();
     void checkStatus().then(() => {
       if (stopped || !visible()) return;
       if (mode === "poll") schedule(TICKET_POLL_INTERVAL_MS, poll);
@@ -223,6 +250,7 @@ export function watchTicketCheckIn(
 
   doc?.addEventListener("visibilitychange", onVisibilityChange);
   connect();
+  armSafety();
 
   return stop;
 }
