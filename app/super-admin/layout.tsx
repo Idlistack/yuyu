@@ -1,6 +1,7 @@
-import Stack from "@mui/material/Stack";
-import Box from "@mui/material/Box";
 import { requireSuperAdminMfa } from "@/lib/permissions";
+import { getAppShellData } from "@/lib/appShell";
+import { AppShell } from "@/components/chrome/AppShell";
+import { PageHeader } from "@/components/ui/display";
 import { SuperAdminTabs } from "@/components/super-admin/SuperAdminTabs";
 import type { Metadata } from "next";
 
@@ -13,14 +14,16 @@ export const dynamic = "force-dynamic";
 export default async function SuperAdminLayout(props: {
   children: React.ReactNode;
 }) {
-  await requireSuperAdminMfa();
+  const session = await requireSuperAdminMfa();
+  const { user, organisations } = await getAppShellData(session.user.id);
 
   return (
-    <Stack spacing={2} sx={{ py: 2 }}>
-      <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+    <AppShell user={user} organisations={organisations}>
+      <div className="flex flex-col gap-6">
+        <PageHeader title="Super admin" description="Instance-wide settings, monitoring, and operations." />
         <SuperAdminTabs />
-      </Box>
-      {props.children}
-    </Stack>
+        <div>{props.children}</div>
+      </div>
+    </AppShell>
   );
 }

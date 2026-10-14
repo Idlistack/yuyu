@@ -7,10 +7,7 @@ import "@fontsource/jetbrains-mono/500.css";
 import "./globals.css";
 import "./styles/legacy.css";
 import { Providers } from "@/components/providers";
-import { AppBarNav } from "@/components/nav/AppBarNav";
-import { AppFooter } from "@/components/nav/AppFooter";
-import Container from "@mui/material/Container";
-import Box from "@mui/material/Box";
+import { ChromeSwitch } from "@/components/chrome/ChromeSwitch";
 import Script from "next/script";
 import { connection } from "next/server";
 import { cookies, headers } from "next/headers";
@@ -39,20 +36,10 @@ export default async function RootLayout({
 
   return (
     <html lang="en" data-color-mode={initialColorMode ?? undefined} suppressHydrationWarning>
-      <body style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
+      <body className="flex min-h-dvh flex-col">
         <AppRouterCacheProvider options={{ key: "mui" }}>
           <Providers initialColorMode={initialColorMode}>
-            <a className="skip-link" href="#main-content">Skip to main content</a>
-            <AppBarNav />
-            <Box component="main" id="main-content" tabIndex={-1} sx={{ flex: 1, py: 3 }}>
-              <Container
-                maxWidth={false}
-                sx={{ width: "100%", maxWidth: 1440, mx: "auto", px: { xs: 2, sm: 3, lg: 4 } }}
-              >
-                {children}
-              </Container>
-            </Box>
-            <AppFooter />
+            <ChromeSwitch>{children}</ChromeSwitch>
             <Script id="plausible-init" nonce={nonce} strategy="afterInteractive">
               {`window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
 plausible.init({transformRequest:function(event){try{var url=new URL(event.u);if(/^\\/ticket\\/[^/]+$/.test(url.pathname)||/^\\/join\\/(?:org|event-collaborator)\\/[^/]+$/.test(url.pathname)||url.pathname==="/reset-password"||url.pathname==="/verify-email")return null;event.u=url.origin+url.pathname;return event}catch{return null}}});`}

@@ -1,9 +1,7 @@
 "use client";
 
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
 import { usePathname } from "next/navigation";
-import Link from "next/link";
+import { NavTabs } from "@/components/ui/tabs";
 
 const tabs = [
   { label: "Overview", href: "/super-admin" },
@@ -19,30 +17,16 @@ const tabs = [
   { label: "Storage", href: "/super-admin/storage" },
 ] as const;
 
-function getActiveTab(pathname: string): string | false {
+function getActiveTab(pathname: string): string | null {
   if (pathname === "/super-admin") return "/super-admin";
-  const match = tabs
+  return tabs
     .map((t) => t.href)
     .filter((href) => href !== "/super-admin")
-    .find((href) => pathname === href || pathname.startsWith(`${href}/`));
-  return match ?? false;
+    .find((href) => pathname === href || pathname.startsWith(`${href}/`)) ?? null;
 }
 
 export function SuperAdminTabs() {
-  const pathname = usePathname();
-  const value = getActiveTab(pathname);
-
-  return (
-    <Tabs value={value} variant="scrollable" scrollButtons="auto">
-      {tabs.map((t) => (
-        <Tab
-          key={t.href}
-          label={t.label}
-          component={Link}
-          href={t.href}
-          value={t.href}
-        />
-      ))}
-    </Tabs>
-  );
+  const pathname = usePathname() ?? "";
+  const active = getActiveTab(pathname);
+  return <NavTabs label="Super admin sections" items={tabs.map((tab) => ({ href: tab.href, label: tab.label, active: tab.href === active }))} />;
 }
