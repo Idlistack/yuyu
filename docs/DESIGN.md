@@ -273,6 +273,8 @@ Rules: destructive actions are never `primary`; destructive confirmations end wi
 
 ### 4.4 Tabs & navigation
 
+- Tab rows that overflow scroll sideways and show a faded arrow on each side with hidden tabs; clicking it scrolls the row (`components/ui/tabs.tsx`).
+
 - **Underline tabs** (page sub-sections): 2px bottom border on active (ink in app, accent on event page), muted text inactive, horizontal scroll on overflow. Max 8 tabs.
 - **Section nav** on event page: About · Schedule · Speakers · Venue · FAQ, anchors.
 - **Breadcrumb:** `Event / Programme`, 15px, parent links 600 weight.
@@ -337,11 +339,11 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
 
 ### 4.13 App shell (dashboard)
 
-- **Sidebar** 240px, `--yy-bg-subtle`, right border. Top: Yuyu logo. Two modes:
+- **Sidebar** 224px, `--yy-bg-subtle`, right border; collapses to a 68px icon rail with tooltips (remembered in the `yy-sidebar` cookie so the server renders the same width). Top: Yuyu lockup (dot mark when collapsed) and the collapse button. The organisation switcher is a card with a dotted strip; the active item is a raised canvas pill. Two modes:
   - *Outside an org:* Home · ORGANISATIONS list (logo + name) · + New organisation.
   - *Inside an org:* org switcher (logo, name, role, ⇅) · Events · Series · Members · Settings (sub: General, API access).
-  - Bottom: user (initials) → Account, Sign out; "View public page ↗".
-  - Active item: `--yy-bg-emphasis` fill, 600 weight, `aria-current="page"`.
+  - Bottom: "View public page ↗" and an account card that opens a menu: Account settings, Light/Dark mode, Sign out.
+  - Active item: canvas fill with a border, 600 weight, `aria-current="page"`.
   - Below `md`: sidebar collapses to a top bar + menu sheet.
 - **Event/series header:** ← All events · date block + title (h1 32px) + status chip + "Public · Tomorrow, 9:30 AM" · actions (View page ↗ secondary, Open check-in primary) · underline tabs: Overview, Guests, Page & programme, Registration form, Invites, Check-in, Feedback, Settings.
 - Page title pattern: optional greeting/kicker (muted) + h1 + one-line description.
