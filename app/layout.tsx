@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import "@fontsource-variable/bricolage-grotesque/opsz.css";
 import "@fontsource-variable/figtree/wght.css";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "./globals.css";
-import "./styles/legacy.css";
 import { Providers } from "@/components/providers";
 import { ChromeSwitch } from "@/components/chrome/ChromeSwitch";
 import Script from "next/script";
@@ -37,7 +35,6 @@ export default async function RootLayout({
   return (
     <html lang="en" data-color-mode={initialColorMode ?? undefined} suppressHydrationWarning>
       <body className="flex min-h-dvh flex-col">
-        <AppRouterCacheProvider options={{ key: "mui" }}>
           <Providers initialColorMode={initialColorMode}>
             <ChromeSwitch>{children}</ChromeSwitch>
             <Script id="plausible-init" nonce={nonce} strategy="afterInteractive">
@@ -51,7 +48,6 @@ plausible.init({transformRequest:function(event){try{var url=new URL(event.u);if
               strategy="afterInteractive"
             />
           </Providers>
-        </AppRouterCacheProvider>
       </body>
     </html>
   );

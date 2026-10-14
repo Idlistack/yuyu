@@ -55,7 +55,8 @@ field, constraint, or cascade from a component alone.
 ## Working conventions
 
 - Inspect nearby code and existing tests before introducing a pattern. Keep
-  changes small, typed, and consistent with the established MUI/Emotion UI.
+  changes small, typed, and consistent with the established UI: Tailwind CSS, Radix
+  primitives and lucide icons via `components/ui/*` (see `docs/DESIGN.md`).
 - Use Server Components by default. Add `"use client"` only for browser state,
   effects, event handlers, or browser APIs.
 - Read the relevant current Next.js 16 guide in `node_modules/next/dist/docs/`
@@ -68,7 +69,7 @@ field, constraint, or cascade from a component alone.
   errors; do not leak internal details.
 - Use the project time-zone and recurrence helpers for dates and series. Avoid
   ad-hoc `Date` parsing or client-only permission decisions.
-- Preserve accessibility: use MUI semantics/labels, keyboard-operable controls,
+- Preserve accessibility: use labelled `components/ui` controls, keyboard-operable controls,
   and accessible feedback for async mutation state.
 
 ## Security and tenancy rules

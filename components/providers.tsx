@@ -1,10 +1,7 @@
 "use client";
 
-import { ThemeProvider } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
 import { SessionProvider } from "next-auth/react";
 import type { Session } from "next-auth";
-import { createAppTheme } from "@/lib/theme";
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ToastProvider } from "@/components/feedback/ToastProvider";
 import { TooltipProvider } from "@/components/ui/menu";
@@ -78,7 +75,6 @@ export function Providers({
     }
   }, [preference]);
 
-  const theme = useMemo(() => createAppTheme(mode), [mode]);
   const colorMode = useMemo(
     () => ({
       mode,
@@ -98,13 +94,9 @@ export function Providers({
   return (
     <SessionProvider session={session}>
       <ColorModeContext.Provider value={colorMode}>
-        {/* TEMPORARY: MUI theme for screens not yet moved to components/ui. */}
-        <ThemeProvider theme={theme}>
-          <CssBaseline enableColorScheme />
-          <TooltipProvider delayDuration={300}>
-            <ToastProvider>{children}</ToastProvider>
-          </TooltipProvider>
-        </ThemeProvider>
+        <TooltipProvider delayDuration={300}>
+          <ToastProvider>{children}</ToastProvider>
+        </TooltipProvider>
       </ColorModeContext.Provider>
     </SessionProvider>
   );

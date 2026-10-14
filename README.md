@@ -21,7 +21,7 @@
 </p>
 
 Yuyu is a multi-tenant event platform built with Next.js, PostgreSQL, Prisma,
-Auth.js, and Material UI. It is designed for organisers who want to retain
+Auth.js, Tailwind CSS and Radix UI. It is designed for organisers who want to retain
 control of their data and run free events without payments, ticket sales, or
 advertising trackers.
 

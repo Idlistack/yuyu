@@ -8,7 +8,7 @@
 - TypeScript
 - PostgreSQL and Prisma ORM
 - Auth.js with Prisma persistence
-- Material UI and Emotion
+- Tailwind CSS, Radix UI primitives and lucide icons (`components/ui/*`)
 - Redis for distributed rate limiting
 - S3-compatible private object storage
 - Nodemailer-backed transactional email
