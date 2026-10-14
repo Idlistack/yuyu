@@ -473,6 +473,18 @@ export async function deliverOutboxBatch(limit = 20) {
           eventUrl: broadcastEventUrl(event.organisation.slug, event.slug),
           organisationName: event.organisation.name,
         }, payload.recipientName ?? null);
+        // If the organiser receiving the test is confirmed for this event themselves,
+        // the ticket button opens their own ticket, so the whole flow can be checked.
+        // (Tests only ever go to the signed-in organiser's own verified address.)
+        const ownRsvp = await prisma.rSVP.findFirst({
+          where: {
+            eventId: payload.eventId,
+            status: RsvpStatus.CONFIRMED,
+            OR: [{ user: { email: { equals: payload.to, mode: "insensitive" } } }, { guestEmail: { equals: payload.to, mode: "insensitive" } }],
+          },
+          select: { checkInToken: true },
+        });
+        if (ownRsvp) variables.ticketLink = broadcastTicketUrl(ownRsvp.checkInToken);
         const bodyHtml = renderBroadcastHtml(payload.body, variables);
         await sendEventBroadcast({
           to: payload.to,

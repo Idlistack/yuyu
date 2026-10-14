@@ -93,6 +93,8 @@ export async function previewEventBroadcast(input: unknown): Promise<ActionResul
     organisationName: event.organisation.name,
     design: parsed.data.design,
     brand: broadcastBrandFor(event),
+    // The preview renders inside this site, so uploaded images load from the page origin.
+    imageBaseUrl: "",
   });
   return { ok: true, data: email };
 }

@@ -344,6 +344,8 @@ export function buildBroadcastEmail(params: {
   organisationName: string;
   design?: BroadcastDesignId;
   brand?: BroadcastBrand;
+  /** Only the dashboard preview sets this (to ""), so site images load relative to the page. */
+  imageBaseUrl?: string;
 }) {
   const subject = headerText(params.subject) || headerText(params.eventTitle) || "Event update";
   const design = isBroadcastDesign(params.design) ? params.design : DEFAULT_BROADCAST_DESIGN;
@@ -353,7 +355,8 @@ export function buildBroadcastEmail(params: {
     eventTitle: params.eventTitle,
     organisationName: params.organisationName,
     brand: params.brand ?? {},
-    baseUrl: (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
+    // Recipients need an absolute public address; without one, site images are left out.
+    baseUrl: params.imageBaseUrl ?? (process.env.NEXT_PUBLIC_BASE_URL?.trim().replace(/\/$/, "") || null),
   });
   const text = `${params.bodyText.replace(/\r\n?/g, "\n").trim()}\n\n—\nYou are receiving this because you registered for "${params.eventTitle}" with ${params.organisationName}.`;
   return { subject, html, text };

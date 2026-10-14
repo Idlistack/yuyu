@@ -65,13 +65,23 @@ export function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-/** Only absolute http(s) image and link URLs make it into an email. Relative paths get the public base URL. */
-export function safeEmailUrl(value: string | null | undefined, baseUrl: string): string | null {
+/**
+ * Only http(s) URLs reach an email. Site-relative paths ("/api/uploads/…")
+ * are made absolute with `baseUrl` (the public site address). With
+ * `baseUrl === ""` (the dashboard preview, which renders inside the site) they
+ * stay relative; with `null` (no public address configured) they are dropped
+ * rather than sent as a link nobody can open.
+ */
+export function safeEmailUrl(value: string | null | undefined, baseUrl: string | null): string | null {
   const raw = value?.trim();
   if (!raw) return null;
-  const absolute = raw.startsWith("/") && !raw.startsWith("//") ? `${baseUrl.replace(/\/$/, "")}${raw}` : raw;
+  if (raw.startsWith("/") && !raw.startsWith("//")) {
+    if (baseUrl === null) return null;
+    if (baseUrl === "") return /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/.test(raw) ? raw : null;
+    return safeEmailUrl(`${baseUrl.replace(/\/$/, "")}${raw}`, null);
+  }
   try {
-    const url = new URL(absolute);
+    const url = new URL(raw);
     return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
   } catch {
     return null;
@@ -131,7 +141,8 @@ type FrameInput = {
   eventTitle: string;
   organisationName: string;
   brand: BroadcastBrand;
-  baseUrl: string;
+  /** Public site address for site-relative images; "" keeps them relative (preview); null drops them. */
+  baseUrl: string | null;
 };
 
 function document(title: string, bodyStyle: string, inner: string): string {
@@ -150,7 +161,7 @@ function footerText(eventTitle: string, organisationName: string): string {
   return `You are receiving this because you registered for ${escapeHtml(eventTitle)} with ${escapeHtml(organisationName)}.`;
 }
 
-function eventLink(brand: BroadcastBrand, baseUrl: string, color: string): string {
+function eventLink(brand: BroadcastBrand, baseUrl: string | null, color: string): string {
   const url = safeEmailUrl(brand.eventUrl, baseUrl);
   return url ? `<br><a href="${escapeHtml(url)}" style="color: ${color}; text-decoration: underline;">View the event page</a>` : "";
 }

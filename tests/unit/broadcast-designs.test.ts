@@ -36,6 +36,16 @@ describe("broadcast designs", () => {
     expect(noCover).not.toContain("<img");
   });
 
+  it("keeps site images relative in the preview and drops them when no public address is set", () => {
+    expect(safeEmailUrl("/api/uploads/a.webp", "")).toBe("/api/uploads/a.webp");
+    expect(safeEmailUrl("/api/uploads/a.webp", null)).toBeNull();
+    expect(safeEmailUrl('/x" onerror="y', "")).toBeNull();
+    const noBase = renderBroadcastDesign("photo", { ...base, baseUrl: null, brand: { coverImageUrl: "/api/uploads/c.webp" } });
+    expect(noBase).not.toContain("<img");
+    const preview = renderBroadcastDesign("photo", { ...base, baseUrl: "", brand: { coverImageUrl: "/api/uploads/c.webp" } });
+    expect(preview).toContain('src="/api/uploads/c.webp"');
+  });
+
   it("only allows absolute http(s) URLs", () => {
     expect(safeEmailUrl("/x", "https://a.test/")).toBe("https://a.test/x");
     expect(safeEmailUrl("//evil.test/x", "https://a.test")).toBeNull();
