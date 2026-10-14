@@ -2,6 +2,7 @@ import type { RsvpStatus } from "@prisma/client";
 import { getEmailTransport } from "./transporter";
 import { calendarInviteFilename, createCalendarInvite, googleCalendarEventUrl } from "@/lib/calendarInvite";
 import { safeTimeZone } from "@/lib/timeZone";
+import { emailBrandHeader } from "./brand";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]!);
@@ -86,18 +87,16 @@ export async function sendRSVPConfirmation(params: {
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #1c1b1f;">
         <div style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e0e0e0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
-          <div style="background-color: #6750A4; padding: 24px; text-align: center; color: #ffffff;">
-            <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 0.5px;">Yuyu Events</h1>
-          </div>
+          ${emailBrandHeader()}
           <div style="padding: 32px;">
-            <h2 style="margin-top: 0; color: #6750A4; font-size: 20px; font-weight: 600;">RSVP Status: ${statusText}</h2>
+            <h2 style="margin-top: 0; color: #18181B; font-size: 20px; font-weight: 600;">RSVP Status: ${statusText}</h2>
             <p style="font-size: 16px; line-height: 1.5; color: #49454f; margin-bottom: 24px;">
               ${salutation.html}<br><br>
               Thank you for registering for <strong>${safeTitle}</strong>. ${statusMessage}
             </p>
             ${eventDetails ? `
               <div style="margin: 24px 0; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #f8f9fa;">
-                <h3 style="margin: 0 0 12px; color: #6750A4; font-size: 16px;">Event details</h3>
+                <h3 style="margin: 0 0 12px; color: #18181B; font-size: 16px;">Event details</h3>
                 <p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Starts:</strong> ${escapeHtml(eventDetails.startsAt)}</p>
                 <p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Ends:</strong> ${escapeHtml(eventDetails.endsAt)}</p>
                 ${eventDetails.location ? `<p style="margin: 8px 0; font-size: 14px; line-height: 1.5;"><strong>Location:</strong> ${escapeHtml(eventDetails.location)}</p>` : ""}
@@ -105,7 +104,7 @@ export async function sendRSVPConfirmation(params: {
             ` : ""}
             ${safeCalendarUrl ? `
               <div style="text-align: center; margin: 24px 0;">
-                <a href="${safeCalendarUrl}" style="background-color: #6750A4; color: #ffffff; padding: 14px 28px; border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <a href="${safeCalendarUrl}" style="background-color: #18181B; color: #ffffff; padding: 14px 28px; border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                   Add to Google Calendar
                 </a>
                 <p style="font-size: 12px; color: #79747e; margin: 12px 0 0;">An .ics calendar invite is also attached for other calendar apps.</p>
@@ -115,19 +114,19 @@ export async function sendRSVPConfirmation(params: {
               ticketUrl && params.status === "CONFIRMED"
                 ? `
               <div style="text-align: center; margin: 32px 0;">
-                <a href="${safeTicketUrl}" style="background-color: #6750A4; color: #ffffff; padding: 14px 28px; border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <a href="${safeTicketUrl}" style="background-color: #18181B; color: #ffffff; padding: 14px 28px; border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                   View Your Ticket & QR Code
                 </a>
               </div>
               <p style="font-size: 14px; text-align: center; color: #79747e; margin-bottom: 24px;">
                 Or copy and paste this link: <br>
-                <a href="${safeTicketUrl}" style="color: #6750A4; text-decoration: underline;">${safeTicketUrl}</a>
+                <a href="${safeTicketUrl}" style="color: #18181B; text-decoration: underline;">${safeTicketUrl}</a>
               </p>
             `
                 : ""
             }
           </div>
-          <div style="background-color: #f3edf7; padding: 16px; text-align: center; font-size: 12px; color: #79747e; border-top: 1px solid #e0e0e0;">
+          <div style="background-color: #f4f4f2; padding: 16px; text-align: center; font-size: 12px; color: #79747e; border-top: 1px solid #e0e0e0;">
             This email was sent by Yuyu Events.<br>
             © ${new Date().getFullYear()} Yuyu. All rights reserved.
           </div>
@@ -194,17 +193,15 @@ export async function sendApprovalNotification(params: {
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #1c1b1f;">
         <div style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e0e0e0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
-          <div style="background-color: #6750A4; padding: 24px; text-align: center; color: #ffffff;">
-            <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 0.5px;">Yuyu Events</h1>
-          </div>
+          ${emailBrandHeader()}
           <div style="padding: 32px;">
-            <h2 style="margin-top: 0; color: #6750A4; font-size: 20px; font-weight: 600;">RSVP Update: ${statusText}</h2>
+            <h2 style="margin-top: 0; color: #18181B; font-size: 20px; font-weight: 600;">RSVP Update: ${statusText}</h2>
             <p style="font-size: 16px; line-height: 1.5; color: #49454f; margin-bottom: 24px;">
               ${salutation.html}<br><br>
               ${statusMessage}
             </p>
           </div>
-          <div style="background-color: #f3edf7; padding: 16px; text-align: center; font-size: 12px; color: #79747e; border-top: 1px solid #e0e0e0;">
+          <div style="background-color: #f4f4f2; padding: 16px; text-align: center; font-size: 12px; color: #79747e; border-top: 1px solid #e0e0e0;">
             This email was sent by Yuyu Events.<br>
             © ${new Date().getFullYear()} Yuyu. All rights reserved.
           </div>
@@ -250,12 +247,12 @@ export async function sendEventInvitation(params: {
     <html><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head>
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background:#f8f9fa; margin:0; padding:20px; color:#1c1b1f;">
       <div style="max-width:600px; margin:40px auto; background:#fff; border:1px solid #e0e0e0; border-radius:16px; overflow:hidden;">
-        <div style="background:#6750A4; color:#fff; padding:24px; text-align:center;"><strong>Yuyu Events</strong></div>
+        ${emailBrandHeader()}
         <div style="padding:32px;">
-          <h2 style="margin-top:0; color:#6750A4;">You’re invited</h2>
+          <h2 style="margin-top:0; color:#18181B;">You’re invited</h2>
           <p><strong>${safeOrganisationName}</strong> invited you to <strong>${safeTitle}</strong>.</p>
           <p>Open the event and register with this email address.</p>
-          <p style="margin:28px 0;"><a href="${safeEventUrl}" style="background:#6750A4; color:#fff; padding:14px 24px; border-radius:999px; text-decoration:none; font-weight:600;">View event</a></p>
+          <p style="margin:28px 0;"><a href="${safeEventUrl}" style="background:#18181B; color:#fff; padding:14px 24px; border-radius:999px; text-decoration:none; font-weight:600;">View event</a></p>
           <p style="font-size:13px; color:#666; overflow-wrap:anywhere;">${safeEventUrl}</p>
         </div>
       </div>
@@ -300,18 +297,16 @@ export async function sendReminder(params: {
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #1c1b1f;">
         <div style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e0e0e0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
-          <div style="background-color: #6750A4; padding: 24px; text-align: center; color: #ffffff;">
-            <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 0.5px;">Yuyu Events</h1>
-          </div>
+          ${emailBrandHeader()}
           <div style="padding: 32px;">
-            <h2 style="margin-top: 0; color: #6750A4; font-size: 20px; font-weight: 600;">Upcoming Event Reminder</h2>
+            <h2 style="margin-top: 0; color: #18181B; font-size: 20px; font-weight: 600;">Upcoming Event Reminder</h2>
             <p style="font-size: 16px; line-height: 1.5; color: #49454f; margin-bottom: 24px;">
               Hello,<br><br>
               This is a reminder that the event <strong>${safeTitle}</strong> is starting soon!<br><br>
               <strong>Start Time:</strong> ${formattedDate}
             </p>
           </div>
-          <div style="background-color: #f3edf7; padding: 16px; text-align: center; font-size: 12px; color: #79747e; border-top: 1px solid #e0e0e0;">
+          <div style="background-color: #f4f4f2; padding: 16px; text-align: center; font-size: 12px; color: #79747e; border-top: 1px solid #e0e0e0;">
             This email was sent by Yuyu Events.<br>
             © ${new Date().getFullYear()} Yuyu. All rights reserved.
           </div>
@@ -344,10 +339,10 @@ const BROADCAST_STYLES: Record<string, string> = {
   ul: "margin: 0 0 16px; padding-left: 24px;",
   ol: "margin: 0 0 16px; padding-left: 24px;",
   li: "margin: 0 0 6px; font-size: 16px; line-height: 1.6; color: #1c1b1f;",
-  blockquote: "margin: 0 0 16px; padding: 10px 16px; border-left: 4px solid #6750A4; background: #f6f2fb; color: #49454f;",
+  blockquote: "margin: 0 0 16px; padding: 10px 16px; border-left: 4px solid #18181B; background: #f6f2fb; color: #49454f;",
 };
-const BROADCAST_LINK_STYLE = "color: #6750A4; text-decoration: underline; overflow-wrap: anywhere;";
-const BROADCAST_BUTTON_STYLE = "display: inline-block; background-color: #6750A4; color: #ffffff; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: 600; font-size: 16px;";
+const BROADCAST_LINK_STYLE = "color: #18181B; text-decoration: underline; overflow-wrap: anywhere;";
+const BROADCAST_BUTTON_STYLE = "display: inline-block; background-color: #18181B; color: #ffffff; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: 600; font-size: 16px;";
 
 /** Mail clients ignore stylesheets, so the sanitised subset is styled inline. */
 export function inlineBroadcastStyles(html: string) {
@@ -379,12 +374,12 @@ export function buildBroadcastEmail(params: {
       <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #1c1b1f;">
         <div style="max-width: 600px; margin: 24px auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e0e0e0; overflow: hidden;">
-          <div style="background-color: #6750A4; padding: 24px; text-align: center; color: #ffffff;">
+          <div style="background-color: #18181B; padding: 24px; text-align: center; color: #ffffff;">
             <h1 style="margin: 0; font-size: 20px; font-weight: 600;">${safeOrganisation}</h1>
             <p style="margin: 6px 0 0; font-size: 13px; opacity: 0.85;">${safeTitle}</p>
           </div>
           <div style="padding: 32px;">${inlineBroadcastStyles(params.bodyHtml)}</div>
-          <div style="background-color: #f3edf7; padding: 16px; text-align: center; font-size: 12px; color: #79747e; border-top: 1px solid #e0e0e0;">
+          <div style="background-color: #f4f4f2; padding: 16px; text-align: center; font-size: 12px; color: #79747e; border-top: 1px solid #e0e0e0;">
             You are receiving this because you registered for ${safeTitle} with ${safeOrganisation}.<br>
             Sent through Yuyu Events.
           </div>

@@ -383,7 +383,7 @@ export function ApiClientManagement(props: {
       <section aria-labelledby="api-clients-title" className="flex flex-col gap-3">
         <h2 id="api-clients-title" className="text-title text-ink">Clients</h2>
         {props.clients.length === 0 ? (
-          <EmptyState>No machine clients have been created.</EmptyState>
+          <EmptyState mood="sleepy">No machine clients have been created.</EmptyState>
         ) : (
           props.clients.map((client) => (
             <ClientPanel

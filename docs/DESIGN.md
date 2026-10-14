@@ -51,20 +51,42 @@ Yuyu's own primary action is ink, not a hue. It inverts in dark mode.
 | `--yy-on-primary` | `#FFFFFF` | `#18181B` |
 | `--yy-inverse-surface` (feature bands, kiosk camera) | `#18181B` | `#1C1C1F` |
 
-### 2.3 Colour — brand
+### 2.3 Colour — brand (dot sign)
 
-The Yuyu logo tile is a 135° gradient **`#7EE8C4 → #B9AEFF`** (mint → lavender) with an ink "Y". Mint and lavender appear **only** in the logo, and as soft tints on Yuyu's own pages (home, about, features, sign-in). They are never used for buttons or status.
+Yuyu's own identity is the **dot sign**: a 5×5 grid of round dots drawing a "Y" (Figma "Brand — Dot sign", 111:292). It belongs to Yuyu's own surfaces only. Organiser logos, covers, certificates and event accent colours are never restyled with it.
+
+**Mark pattern** (`components/brand/patterns.ts`, rows top to bottom; `X` lit, `O` base, `.` soft):
+
+```
+X...X
+.X.X.
+..X..
+..X..
+..O..
+```
+
+**Rules**
+
+- The gap between dots is ¼ of a dot. Leave one dot step of clear space around the mark.
+- Show the full grid (lit and soft dots) at 48px and above. Below 48px, show the lit dots and the base dot only. Never render the mark smaller than 16px.
+- Below 32px on a light background, lit dots use deep marigold so they stay visible.
+- Wordmark: lowercase **yuyu**, Bricolage Grotesque 800, tracking −3%, in ink.
+- Marigold is never used for text.
+- Don't use square dots, rotation, other hues, filled soft dots, outlines, shadows or gradients.
+
+**Components** (`components/brand/`): `DotGrid` (the primitive), `DotMark` (full / bright / onMarigold / mono), `DotLockup` (horizontal / stacked / tagline), `DotFace` (10 moods), `DotIcon` and `DotLoader`. Face moods are fixed by meaning: Sleepy for empty states, Cheering for "You're in", Wink for checked in, Sad for errors, Waiting for the waitlist and Thinking for loading.
+
+**Assets:** hand-written SVG masters live in `public/brand/`. `npm run brand:generate` rasterises them into the favicon, PWA icons, apple-touch icon, default social card and email lockup. Commit both the masters and the outputs.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--yy-brand-mint` | `#7EE8C4` | `#7EE8C4` | Logo gradient start |
-| `--yy-brand-lavender` | `#B9AEFF` | `#B9AEFF` | Logo gradient end |
-| `--yy-highlight-mint` | `#BDF3DF` | `#1F4D3D` | Highlighter mark under a display word |
-| `--yy-highlight-lavender` | `#DCD6FF` | `#332E5C` | Same, alternate |
-| `--yy-highlight-peach` | `#FDE7C8` | `#4A3418` | Step number circles |
-| `--yy-tint-mint` | `#E9FBF3` | `#10261E` | Feature/principle cards, sign-in panel |
-| `--yy-tint-lavender` | `#F1EFFF` | `#1C1A33` | Same |
-| `--yy-tint-peach` | `#FFF4E5` | `#2A1F10` | Same |
+| `--yy-brand-marigold` | `#FFB547` | `#FFB547` | Lit dots |
+| `--yy-brand-marigold-deep` | `#E8930C` | `#E8930C` | Lit dots under 32px on white |
+| `--yy-brand-marigold-small` | `#E8930C` | `#FFB547` | Resolved small-size lit dot |
+| `--yy-brand-dot-base` | `#18181B` | `#F4F4F5` | Base dot (the stem's foot) |
+| `--yy-brand-dot-off` | `#E7E6E2` | `#2A2A2E` | Soft dots |
+| `--yy-highlight-peach` | `#FDE7C8` | `#4A3418` | Highlighter mark, step circles, text selection |
+| `--yy-tint-peach` | `#FFF4E5` | `#2A1F10` | Feature cards, sign-in panel |
 
 ### 2.4 Colour — status
 
@@ -182,6 +204,8 @@ Flat by default: cards use a 1px `--yy-border`, no shadow.
 - **Content is visible by default.** Scroll-reveal animations may only enhance, never hide content (fixes the blank sections on v1 Home/About).
 - Respect `prefers-reduced-motion: reduce` → no translate/scale, fades ≤ 120ms.
 - Success moments (Registered, Checked in): a single 360ms scale-in of the check icon; no confetti.
+- **Colour-mode switch** (`components/providers.tsx`): the new mode grows from the toggle as a soft-edged circle (View Transitions + an animated `--yy-reveal` mask, 720ms, final frame held with `fill: "forwards"` so the old mode never flashes back). The light/dark illustration twins are decoded before the snapshot, waiting at most 150ms. Without View Transitions, colours cross-fade for 420ms. Reduced motion switches instantly.
+- **Loading:** `DotLoader` lights the mark's dots row by row (1.6s loop) on Yuyu chrome. Buttons keep their own pending state. With reduced motion, the mark stays lit and still.
 
 ### 2.11 Breakpoints
 
@@ -197,6 +221,9 @@ Flat by default: cards use a 1px `--yy-border`, no shadow.
 - Avatars: photo if present, else initials (1–2 letters, 700 weight) on a tint: `--yy-accent-soft` on event pages; status tint in activity feeds; `--yy-bg-emphasis` for users.
 - Organisation logo: square, radius 9–28 depending on size; fallback = initials on the org accent.
 - Logos of sponsors: real logo in a 40×40 tile; fallback dashed tile. Never repeat the name twice.
+- **Dot illustrations** (Yuyu's own pages only): 7×7 dot icons and faces from `components/brand` or `/public/landing`. Every landing SVG has a `-dark.svg` twin, swapped by `ThemedImage` with CSS only (no JS, no flash).
+- **Faces carry meaning, not decoration.** `EmptyState` takes a `mood`: Sleepy for empty lists, Sad for errors and not-found, Cheering for "You're in", Wink for checked in, Waiting for the waitlist, Thinking for loading. Keep the existing words beside the face. Organiser surfaces (org page, event schedule) don't show faces.
+- **404:** a dot-grid page with a small companion that follows the pointer (or taps on touch) and settles when idle. It is decorative (`aria-hidden`) and still under reduced motion.
 
 ---
 
@@ -321,10 +348,11 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
 
 ### 4.14 Public chrome
 
-- **Yuyu site header** (home, about, features, discover, legal): logo · Discover · Features · About (active = muted pill) · right: Sign in (secondary) + Start organising (primary). Footer: logo + "Free events, run by communities." · links · "Built by Abhiram · Hosted on Idlistack".
-- **Event-context header** (event, programme, session, speaker, series, feedback, org page): **organiser** logo + name on the left (not Yuyu); right: Discover events + Sign in, or an accent "Register — free" on sub-pages. Footer: small Yuyu mark + "Free event, powered by Yuyu" · Privacy · Terms.
+- **Yuyu site header** (home, about, features, discover, legal): `DotLockup` · Discover · Features · About (active = muted pill) · right: Sign in (secondary) + Start organising (primary). Footer: `DotLockup` + "Free events, run by communities." · links (incl. GitHub) · "Built by Abhiram · Hosted on Idlistack".
+- **Open source:** the homepage hero links to the GitHub repo, the Self-host band ends with a "Built in the open" row (star, report a bug, suggest an idea, contribute), and About's "Open and yours" section links issues, discussions and `CONTRIBUTING.md`. All repo URLs come from `lib/openSource.ts`.
+- **Event-context header** (event, programme, session, speaker, series, feedback, org page): **organiser** logo + name on the left (not Yuyu); right: Discover events + Sign in, or an accent "Register — free" on sub-pages. Footer: 18px `DotMark` + "Free event, powered by Yuyu" · Privacy · Terms. Embedded events (`/embed/…`) end with the same credit, opening Yuyu in a new tab.
 - "Powered by Idlistack" lives in the footer only — never in the top nav.
-- **Auth pages:** minimal header (logo only), centered card `r-2xl` max 440–480px, or split layout on sign-in (form left, mint-tint brand panel right).
+- **Auth pages:** minimal header (logo only), centered card `r-2xl` max 440–480px, or split layout on sign-in (form left, peach-tint brand panel right).
 
 ### 4.15 Dialogs, toasts, menus
 
@@ -346,7 +374,8 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
 | Auth & account | Sign in / Create account, Set new password, Verify email, Join organisation, Co-organiser invite, Account profile, Account security |
 | Workspace | Workspace home, Organisation events, Create organisation, Members, Organisation settings, API access |
 | Event management | Event overview, Check-in desk, Programme editor, Series manage |
-| Not yet designed — follow this system | Create event / series flow, Event settings, Guests list, Registration form builder, Page content editor, Feedback builder/results, Certificate designer, Analytics, Invites, ID card print, Super-admin, emails, error/empty/404 |
+| Brand & system states | Dot sign kit, app icons, social card, email header, error / empty / loading states, 404 |
+| Not yet designed — follow this system | Create event / series flow, Event settings, Guests list, Registration form builder, Page content editor, Feedback builder/results, Certificate designer, Analytics, Invites, ID card print, Super-admin |
 
 ### 5.2 Event page layout
 
@@ -412,37 +441,37 @@ Show the timezone abbreviation once per page/section, not on every row. Never sh
 - QR codes always on a white plate.
 - Shadows → `rgba(0,0,0,.5)`; rely more on borders.
 - Cover images: no automatic dimming.
+- The dot sign swaps its base dot to `#F4F4F5` and soft dots to `#2A2A2E`. Marigold stays the same.
+- The mode is chosen by `data-color-mode` on `<html>` (set from a cookie on the server, so there is no flash), or follows the system when unset. `.yy-dark-band` forces dark tokens on one band, such as the "At the door" section and the closing CTA.
 
 ---
 
 ## 9. Implementing in the Yuyu codebase
 
-Stack: Next.js 16 App Router, React 19, TypeScript, **MUI 9 + Emotion**, **Tailwind 4**, framer-motion. Follow the repo's AGENTS.md/CLAUDE.md, keep Server Components by default, and never weaken the security invariants (CSP nonce, tenant isolation, etc.).
+Stack: Next.js 16 App Router, React 19, TypeScript, **Tailwind 4**, **Radix UI** primitives, **lucide-react** icons and framer-motion. MUI and Emotion have been removed. Fonts are self-hosted with `@fontsource` (Bricolage Grotesque, Figtree, JetBrains Mono); no font CDN. Follow the repo's AGENTS.md/CLAUDE.md, keep Server Components by default, and never weaken the security invariants (CSP nonce, tenant isolation, etc.). Inline SVG and inline styles are fine under the CSP; don't add external scripts, fonts or image hosts.
 
 ### 9.1 One source of truth for tokens
 
-1. `app/styles/tokens.css` declares every token as a CSS variable under `:root` (light) and `[data-theme="dark"]` / `@media (prefers-color-scheme: dark)` (dark), named `--yy-*` exactly as in §2.
-2. **Tailwind 4** maps them in `@theme` (e.g. `--color-canvas: var(--yy-bg-canvas)`, `--color-accent: var(--yy-accent)`, `--radius-lg: 16px`, `--font-display: "Bricolage Grotesque", …`).
-3. **MUI** uses `createTheme({ cssVariables: { colorSchemeSelector: 'data-theme' }, colorSchemes: { light, dark } })` with palette values pointing at the same hex values, `shape.borderRadius: 12`, typography variants mapped to §2.6, and component overrides:
-   - `MuiButton`: `disableElevation`, `borderRadius: 999`, `textTransform: 'none'`, variants for `primary | accent | secondary | quiet | danger | dangerQuiet | inverse`.
-   - `MuiTextField` / `MuiOutlinedInput`: **outlined only**, label rendered above (`InputLabel shrink` + `notched={false}` or a custom `Field` wrapper), remove filled variants.
-   - `MuiChip`, `MuiTabs`, `MuiSwitch`, `MuiDialog`, `MuiTableCell` styled per §4.
-4. Delete the v1 gradients, the bright blue `#0A7AFF`-style primary, and the filled grey MUI inputs.
+1. `app/styles/tokens.css` declares every token as a CSS variable named `--yy-*` exactly as in §2. Light values go under `:root`. Dark values go under `:root[data-color-mode="dark"], .yy-dark-band` and under `@media (prefers-color-scheme: dark) { :root:not([data-color-mode]) }`.
+2. **Tailwind 4** maps them in `@theme inline` in `app/globals.css` (e.g. `--color-canvas: var(--yy-bg-canvas)`, `--color-accent: var(--yy-accent)`, `--color-brand-marigold: var(--yy-brand-marigold)`). The type scale lives there as `text-display-*`, `text-h*`, `text-body*`, `text-label`, `text-caption` and `text-overline`.
+3. UI primitives live in `components/ui/*` (Button, Field, Select, Choice, Tabs, Menu, Dialog, Table, display helpers such as `EmptyState`), built on Radix with Tailwind classes.
+4. Brand components live in `components/brand/*`; see §2.3. Never redraw the mark by hand. Use `DotMark`/`DotLockup`, or the SVG/PNG masters in `public/brand/` where React can't render, such as email and OG images.
+5. Emails use the hosted `public/brand/email-lockup.png`, built from `NEXT_PUBLIC_BASE_URL` with `width`/`height`/`alt="Yuyu"`, never inline SVG. Share cards (`lib/og/shareCard.tsx`) and the report PDF (`lib/eventReport.ts`, pdf-lib circles) use the same mark.
 
 ### 9.2 Event accent at runtime
 
 In the event layout (server component) compute accent tokens with a small pure helper (`lib/theme/accent.ts`: `getAccentTokens(hex, scheme)` returning `--yy-accent`, `--yy-accent-soft`, `--yy-on-accent`, `--yy-accent-text` with WCAG contrast checks) and set them as inline `style` CSS variables on the page root. Validate the hex server-side (zod) — never inject raw user strings into CSS.
 
-### 9.3 Shared components to create
+### 9.3 Shared components
 
-`Button`, `Field` (label + input + helper + error), `SearchField`, `PasswordField`, `Chip`, `StatusChip`, `DateBlock`, `Avatar` (initials fallback), `OrgLogo`, `EventCard`, `EventRow`, `StatTile`, `Callout`, `EmptyState`, `DangerZone`, `SectionNav`, `ScheduleList`, `ProgrammeGrid`, `RegistrationCard`, `StickyRegisterBar`, `Ticket`, `PinInput`, `RatingInput`, `CheckinResult`, `AppShell` (Sidebar + OrgSwitcher), `EventHeader`, `SiteHeader`, `EventContextHeader`, `SiteFooter`, `ConfirmDialog`, `Toast`.
+Most of these now exist in `components/ui`, `components/chrome` and `components/brand`. Reuse them before adding new ones: `Button`, `Field` (label + input + helper + error), `SearchField`, `PasswordField`, `Chip`, `StatusChip`, `DateBlock`, `Avatar` (initials fallback), `OrgLogo`, `EventCard`, `EventRow`, `StatTile`, `Callout`, `EmptyState`, `DangerZone`, `SectionNav`, `ScheduleList`, `ProgrammeGrid`, `RegistrationCard`, `StickyRegisterBar`, `Ticket`, `PinInput`, `RatingInput`, `CheckinResult`, `AppShell` (Sidebar + OrgSwitcher), `EventHeader`, `SiteHeader`, `EventContextHeader`, `SiteFooter`, `ConfirmDialog`, `Toast`.
 
 ### 9.4 Do / Don't
 
 **Do:** use tokens; one primary action per view; label fields above; show the timezone once; keep event accents on event surfaces; keep content visible without JS animations; test light + dark + 360px.
 
-**Don't:** gradient text or gradient buttons; hard-coded blues; floating MUI labels or filled inputs; cards in cards in cards; left-border accent cards; emoji; countdown timers; raw RRULE/URLs/seconds; Idlistack in the top nav; colour-only status; white text on a light accent.
+**Don't:** gradient text or gradient buttons (including the retired mint→lavender logo tile); hard-coded blues; floating labels or filled inputs; marigold text; restyling organiser logos, covers, certificates or accents with Yuyu's brand; cards in cards in cards; left-border accent cards; emoji; countdown timers; raw RRULE/URLs/seconds; Idlistack in the top nav; colour-only status; white text on a light accent.
 
 ---
 
-*Version 1.0 · 14 Oct 2026 · Direction A+ (chosen after comparing Commons, Signal and Marquee).*
+*Version 1.1 · 14 Oct 2026 · Direction A+ (chosen after comparing Commons, Signal and Marquee). 1.1: dot-sign rebrand, Tailwind/Radix implementation notes, open-source links, motion and dark-mode details.*

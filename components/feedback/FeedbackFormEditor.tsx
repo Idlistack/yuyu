@@ -163,7 +163,7 @@ export function FeedbackFormEditor(props: {
         <h3 className="text-h4 text-ink">Questions</h3>
         <Button variant="primary" startIcon={<Plus />} onClick={() => openFieldDialog()} disabled={pending}>Add question</Button>
       </div>
-      {fields.length === 0 ? <EmptyState>Add at least one question before opening the form.</EmptyState> : (
+      {fields.length === 0 ? <EmptyState mood="sleepy">Add at least one question before opening the form.</EmptyState> : (
         <ul className="flex flex-col gap-2.5">
           {fields.map((field) => (
             <li key={field.id} className="flex items-center gap-3 rounded-lg border border-line bg-canvas px-4 py-3">

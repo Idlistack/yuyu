@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { LoginForm } from "./ui";
 import { YuyuWordmark } from "@/components/chrome/SiteHeader";
+import { DotMark } from "@/components/brand/DotMark";
 import { getGoogleSsoSettings, isNewUserRegistrationEnabled } from "@/lib/instanceSettings";
 import type { Metadata } from "next";
 
@@ -37,18 +38,13 @@ export default async function LoginPage() {
       </div>
 
       <aside aria-hidden className="relative hidden overflow-hidden p-4 md:block">
-        <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-[28px] bg-tint-mint p-12">
+        <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-[28px] bg-tint-peach p-12">
           <p className="max-w-[440px] font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] text-ink">
             Free events.
             <br />
             Your community’s data stays yours.
           </p>
-          <div className="pointer-events-none absolute -bottom-24 -right-24 opacity-90">
-            <svg width="420" height="420" viewBox="0 0 420 420" fill="none">
-              <circle cx="210" cy="210" r="200" className="fill-brand-mint/40" />
-              <circle cx="280" cy="150" r="120" className="fill-brand-lavender/45" />
-            </svg>
-          </div>
+          <DotMark size={192} label={null} className="self-end" />
         </div>
       </aside>
     </div>

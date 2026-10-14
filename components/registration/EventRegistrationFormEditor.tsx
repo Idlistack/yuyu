@@ -274,7 +274,7 @@ export function EventRegistrationFormEditor(props: {
 
           {/* Custom Fields List */}
           {fields.length === 0 ? (
-            <EmptyState>No custom fields configured. Click &quot;Add Custom Field&quot; to capture dietary needs, phone numbers, or sizes.</EmptyState>
+            <EmptyState mood="sleepy">No custom fields configured. Click &quot;Add Custom Field&quot; to capture dietary needs, phone numbers, or sizes.</EmptyState>
           ) : (
             <ul className="flex flex-col gap-2.5">
               {fields.map((f, idx) => (

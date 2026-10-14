@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { YuyuMark } from "@/components/ui/display";
+import { DotMark } from "@/components/brand/DotMark";
+import { GitHubMark } from "@/components/ui/github-mark";
 import { ThemedImage } from "@/components/ui/themed-image";
+import { CONTRIBUTING_URL, DISCUSSIONS_URL, GITHUB_REPO, GITHUB_URL, NEW_ISSUE_URL, SETUP_GUIDE_URL } from "@/lib/openSource";
 import { Container, DotIcon, SectionHeading } from "../primitives";
 
-const GITHUB_URL = "https://github.com/twilighty-abhi/yuyu";
-const SETUP_GUIDE_URL = `${GITHUB_URL}/blob/main/docs/DEPLOYMENT_DOCKER.md`;
 
 const story = [
   "Community events run on goodwill. The person at the door is usually a volunteer, the budget is usually zero, and the guest list often lives in a spreadsheet.",
@@ -42,8 +42,8 @@ export function AboutPage({ getStartedHref }: { getStartedHref: string }) {
               Most event tools are built to sell tickets. Yuyu is built for the other kind of event: the free meetup, the campus club, the NGO workshop, organised by volunteers in their spare time.
             </p>
           </div>
-          <YuyuMark size={312} className="hidden lg:inline-flex" />
-          <YuyuMark size={160} className="lg:hidden" />
+          <DotMark size={312} label={null} className="hidden lg:inline-flex" />
+          <DotMark size={160} label={null} className="lg:hidden" />
         </Container>
       </section>
 
@@ -90,13 +90,26 @@ export function AboutPage({ getStartedHref }: { getStartedHref: string }) {
               </li>
             ))}
           </ul>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild variant="primary">
-              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">View on GitHub</a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href={SETUP_GUIDE_URL} target="_blank" rel="noopener noreferrer">Read the setup guide</a>
-            </Button>
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-wrap gap-3">
+              <Button asChild variant="primary">
+                <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer"><GitHubMark />View on GitHub</a>
+              </Button>
+              <Button asChild variant="secondary">
+                <a href={SETUP_GUIDE_URL} target="_blank" rel="noopener noreferrer">Read the setup guide</a>
+              </Button>
+            </div>
+            <p className="text-body-ui text-ink-secondary">
+              The code lives at{" "}
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="font-mono text-[14px] text-ink underline underline-offset-4">{GITHUB_REPO}</a>
+              . You can{" "}
+              <a href={NEW_ISSUE_URL} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">report a bug</a>
+              ,{" "}
+              <a href={DISCUSSIONS_URL} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">start a discussion</a>
+              {" "}or read{" "}
+              <a href={CONTRIBUTING_URL} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">how to contribute</a>
+              .
+            </p>
           </div>
         </Container>
       </section>
@@ -124,8 +137,8 @@ export function AboutPage({ getStartedHref }: { getStartedHref: string }) {
       <section aria-labelledby="about-cta-title">
         <Container className="pb-16 lg:pb-[88px]">
           <div className="yy-dark-band flex flex-col items-start gap-10 overflow-hidden rounded-[28px] bg-[var(--yy-inverse-surface)] p-8 sm:p-12 md:flex-row md:items-center lg:p-[72px]">
-            <YuyuMark size={132} className="hidden md:inline-flex" />
-            <YuyuMark size={96} className="md:hidden" />
+            <DotMark size={132} label={null} className="hidden md:inline-flex" />
+            <DotMark size={96} label={null} className="md:hidden" />
             <div className="flex flex-col gap-[18px]">
               <h2 id="about-cta-title" className="max-w-[760px] text-display-l text-ink">Bring your community together.</h2>
               <div className="flex flex-wrap gap-3">

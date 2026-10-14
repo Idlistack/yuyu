@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DotFace } from "@/components/brand/DotFace";
 import { ArrowLeft, CalendarPlus, Check } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { TicketQrPanel } from "@/components/ticket/TicketQrPanel";
@@ -177,7 +178,14 @@ export default async function TicketPage({ params }: Props) {
             <Chip tone={status.tone} icon={confirmed ? <Check /> : undefined}>{status.label}</Chip>
           </div>
         </div>
-        {confirmed ? <p className="text-display-m break-words text-ink">You&apos;re in, {name}!</p> : null}
+        {confirmed ? (
+          <div className="flex items-center gap-4">
+            <DotFace mood="cheering" size={64} />
+            <p className="text-display-m break-words text-ink">You&apos;re in, {name}!</p>
+          </div>
+        ) : rsvp.status === "WAITLISTED" ? (
+          <DotFace mood="waiting" size={64} />
+        ) : null}
 
         <article className="overflow-hidden rounded-xl border border-line bg-canvas shadow-raised">
           <header className="bg-accent px-6 py-5 text-on-accent">

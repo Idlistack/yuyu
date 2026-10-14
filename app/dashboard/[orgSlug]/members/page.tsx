@@ -88,7 +88,7 @@ export default async function OrgMembersPage({ params, searchParams }: Props) {
       ) : null}
 
       {members.length === 0 ? (
-        <EmptyState>No members found.</EmptyState>
+        <EmptyState mood="sleepy">No members found.</EmptyState>
       ) : (
         <Table label="Members" className="min-w-[560px]">
           <THead>

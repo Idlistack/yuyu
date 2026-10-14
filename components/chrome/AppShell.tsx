@@ -197,7 +197,7 @@ export function AppShell({ user, organisations, children }: { user: ShellUser; o
       </aside>
 
       <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-subtle/95 px-4 backdrop-blur-md md:hidden">
-        <YuyuWordmark href="/dashboard" size={26} />
+        <YuyuWordmark href="/dashboard" />
         <DialogPrimitive.Root open={menuOpen} onOpenChange={setMenuOpen}>
           <DialogPrimitive.Trigger asChild>
             <IconButton label="Open navigation menu">

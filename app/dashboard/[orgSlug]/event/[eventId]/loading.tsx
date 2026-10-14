@@ -1,8 +1,10 @@
 import { Skeleton } from "@/components/ui/display";
+import { DotLoader } from "@/components/brand/DotLoader";
 
 export default function Loading() {
   return (
     <div className="flex flex-col gap-6" aria-busy="true">
+      <DotLoader size={40} label="Loading event" className="self-center" />
       <Skeleton className="h-4 w-24" />
       <div className="flex items-center gap-4">
         <Skeleton className="size-14 rounded-md" />

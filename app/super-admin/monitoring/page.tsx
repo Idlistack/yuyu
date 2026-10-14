@@ -53,7 +53,7 @@ export default async function SuperAdminMonitoringPage() {
 
       <AdminPanel title="API request stats (in-memory)" description="These stats reset on server restart and are not shared across multiple instances.">
         {snapshot.routes.length === 0 ? (
-          <EmptyState>No traffic observed yet.</EmptyState>
+          <EmptyState mood="sleepy">No traffic observed yet.</EmptyState>
         ) : (
           <div className="flex flex-col gap-4">
             <Table label="API request stats">

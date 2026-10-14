@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Bug, GitPullRequest, Lightbulb, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GitHubMark } from "@/components/ui/github-mark";
 import { ThemedImage } from "@/components/ui/themed-image";
-import { YuyuMark } from "@/components/ui/display";
+import { DotMark } from "@/components/brand/DotMark";
+import { CONTRIBUTING_URL, DISCUSSIONS_URL, GITHUB_REPO, GITHUB_URL, NEW_ISSUE_URL, SETUP_GUIDE_URL } from "@/lib/openSource";
 import { accentStyle } from "@/lib/theme/accent";
 import { ColourPreview } from "./ColourPreview";
 import { Container, DotIcon, SectionHeading } from "./primitives";
-
-const GITHUB_URL = "https://github.com/twilighty-abhi/yuyu";
-const SETUP_GUIDE_URL = `${GITHUB_URL}/blob/main/docs/DEPLOYMENT_DOCKER.md`;
 
 /* eslint-disable @next/next/no-img-element -- static SVG design assets from /public */
 
@@ -60,11 +59,19 @@ const requirements = [
   ["Sign-in", "Email + optional Google"],
 ];
 
+const openLinks = [
+  { title: "Star the project", body: "Follow along and help other communities find Yuyu.", href: GITHUB_URL, Icon: Star },
+  { title: "Report a bug", body: "Something not working? Open an issue with the steps to repeat it.", href: NEW_ISSUE_URL, Icon: Bug },
+  { title: "Suggest an idea", body: "Tell us what your community needs in GitHub Discussions.", href: DISCUSSIONS_URL, Icon: Lightbulb },
+  { title: "Contribute", body: "Read the contributing guide, then send a fix or a feature.", href: CONTRIBUTING_URL, Icon: GitPullRequest },
+];
+
 const faqs = [
   { q: "Is Yuyu really free?", a: "Yes. Yuyu is built only for free events: there is nothing to buy and nothing to sell. If you host it yourself, you only pay for your own server." },
   { q: "Who is Yuyu for?", a: "Clubs, meetups, NGOs, campus groups and any community that runs free events, usually with a small team of volunteers." },
   { q: "Do my guests need an account?", a: "No. Guests can register with a name and email and get their ticket by email. They can create an account later if they want one." },
   { q: "Can I run it on my own server?", a: "Yes. Yuyu ships as a Docker image with a Helm chart. You will need PostgreSQL, Redis, S3-compatible storage and an SMTP provider." },
+  { q: "Is Yuyu open source?", a: "Yes. All of the code is public on GitHub, where anyone can read it, report bugs, suggest ideas and send improvements." },
   { q: "What happens if the internet drops at the venue?", a: "Download the guest list before doors open and keep checking people in. Everything syncs when the connection comes back." },
 ];
 
@@ -92,7 +99,13 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
                 <Link href="/discover">Discover events</Link>
               </Button>
             </div>
-            <p className="text-caption text-ink-muted">No tickets for sale, no payments, no ad trackers. Ever.</p>
+            <div className="flex flex-col gap-2">
+              <p className="text-caption text-ink-muted">No tickets for sale, no payments, no ad trackers. Ever.</p>
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 self-start text-label text-ink-secondary underline-offset-4 transition-colors hover:text-ink hover:underline">
+                <GitHubMark />
+                Open source on GitHub · {GITHUB_REPO}
+              </a>
+            </div>
           </div>
 
           {/* Hero visual: an example event card and ticket (illustrative, not live data) */}
@@ -214,7 +227,7 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
 
       {/* At the door (always dark) */}
       <section aria-labelledby="door-title" className="yy-dark-band bg-canvas text-ink">
-        <Container className="grid items-center gap-12 py-16 lg:grid-cols-2 lg:gap-14 lg:py-[88px]">
+        <Container className="grid items-center gap-12 pb-12 pt-16 lg:grid-cols-2 lg:gap-14 lg:pb-14 lg:pt-[88px]">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
               <p className="text-overline text-ink-muted">At the door</p>
@@ -273,7 +286,7 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
 
       {/* Self-host */}
       <section id="self-host" aria-labelledby="self-host-title" className="scroll-mt-20 border-y border-line bg-subtle">
-        <Container className="grid items-center gap-12 py-16 lg:grid-cols-2 lg:gap-14 lg:py-[88px]">
+        <Container className="grid items-center gap-12 pb-12 pt-16 lg:grid-cols-2 lg:gap-14 lg:pb-14 lg:pt-[88px]">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
               <p className="text-overline text-ink-muted">Self-host</p>
@@ -285,7 +298,7 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
                 <a href={SETUP_GUIDE_URL} target="_blank" rel="noopener noreferrer">Read the setup guide</a>
               </Button>
               <Button asChild variant="secondary">
-                <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">View on GitHub</a>
+                <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer"><GitHubMark />View on GitHub</a>
               </Button>
             </div>
           </div>
@@ -300,6 +313,27 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
               ))}
             </dl>
           </div>
+        </Container>
+        {/* Built in the open */}
+        <Container className="flex flex-col gap-8 pb-16 lg:pb-[88px]">
+          <div className="flex flex-col gap-2 border-t border-line pt-12 lg:pt-14">
+            <p className="text-overline text-ink-muted">Open source</p>
+            <h3 className="text-h2 text-ink">Built in the open</h3>
+            <p className="max-w-[680px] text-body-l text-ink-secondary">Every line of Yuyu is public on GitHub. Read how it works, tell us what is missing, or help build it.</p>
+          </div>
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {openLinks.map(({ title, body, href, Icon }) => (
+              <li key={title}>
+                <a href={href} target="_blank" rel="noopener noreferrer" className="group flex h-full flex-col gap-3 rounded-[20px] border border-line bg-canvas p-6 transition-colors hover:border-line-strong">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-tint-peach text-ink">
+                    <Icon className="size-[18px]" aria-hidden />
+                  </span>
+                  <span className="text-h4 text-ink underline-offset-4 group-hover:underline">{title}</span>
+                  <span className="text-body-ui text-ink-secondary">{body}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </Container>
       </section>
 
@@ -332,8 +366,8 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
       <section aria-labelledby="cta-title">
         <Container className="pb-16 lg:pb-[88px]">
           <div className="yy-dark-band flex flex-col items-start gap-10 overflow-hidden rounded-[28px] bg-[var(--yy-inverse-surface)] p-8 sm:p-12 md:flex-row md:items-center lg:p-20">
-            <YuyuMark size={150} className="hidden md:inline-flex" />
-            <YuyuMark size={96} className="md:hidden" />
+            <DotMark size={150} label={null} className="hidden md:inline-flex" />
+            <DotMark size={96} label={null} className="md:hidden" />
             <div className="flex flex-col gap-5">
               <h2 id="cta-title" className="max-w-[760px] text-display-l text-ink">Your next event starts here.</h2>
               <p className="max-w-[760px] text-body-l text-ink-secondary">Set up your organisation in a few minutes. Free for you and for everyone who comes.</p>

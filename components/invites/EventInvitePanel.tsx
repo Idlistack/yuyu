@@ -69,7 +69,7 @@ export function EventInvitePanel(props: {
         </Button>
       </form>
       {invites.length === 0 ? (
-        <EmptyState title="No invites yet." />
+        <EmptyState mood="sleepy" title="No invites yet." />
       ) : (
         <ul className="divide-y divide-line rounded-lg border border-line bg-canvas">
           {invites.map((inv) => (

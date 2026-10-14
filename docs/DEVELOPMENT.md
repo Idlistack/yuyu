@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- Node.js 20 or newer
+- Node.js 20 or newer (22.18 or newer to run `npm run brand:generate`, which executes a TypeScript script directly)
 - npm
 - Docker and Docker Compose for local PostgreSQL
 

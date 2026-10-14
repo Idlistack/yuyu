@@ -69,7 +69,7 @@ export function ResetPasswordForm(props: { token: string; email: string }) {
 
   return (
     <div className="flex w-full max-w-[440px] flex-col gap-5 rounded-2xl border border-line bg-canvas p-6 shadow-raised sm:p-8">
-      <span aria-hidden className="flex size-12 items-center justify-center rounded-xl bg-tint-lavender text-ink [&_svg]:size-5">
+      <span aria-hidden className="flex size-12 items-center justify-center rounded-xl bg-tint-peach text-ink [&_svg]:size-5">
         {hasToken ? <LockKeyhole /> : <KeyRound />}
       </span>
       <div className="flex flex-col gap-2">

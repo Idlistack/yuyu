@@ -24,7 +24,7 @@ export default async function SuperAdminOrgDetailPage({ params }: Props) {
   });
 
   if (!org) {
-    return <EmptyState>Organisation not found.</EmptyState>;
+    return <EmptyState mood="sad">Organisation not found.</EmptyState>;
   }
 
   const [members, events, series, invites] = await Promise.all([

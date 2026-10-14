@@ -8,7 +8,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Menu as MenuIcon, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Button, IconButton } from "@/components/ui/button";
-import { YuyuMark } from "@/components/ui/display";
+import { DotLockup } from "@/components/brand/DotLockup";
 import { ColorModeToggle } from "./ColorModeToggle";
 
 const primaryLinks = [
@@ -18,11 +18,11 @@ const primaryLinks = [
   { href: "/about", label: "About", guestOnly: false },
 ];
 
-export function YuyuWordmark({ href = "/", size = 36 }: { href?: string; size?: number }) {
+/** The Yuyu horizontal lockup as a home link (site header, auth pages, app shell). */
+export function YuyuWordmark({ href = "/", size = "sm" }: { href?: string; size?: "sm" | "md" }) {
   return (
-    <Link href={href} aria-label="Yuyu home" className="inline-flex items-center gap-2.5 rounded-md">
-      <YuyuMark size={size} />
-      <span aria-hidden className="font-display text-[26px] font-extrabold leading-none tracking-[-0.03em] text-ink">yuyu</span>
+    <Link href={href} aria-label="Yuyu home" className="inline-flex items-center rounded-md">
+      <DotLockup size={size} label={null} />
     </Link>
   );
 }

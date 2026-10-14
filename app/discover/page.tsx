@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import type { Metadata } from "next";
 import { DiscoverEventCard } from "@/components/discover/DiscoverEventCard";
 import { Container } from "@/components/landing/primitives";
+import { DotFace } from "@/components/brand/DotFace";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/display";
 import { controlClasses } from "@/components/ui/styles";
@@ -319,6 +320,7 @@ export default async function DiscoverPage({
 
         {pageItems.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-[20px] border border-line bg-canvas px-6 py-10 text-center">
+            <DotFace mood="sleepy" size={56} className="mb-1" />
             <p className="text-label text-ink">Nothing matches just yet</p>
             <p className="max-w-md text-body-ui text-ink-muted">Try clearing a filter or searching for something else.</p>
             {hasActiveFilters ? (

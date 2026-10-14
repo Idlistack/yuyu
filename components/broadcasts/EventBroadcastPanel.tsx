@@ -1,5 +1,6 @@
 "use client";
 
+import { DotLoader } from "@/components/brand/DotLoader";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { BroadcastAttendanceFilter, RsvpStatus } from "@prisma/client";
@@ -10,7 +11,6 @@ import { Callout, Card } from "@/components/ui/display";
 import { Field, Input } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/menu";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
 import { countBroadcastRecipients, previewEventBroadcast, sendEventBroadcast, sendEventBroadcastTest } from "@/app/actions/broadcasts";
 import {
   BROADCAST_ATTENDANCE_OPTIONS,
@@ -271,7 +271,7 @@ export function EventBroadcastPanel(props: {
           <div className="relative flex justify-center rounded-lg bg-muted p-2 sm:p-4">
             {!previewReady ? (
               <div aria-live="polite" className="absolute right-3 top-3 flex items-center gap-2 text-caption text-ink-secondary">
-                <Spinner className="size-4" /> Updating…
+                <DotLoader size={16} label="Updating preview" /> Updating…
               </div>
             ) : null}
             <div className="w-full max-w-[720px] transition-[width] duration-200" style={{ width: previewWidth === "mobile" ? 390 : "100%" }}>

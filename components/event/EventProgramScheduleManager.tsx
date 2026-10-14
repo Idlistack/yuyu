@@ -252,7 +252,7 @@ export function EventProgramScheduleManager({ organisationSlug, eventId, eventSt
                     </li>
                   ))}
                 </ul>
-              ) : <EmptyState className="py-6">No sessions in this track yet.</EmptyState>}
+              ) : <EmptyState mood="sleepy" className="py-6">No sessions in this track yet.</EmptyState>}
             </section>
           );
         })}

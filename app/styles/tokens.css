@@ -31,14 +31,15 @@
   --yy-inverse-surface: #18181b;
   --yy-on-inverse: #ffffff;
 
-  /* Brand (logo and Yuyu's own pages only) */
-  --yy-brand-mint: #7ee8c4;
-  --yy-brand-lavender: #b9aeff;
-  --yy-highlight-mint: #bdf3df;
-  --yy-highlight-lavender: #dcd6ff;
+  /* Brand: the dot sign (Figma "Brand — Dot sign"). Marigold is for dots and
+     fills only, never text. */
+  --yy-brand-marigold: #ffb547;
+  --yy-brand-marigold-deep: #e8930c;
+  /* Bright dots under 32px: deep marigold on light, marigold on dark. */
+  --yy-brand-marigold-small: #e8930c;
+  --yy-brand-dot-base: #18181b;
+  --yy-brand-dot-off: #e7e6e2;
   --yy-highlight-peach: #fde7c8;
-  --yy-tint-mint: #e9fbf3;
-  --yy-tint-lavender: #f1efff;
   --yy-tint-peach: #fff4e5;
 
   /* Status */
@@ -91,11 +92,12 @@
   --yy-inverse-surface: #1c1c1f;
   --yy-on-inverse: #f4f4f5;
 
-  --yy-highlight-mint: #1f4d3d;
-  --yy-highlight-lavender: #332e5c;
+  --yy-brand-marigold: #ffb547;
+  --yy-brand-marigold-deep: #e8930c;
+  --yy-brand-marigold-small: #ffb547;
+  --yy-brand-dot-base: #f4f4f5;
+  --yy-brand-dot-off: #2a2a2e;
   --yy-highlight-peach: #4a3418;
-  --yy-tint-mint: #10261e;
-  --yy-tint-lavender: #1c1a33;
   --yy-tint-peach: #2a1f10;
 
   --yy-success-bg: #13301f;
@@ -137,11 +139,12 @@
     --yy-inverse-surface: #1c1c1f;
     --yy-on-inverse: #f4f4f5;
 
-    --yy-highlight-mint: #1f4d3d;
-    --yy-highlight-lavender: #332e5c;
+    --yy-brand-marigold: #ffb547;
+    --yy-brand-marigold-deep: #e8930c;
+    --yy-brand-marigold-small: #ffb547;
+    --yy-brand-dot-base: #f4f4f5;
+    --yy-brand-dot-off: #2a2a2e;
     --yy-highlight-peach: #4a3418;
-    --yy-tint-mint: #10261e;
-    --yy-tint-lavender: #1c1a33;
     --yy-tint-peach: #2a1f10;
 
     --yy-success-bg: #13301f;

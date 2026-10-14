@@ -64,7 +64,7 @@ export function SeriesInvitePanel(props: {
         </Button>
       </form>
       {invites.length === 0 ? (
-        <EmptyState>No invites yet.</EmptyState>
+        <EmptyState mood="sleepy">No invites yet.</EmptyState>
       ) : (
         <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-canvas">
           {invites.map((inv) => (

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { YuyuMark } from "@/components/ui/display";
+import { DotMark } from "@/components/brand/DotMark";
 import { cn } from "@/lib/cn";
 import { Container, DotIcon } from "../primitives";
+import { SETUP_GUIDE_URL } from "@/lib/openSource";
 
-const SETUP_GUIDE_URL = "https://github.com/twilighty-abhi/yuyu/blob/main/docs/DEPLOYMENT_DOCKER.md";
 
 /* eslint-disable @next/next/no-img-element -- static SVG design assets from /public */
 
@@ -191,8 +191,8 @@ export function FeaturesPage({ getStartedHref }: { getStartedHref: string }) {
       <section aria-labelledby="features-cta-title" className="border-t border-line">
         <Container className="py-16 lg:py-[88px]">
           <div className="yy-dark-band flex flex-col items-start gap-10 overflow-hidden rounded-[28px] bg-[var(--yy-inverse-surface)] p-8 sm:p-12 md:flex-row md:items-center lg:p-[72px]">
-            <YuyuMark size={132} className="hidden md:inline-flex" />
-            <YuyuMark size={96} className="md:hidden" />
+            <DotMark size={132} label={null} className="hidden md:inline-flex" />
+            <DotMark size={96} label={null} className="md:hidden" />
             <div className="flex flex-col gap-[18px]">
               <h2 id="features-cta-title" className="max-w-[760px] text-display-l text-ink">Ready for your next event?</h2>
               <div className="flex flex-wrap gap-3">

@@ -24,7 +24,8 @@
     "storage:migrate": "node scripts/migrate-assets-to-s3.mjs",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "production:check": "node scripts/check-production-env.mjs"
+    "production:check": "node scripts/check-production-env.mjs",
+    "brand:generate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-brand-assets.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
@@ -84,6 +85,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9",
     "eslint-config-next": "^16.3.5",
+    "fontkit": "2.0.4",
     "prisma": "6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5",

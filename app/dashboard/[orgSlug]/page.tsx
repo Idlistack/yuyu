@@ -205,7 +205,7 @@ export default async function OrgDashboardPage({
         />
 
         {events.length === 0 ? (
-          <EmptyState>
+          <EmptyState mood="sleepy">
             {view === "upcoming"
               ? "No upcoming published events."
               : `No ${view} events found.`}
@@ -267,7 +267,7 @@ export default async function OrgDashboardPage({
       <section id="series" aria-labelledby="series-title" className="flex scroll-mt-6 flex-col gap-4">
         <h2 id="series-title" className="text-h4 text-ink">Event series</h2>
         {seriesList.length === 0 ? (
-          <EmptyState>No recurring series yet. Create one to keep a regular event rhythm.</EmptyState>
+          <EmptyState mood="sleepy">No recurring series yet. Create one to keep a regular event rhythm.</EmptyState>
         ) : (
           <>
             <ul className="flex flex-col gap-2.5">

@@ -140,7 +140,7 @@ export function AttendeeTable(props: {
   }
 
   if (attendees.length === 0) {
-    return <EmptyState title="No RSVPs yet." />;
+    return <EmptyState mood="sleepy" title="No RSVPs yet." />;
   }
 
   const firstShown = rows.length === 0 ? 0 : page * rowsPerPage + 1;

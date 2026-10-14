@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/twilighty-abhi/yuyu">
-    <img src="public/brand/yuyu-mark.svg" width="112" height="112" alt="Yuyu" />
+    <img src="public/brand/lockup-horizontal.svg" width="203" height="60" alt="Yuyu" />
   </a>
 </p>
 
@@ -18,6 +18,8 @@
   <a href="docs/DEVELOPMENT.md">Local development</a>
   ·
   <a href="docs/DEPLOYMENT_DOCKER.md">Production deployment</a>
+  ·
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 Yuyu is a multi-tenant event platform built with Next.js, PostgreSQL, Prisma,
@@ -34,6 +36,19 @@ advertising trackers.
 - Feedback forms, response reporting, and eligible attendee certificates
 - Recurring event series, organisation roles, event collaborators, and tenant-bound API clients
 - Security-conscious operations: private object storage, CSP nonces, rate limiting, audit events, outbox email, and readiness checks
+- Light and dark modes, accessible defaults, and organiser colours on every event page
+
+## Design and brand
+
+Yuyu's interface follows the [design system brief](docs/DESIGN.md): ink neutrals,
+Bricolage Grotesque and Figtree, and organiser accent colours on event pages.
+Yuyu's own identity is the **dot sign**, a 5×5 grid of round dots that draws a "Y"
+in marigold (`#FFB547`). It appears only on Yuyu's surfaces. Organiser logos,
+covers and certificates are never rebranded.
+
+- Brand components: `components/brand/` (`DotMark`, `DotLockup`, `DotFace`, `DotIcon`, `DotLoader`)
+- SVG masters and generated icons: `public/brand/` (regenerate with `npm run brand:generate`)
+- Usage rules: [docs/DESIGN.md §2.3](docs/DESIGN.md#23-colour--brand-dot-sign)
 
 ## Quick start (local development)
 
@@ -65,6 +80,7 @@ out the application image.
 The project handbook lives in [`docs/`](docs/README.md):
 
 - [Features](docs/FEATURES.md)
+- [Design system and brand](docs/DESIGN.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Local development](docs/DEVELOPMENT.md)
 - [Configuration](docs/CONFIGURATION.md)
@@ -89,7 +105,18 @@ npm run test:e2e             # browser tests against development
 npm run test:e2e:production  # browser tests against standalone output
 npm run test:coverage        # repository-wide coverage report
 npm run build                # production build
+npm run brand:generate       # rebuild favicon, app icons, social card and email lockup from public/brand SVGs
 ```
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome:
+
+- [Report a bug](https://github.com/twilighty-abhi/yuyu/issues/new)
+- [Suggest an idea or ask a question](https://github.com/twilighty-abhi/yuyu/discussions)
+- [Contributing guide](CONTRIBUTING.md)
+
+Please report security issues privately rather than in a public issue (see the contributing guide).
 
 ## License
 

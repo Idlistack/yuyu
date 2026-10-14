@@ -12,6 +12,7 @@ import { Input, Textarea } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/menu";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { cn } from "@/lib/cn";
+import { DotFace } from "@/components/brand/DotFace";
 import {
   checkInByRsvpId,
   downloadOfflineCheckInRoster,
@@ -713,9 +714,15 @@ export function EventCheckInClient(props: {
               role="status"
               className={cn("flex flex-col gap-3 rounded-xl p-6", lastResult.kind === "already" ? "bg-emphasis text-ink" : "bg-success-solid text-white")}
             >
-              <span aria-hidden className={cn("flex size-14 items-center justify-center rounded-full", lastResult.kind === "already" ? "bg-canvas" : "bg-white/20")}>
-                {lastResult.kind === "already" ? <Info className="size-6" /> : <Check className="size-7" />}
-              </span>
+              {lastResult.kind === "already" ? (
+                <span aria-hidden className="flex size-14 items-center justify-center rounded-full bg-canvas">
+                  <Info className="size-6" />
+                </span>
+              ) : (
+                <span className="self-start rounded-[20px] bg-white p-3">
+                  <DotFace mood="wink" size={72} colors={{ O: "#18181B" }} />
+                </span>
+              )}
               <div>
                 <p className="text-[15px] font-semibold">{lastResult.kind === "already" ? "Already checked in" : "Checked in"}</p>
                 <p className="break-words font-display text-[34px] font-extrabold leading-none tracking-[-0.03em]">{lastResult.displayName}</p>

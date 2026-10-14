@@ -27,13 +27,11 @@
   --color-inverse: var(--yy-inverse-surface);
   --color-on-inverse: var(--yy-on-inverse);
 
-  --color-brand-mint: var(--yy-brand-mint);
-  --color-brand-lavender: var(--yy-brand-lavender);
-  --color-highlight-mint: var(--yy-highlight-mint);
-  --color-highlight-lavender: var(--yy-highlight-lavender);
+  --color-brand-marigold: var(--yy-brand-marigold);
+  --color-brand-marigold-deep: var(--yy-brand-marigold-deep);
+  --color-brand-dot-base: var(--yy-brand-dot-base);
+  --color-brand-dot-off: var(--yy-brand-dot-off);
   --color-highlight-peach: var(--yy-highlight-peach);
-  --color-tint-mint: var(--yy-tint-mint);
-  --color-tint-lavender: var(--yy-tint-lavender);
   --color-tint-peach: var(--yy-tint-peach);
 
   --color-success-bg: var(--yy-success-bg);
@@ -130,7 +128,7 @@
   }
 
   ::selection {
-    background: var(--yy-highlight-lavender);
+    background: var(--yy-highlight-peach);
     color: var(--yy-text);
   }
 
@@ -174,10 +172,7 @@
 
   /* Highlighter mark under a display word on Yuyu's own pages. */
   .yy-highlight {
-    background-image: linear-gradient(transparent 62%, var(--yy-highlight-mint) 62%, var(--yy-highlight-mint) 92%, transparent 92%);
-  }
-  .yy-highlight-lavender {
-    background-image: linear-gradient(transparent 62%, var(--yy-highlight-lavender) 62%, var(--yy-highlight-lavender) 92%, transparent 92%);
+    background-image: linear-gradient(transparent 62%, var(--yy-highlight-peach) 62%, var(--yy-highlight-peach) 92%, transparent 92%);
   }
 
   /* Accent placeholder cover: solid accent with a soft white dot grid. */
@@ -380,4 +375,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-color-mode]) .yy-img-light { display: none; }
   :root:not([data-color-mode]) .yy-img-dark { display: block; }
+}
+
+/* DotLoader (components/brand/DotLoader.tsx): each lit dot of the sign starts
+   soft and lights up, arms first; with reduced motion it ends lit (static mark). */
+@keyframes yy-dot-light {
+  0%, 35% { background-color: var(--yy-brand-dot-off); }
+}
+.yy-dot-loader-cell {
+  animation: yy-dot-light 1.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
 }

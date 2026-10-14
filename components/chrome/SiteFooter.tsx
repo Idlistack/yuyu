@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { YuyuMark } from "@/components/ui/display";
+import { DotLockup } from "@/components/brand/DotLockup";
+import { DotMark } from "@/components/brand/DotMark";
+import { GITHUB_URL } from "@/lib/openSource";
 
-const GITHUB_URL = "https://github.com/twilighty-abhi/yuyu";
 
 const publicLinks = [
   { label: "Discover", href: "/discover" },
@@ -29,9 +30,8 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-[1160px] flex-col gap-5 px-4 py-10 sm:px-6 xl:px-0">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="flex flex-col gap-2.5">
-            <Link href="/" className="inline-flex items-center gap-2.5 self-start" aria-label="Yuyu home">
-              <YuyuMark size={36} />
-              <span aria-hidden className="font-display text-[24px] font-extrabold leading-none tracking-[-0.03em] text-ink">yuyu</span>
+            <Link href="/" className="inline-flex items-center self-start" aria-label="Yuyu home">
+              <DotLockup size="md" label={null} />
             </Link>
             <p className="text-body-ui text-ink-secondary">Free events, run by communities.</p>
           </div>
@@ -67,7 +67,7 @@ export function EventFooter() {
     <footer className="mt-auto border-t border-line bg-canvas">
       <div className="mx-auto flex max-w-[1160px] flex-col gap-3 px-4 py-6 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <Link href="/" className="inline-flex items-center gap-2 hover:text-ink">
-          <YuyuMark size={18} />
+          <DotMark size={18} label={null} />
           <span>Free event, powered by Yuyu</span>
         </Link>
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -81,6 +81,18 @@ export function EventFooter() {
           </span>
         </p>
       </div>
+    </footer>
+  );
+}
+
+/** Credit under an embedded event (inside the organiser's iframe): opens Yuyu in a new tab. */
+export function EmbedCredit() {
+  return (
+    <footer className="flex justify-center px-4 py-5">
+      <a href="/" target="_blank" rel="noopener" className="inline-flex items-center gap-2 text-sm text-ink-muted hover:text-ink">
+        <DotMark size={18} label={null} />
+        <span>Free event, powered by Yuyu</span>
+      </a>
     </footer>
   );
 }

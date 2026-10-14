@@ -211,11 +211,24 @@ export async function createEventReportPdf(metrics: EventReportMetrics): Promise
     page.drawRectangle({ x, y, width: Math.max(0, Math.min(width, width * ratio)), height: 8, color });
   };
 
+  // Yuyu dot sign, one colour (Figma Logo/Mark, Style=Mono): a Y on a 5×5
+  // grid of circles, drawn as vectors so it stays sharp in print.
+  const dotMark = (page: ReturnType<typeof pdf.addPage>, right: number, top: number, size: number, color: ReturnType<typeof rgb>) => {
+    const dot = size / 6;
+    const step = dot * 1.25;
+    const lit = ["X...X", ".X.X.", "..X..", "..X..", "..X.."];
+    lit.forEach((row, r) => row.split("").forEach((cell, c) => {
+      if (cell !== "X") return;
+      page.drawCircle({ x: right - size + dot / 2 + c * step, y: top - dot / 2 - r * step, size: dot / 2, color });
+    }));
+  };
+
   const overview = pdf.addPage(pageSize);
   overview.drawRectangle({ x: 0, y: 0, width: pageSize[0], height: pageSize[1], color: rgb(1, 1, 1) });
   overview.drawRectangle({ x: 0, y: 670, width: pageSize[0], height: 171.89, color: navy });
   overview.drawRectangle({ x: 0, y: 650, width: pageSize[0], height: 20, color: blue });
   overview.drawText(cleanPdfText(metrics.organisationName), { x: margin, y: 797, size: 11, font: bold, color: rgb(0.82, 0.91, 1) });
+  dotMark(overview, pageSize[0] - margin, 808, 36, rgb(1, 1, 1));
   overview.drawText("POST-EVENT REPORT", { x: margin, y: 756, size: 24, font: bold, color: rgb(1, 1, 1) });
   overview.drawText(shorten(metrics.title, 52), { x: margin, y: 726, size: 14, font: regular, color: rgb(0.9, 0.95, 1) });
   overview.drawText(`Completed ${dateTime(metrics.endDateTime, metrics.timeZone)}`, { x: margin, y: 696, size: 9, font: regular, color: rgb(0.77, 0.87, 0.98) });
@@ -255,6 +268,7 @@ export async function createEventReportPdf(metrics: EventReportMetrics): Promise
   analytics.drawRectangle({ x: 0, y: 0, width: pageSize[0], height: pageSize[1], color: rgb(1, 1, 1) });
   analytics.drawRectangle({ x: 0, y: 754, width: pageSize[0], height: 87.89, color: navy });
   analytics.drawText("ANALYTICS", { x: margin, y: 794, size: 22, font: bold, color: rgb(1, 1, 1) });
+  dotMark(analytics, pageSize[0] - margin, 812, 30, rgb(1, 1, 1));
   analytics.drawText("Registration, attendance and engagement snapshot", { x: margin, y: 771, size: 10, font: regular, color: rgb(0.8, 0.89, 0.98) });
 
   label(analytics, "Registration outcome", margin, 718);

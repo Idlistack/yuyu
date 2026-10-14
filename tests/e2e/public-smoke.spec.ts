@@ -97,11 +97,14 @@ test("mobile navigation uses a compact touch-friendly menu", async ({ page }) =>
   expect(bounds?.height).toBeGreaterThanOrEqual(44);
 
   await menuButton.click();
-  const menu = page.getByRole("menu");
+  // The mobile menu is a top sheet (dialog) of plain links.
+  const menu = page.getByRole("dialog", { name: "Navigation" });
   await expect(menu).toBeVisible();
   const menuBounds = await menu.boundingBox();
-  expect(menuBounds?.height).toBeLessThan(280);
-  await page.getByRole("menuitem", { name: "Discover" }).click();
+  expect(menuBounds?.height).toBeLessThan(480);
+  const discover = menu.getByRole("link", { name: "Discover" });
+  expect((await discover.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await discover.click();
   await expect(page).toHaveURL(/\/discover$/);
   await expect(page.getByRole("button", { name: "Open navigation menu" })).toHaveAttribute("aria-expanded", "false");
 });

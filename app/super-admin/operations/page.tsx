@@ -130,7 +130,7 @@ export default async function SuperAdminOperationsPage() {
 
       <AdminPanel title="Failed email deliveries" description="Recipient addresses, message payloads, and bearer links are never shown here.">
         {failedMessages.length === 0 ? (
-          <EmptyState>No failed email deliveries.</EmptyState>
+          <EmptyState mood="sleepy">No failed email deliveries.</EmptyState>
         ) : (
           <Table label="Failed email deliveries">
             <THead>

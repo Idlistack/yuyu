@@ -78,7 +78,7 @@ function transitionColorMode(commit: () => void, origin?: ColorModeOrigin) {
     commit();
     return;
   }
-  type ViewTransitionDocument = Document & { startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> } };
+  type ViewTransitionDocument = Document & { startViewTransition?: (update: () => void | Promise<void>) => { ready: Promise<void>; finished: Promise<void> } };
   const doc = document as ViewTransitionDocument;
   if (typeof doc.startViewTransition !== "function") {
     root.classList.add("yy-theme-fade");
@@ -99,8 +99,16 @@ function transitionColorMode(commit: () => void, origin?: ColorModeOrigin) {
     root.style.removeProperty("--yy-reveal-x");
     root.style.removeProperty("--yy-reveal-y");
   };
-  const transition = doc.startViewTransition(commit);
-  const timing = { duration: 720, easing: "cubic-bezier(0.45, 0, 0.2, 1)", pseudoElement: "::view-transition-new(root)" };
+  const transition = doc.startViewTransition(async () => {
+    // Decode the other mode's illustration twins first so they don't pop in
+    // after the reveal; capped so the switch never feels slow.
+    const twins = Array.from(document.querySelectorAll<HTMLImageElement>("img.yy-img-light, img.yy-img-dark"));
+    await Promise.race([Promise.allSettled(twins.map((image) => image.decode())), new Promise((resolve) => window.setTimeout(resolve, 150))]);
+    commit();
+  });
+  // Hold the final frame: without fill the mask snaps back to 0 for a frame
+  // before the transition tears down, flashing the old mode.
+  const timing: KeyframeAnimationOptions = { duration: 720, easing: "cubic-bezier(0.45, 0, 0.2, 1)", fill: "forwards", pseudoElement: "::view-transition-new(root)" };
   transition.ready
     .then(() => {
       root.animate(
