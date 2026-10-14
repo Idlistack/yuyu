@@ -2,7 +2,10 @@
 
 <p align="center">
   <a href="https://github.com/twilighty-abhi/yuyu">
-    <img src="public/brand/lockup-horizontal.svg" width="203" height="60" alt="Yuyu" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="public/brand/lockup-horizontal-dark.svg" />
+      <img src="public/brand/lockup-horizontal.svg" width="203" height="60" alt="Yuyu" />
+    </picture>
   </a>
 </p>
 
