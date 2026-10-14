@@ -52,13 +52,16 @@ export function toDotLevels(counts: number[], levels = 4): number[] {
   return counts.map((count) => (count === 0 ? 0 : Math.max(1, Math.round((count / max) * levels))));
 }
 
-/** "+20% on last week", "Same as last week", "New this week", or null when both weeks are empty. */
-export function weekOverWeek(current: number, previous: number): string | null {
+/**
+ * "+20% on last week", "Same as last week", "New this week", or null when both
+ * periods are empty. `period` names the compared periods for other spans.
+ */
+export function weekOverWeek(current: number, previous: number, period: { previous: string; current: string } = { previous: "last week", current: "this week" }): string | null {
   if (current === 0 && previous === 0) return null;
-  if (previous === 0) return "New this week";
-  if (current === previous) return "Same as last week";
+  if (previous === 0) return `New ${period.current}`;
+  if (current === previous) return `Same as ${period.previous}`;
   const change = Math.round(((current - previous) / previous) * 100);
-  return `${change > 0 ? "+" : ""}${change}% on last week`;
+  return `${change > 0 ? "+" : ""}${change}% on ${period.previous}`;
 }
 
 export type FillStatus = { label: string; tone: "success" | "warning" | "neutral" };
@@ -108,4 +111,59 @@ export function homeSummary(input: {
     return input.signupsLastDay > 0 ? `${input.next.title} is ${when}, and ${signups} in the last day.` : `${input.next.title} is ${when}.`;
   }
   return "Nothing on the calendar yet. Your next event starts here.";
+}
+
+/* ---------- Organisation workspace ---------- */
+
+/** Counts per rolling window of `windowMs`, `buckets` windows ending at `now`, oldest first. */
+export function windowCounts(dates: Date[], now: Date, buckets: number, windowMs: number): number[] {
+  const counts = Array.from({ length: buckets }, () => 0);
+  for (const date of dates) {
+    const age = now.getTime() - date.getTime();
+    if (age < 0 || age >= buckets * windowMs) continue;
+    counts[buckets - 1 - Math.floor(age / windowMs)] += 1;
+  }
+  return counts;
+}
+
+/**
+ * Turnout across past events: checked in ÷ going, as a whole percentage, plus
+ * one 0..4 level per event (oldest first) for the dot chart. Null when nobody
+ * was going.
+ */
+export function turnout(events: Array<{ confirmed: number; checkedIn: number }>): { percent: number | null; levels: number[] } {
+  const going = events.reduce((sum, event) => sum + event.confirmed, 0);
+  const came = events.reduce((sum, event) => sum + Math.min(event.checkedIn, event.confirmed), 0);
+  return {
+    percent: going > 0 ? Math.round((came / going) * 100) : null,
+    levels: events.map((event) => (event.confirmed > 0 ? Math.round((Math.min(event.checkedIn, event.confirmed) / event.confirmed) * 4) : 0)),
+  };
+}
+
+/** "2026-10" from a `?month=` value, falling back to the given date's month. */
+export function parseMonth(value: string | undefined, fallback: { year: number; month: number }): { year: number; month: number } {
+  const match = /^(\d{4})-(\d{2})$/.exec(value ?? "");
+  if (!match) return fallback;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (year < 2000 || year > 2100 || month < 1 || month > 12) return fallback;
+  return { year, month };
+}
+
+/** Shifts a year/month by `delta` months. */
+export function shiftMonth({ year, month }: { year: number; month: number }, delta: number) {
+  const index = year * 12 + (month - 1) + delta;
+  return { year: Math.floor(index / 12), month: (index % 12) + 1 };
+}
+
+export function monthKey({ year, month }: { year: number; month: number }) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+/** Monday-first month grid: leading blanks (null) then day numbers. */
+export function monthGrid({ year, month }: { year: number; month: number }): Array<number | null> {
+  const first = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0 = Sunday
+  const leading = (first + 6) % 7;
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return [...Array.from({ length: leading }, () => null), ...Array.from({ length: days }, (_, index) => index + 1)];
 }

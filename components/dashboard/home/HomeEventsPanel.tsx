@@ -9,7 +9,8 @@ import { DotMeter, meterDots } from "./DotCharts";
 /** A dashboard event row, already formatted on the server. */
 export type HomeEventRowView = {
   key: string;
-  href: string;
+  /** Null when the person cannot manage this event; the row is then not a link. */
+  href: string | null;
   title: string;
   month: string;
   day: string;
@@ -23,28 +24,36 @@ export type HomeEventRowView = {
 };
 
 function EventRow({ row }: { row: HomeEventRowView }) {
+  const className = cn(
+    "flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg bg-canvas px-4 py-3.5 sm:flex-nowrap",
+    row.href && "transition-colors hover:bg-subtle",
+    row.isDraft ? "border-[1.5px] border-dashed border-line-strong" : "border border-line",
+  );
+  const content = (
+    <>
+      <DateBlock month={row.month} day={row.day} size="sm" series={row.isSeries} tone={row.isDraft ? "draft" : "accent"} color={row.isDraft ? undefined : row.accent} />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-base font-bold text-ink">{row.title}</span>
+        <span className="truncate text-caption text-ink-muted">
+          {row.meta}
+          {row.organisationName ? ` · ${row.organisationName}` : ""}
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
+        <Chip tone={row.status.tone} size="sm">{row.status.label}</Chip>
+        {row.fill ? <DotMeter filled={meterDots(row.fill.filled, row.fill.total, 10)} total={10} color={row.accent} /> : null}
+      </span>
+    </>
+  );
   return (
     <li>
-      <Link
-        href={row.href}
-        className={cn(
-          "flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg bg-canvas px-4 py-3.5 transition-colors hover:bg-subtle sm:flex-nowrap",
-          row.isDraft ? "border-[1.5px] border-dashed border-line-strong" : "border border-line",
-        )}
-      >
-        <DateBlock month={row.month} day={row.day} size="sm" series={row.isSeries} tone={row.isDraft ? "draft" : "accent"} color={row.isDraft ? undefined : row.accent} />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-base font-bold text-ink">{row.title}</span>
-          <span className="truncate text-caption text-ink-muted">
-            {row.meta}
-            {row.organisationName ? ` · ${row.organisationName}` : ""}
-          </span>
-        </span>
-        <span className="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
-          <Chip tone={row.status.tone} size="sm">{row.status.label}</Chip>
-          {row.fill ? <DotMeter filled={meterDots(row.fill.filled, row.fill.total, 10)} total={10} color={row.accent} /> : null}
-        </span>
-      </Link>
+      {row.href ? (
+        <Link href={row.href} className={className}>
+          {content}
+        </Link>
+      ) : (
+        <div className={className}>{content}</div>
+      )}
     </li>
   );
 }

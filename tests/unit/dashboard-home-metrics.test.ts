@@ -5,10 +5,16 @@ import {
   forwardDailyCounts,
   homeSummary,
   intervalCounts,
+  monthGrid,
+  monthKey,
   nowAndNext,
+  parseMonth,
   relativeDayPhrase,
+  shiftMonth,
   toDotLevels,
+  turnout,
   weekOverWeek,
+  windowCounts,
 } from "@/lib/dashboardHomeMetrics";
 
 const now = new Date("2026-10-14T06:00:00Z"); // 11:30 AM in Asia/Kolkata
@@ -39,6 +45,8 @@ describe("dashboard home charts", () => {
     expect(weekOverWeek(5, 5)).toBe("Same as last week");
     expect(weekOverWeek(12, 10)).toBe("+20% on last week");
     expect(weekOverWeek(5, 10)).toBe("-50% on last week");
+    expect(weekOverWeek(3, 0, { previous: "the 30 days before", current: "this month" })).toBe("New this month");
+    expect(weekOverWeek(6, 4, { previous: "the 30 days before", current: "this month" })).toBe("+50% on the 30 days before");
   });
 });
 
@@ -77,5 +85,34 @@ describe("dashboard home summary", () => {
     expect(homeSummary({ live: null, next, signupsLastDay: 12, now })).toBe("Demo Summit is tomorrow, and 12 people signed up in the last day.");
     expect(homeSummary({ live: null, next, signupsLastDay: 1, now })).toBe("Demo Summit is tomorrow, and 1 person signed up in the last day.");
     expect(homeSummary({ live: null, next: null, signupsLastDay: 0, now })).toBe("Nothing on the calendar yet. Your next event starts here.");
+  });
+});
+
+describe("organisation workspace helpers", () => {
+  it("buckets dates into rolling windows", () => {
+    const fiveDays = 5 * 86_400_000;
+    expect(windowCounts([hours(-1), hours(-24 * 6), hours(-24 * 29), hours(-24 * 31)], now, 6, fiveDays)).toEqual([1, 0, 0, 0, 1, 1]);
+  });
+
+  it("computes turnout as checked in over going, ignoring over-counted check-ins", () => {
+    expect(turnout([{ confirmed: 10, checkedIn: 8 }, { confirmed: 10, checkedIn: 12 }])).toEqual({ percent: 90, levels: [3, 4] });
+    expect(turnout([{ confirmed: 0, checkedIn: 0 }])).toEqual({ percent: null, levels: [0] });
+    expect(turnout([])).toEqual({ percent: null, levels: [] });
+  });
+
+  it("parses and shifts months safely", () => {
+    const fallback = { year: 2026, month: 10 };
+    expect(parseMonth("2026-12", fallback)).toEqual({ year: 2026, month: 12 });
+    expect(parseMonth("2026-13", fallback)).toEqual(fallback);
+    expect(parseMonth("<script>", fallback)).toEqual(fallback);
+    expect(shiftMonth({ year: 2026, month: 12 }, 1)).toEqual({ year: 2027, month: 1 });
+    expect(shiftMonth({ year: 2026, month: 1 }, -1)).toEqual({ year: 2025, month: 12 });
+    expect(monthKey({ year: 2027, month: 3 })).toBe("2027-03");
+  });
+
+  it("builds a Monday-first month grid", () => {
+    const october = monthGrid({ year: 2026, month: 10 }); // 1 Oct 2026 is a Thursday
+    expect(october.slice(0, 4)).toEqual([null, null, null, 1]);
+    expect(october.filter((day) => day !== null)).toHaveLength(31);
   });
 });

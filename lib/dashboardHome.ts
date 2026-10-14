@@ -24,7 +24,8 @@ const LISTED: EventStatus[] = ["PUBLISHED", "HIDDEN"];
 
 export type HomeEventRow = {
   key: string;
-  href: string;
+  /** Management link; null when the person cannot manage this organisation's events. */
+  href: string | null;
   title: string;
   organisationName: string;
   dateBlock: { start: Date; timezone: string };
@@ -45,16 +46,17 @@ export type HomeActivity = {
   timezone: string;
 };
 
-export type HomeStat = { label: string; value: number; hint: string; levels: number[]; tone: "ink" | "marigold" | "success" | "amber" };
+export type HomeStat = { label: string; value: number | string; hint: string; levels: number[]; tone: "ink" | "marigold" | "success" | "amber" };
 
 export type HomeOrganisation = { id: string; slug: string; name: string; logoUrl: string | null; role: string; upcoming: number; members: number };
 
 export type HomeLiveEvent = {
   id: string;
   title: string;
-  href: string;
+  /** Management link; null for members who cannot manage events. */
+  href: string | null;
   checkInHref: string | null;
-  scheduleHref: string;
+  scheduleHref: string | null;
   timezone: string;
   location: string;
   startDateTime: Date;
@@ -112,8 +114,9 @@ function tally(groups: CountKey[], key: "eventId" | "eventInstanceId") {
   return map;
 }
 
-const eventSelect = {
+export const eventSelect = {
   id: true,
+  organisationId: true,
   title: true,
   slug: true,
   startDateTime: true,
@@ -127,7 +130,143 @@ const eventSelect = {
   page: { select: { accentColor: true } },
 } satisfies Prisma.EventSelect;
 
-type EventForRow = Prisma.EventGetPayload<{ select: typeof eventSelect }>;
+export type EventForRow = Prisma.EventGetPayload<{ select: typeof eventSelect }>;
+
+export type RsvpCounts = { event: Map<string, CountTriple>; instance: Map<string, CountTriple> };
+type CountTriple = { confirmed: number; waitlisted: number; pending: number };
+const EMPTY_COUNTS: CountTriple = { confirmed: 0, waitlisted: 0, pending: 0 };
+
+/** Confirmed / waitlisted / pending counts for the listed events and series dates. */
+export async function loadRsvpCounts(eventIds: string[], instanceIds: string[]): Promise<RsvpCounts> {
+  const uniqueEvents = [...new Set(eventIds)];
+  const [eventGroups, instanceGroups] = await Promise.all([
+    uniqueEvents.length ? prisma.rSVP.groupBy({ by: ["eventId", "status"], where: { eventId: { in: uniqueEvents } }, _count: { _all: true } }) : Promise.resolve([]),
+    instanceIds.length ? prisma.rSVP.groupBy({ by: ["eventInstanceId", "status"], where: { eventInstanceId: { in: instanceIds } }, _count: { _all: true } }) : Promise.resolve([]),
+  ]);
+  return { event: tally(eventGroups, "eventId"), instance: tally(instanceGroups, "eventInstanceId") };
+}
+
+export function countsFor(counts: RsvpCounts, eventId: string): CountTriple {
+  return counts.event.get(eventId) ?? EMPTY_COUNTS;
+}
+
+/**
+ * One event row. `canManage` must reflect the person's role in the event's
+ * organisation: without it there is no management link and pending
+ * approvals are not revealed.
+ */
+export function toEventRow(event: EventForRow, counts: RsvpCounts, canManage: boolean): HomeEventRow {
+  const all = countsFor(counts, event.id);
+  const tallies = canManage ? all : { ...all, pending: 0 };
+  const draft = event.status === "DRAFT";
+  return {
+    key: `event-${event.id}`,
+    href: canManage ? `/dashboard/${event.organisation.slug}/event/${event.id}` : null,
+    title: event.title,
+    organisationName: event.organisation.name,
+    dateBlock: { start: event.startDateTime, timezone: event.timezone },
+    meta: event.isOnline ? "Online" : event.location || "Venue to be confirmed",
+    accent: accentOf(event.page?.accentColor),
+    isSeries: false,
+    isDraft: draft,
+    status: draft ? { label: "Finish & publish", tone: "warning" } : eventFillStatus(tallies, event.capacity),
+    fill: !draft && event.capacity ? { filled: tallies.confirmed, total: event.capacity } : null,
+  };
+}
+
+export const instanceSelect = {
+  id: true,
+  startDateTime: true,
+  series: { select: { id: true, organisationId: true, title: true, timezone: true, capacity: true, organisation: { select: { slug: true, name: true } } } },
+} satisfies Prisma.EventInstanceSelect;
+
+export type InstanceForRow = Prisma.EventInstanceGetPayload<{ select: typeof instanceSelect }>;
+
+export function toInstanceRow(instance: InstanceForRow, counts: RsvpCounts, canManage: boolean): HomeEventRow {
+  const all = counts.instance.get(instance.id) ?? EMPTY_COUNTS;
+  const tallies = canManage ? all : { ...all, pending: 0 };
+  return {
+    key: `instance-${instance.id}`,
+    href: canManage ? `/dashboard/${instance.series.organisation.slug}/series/${instance.series.id}` : null,
+    title: instance.series.title,
+    organisationName: instance.series.organisation.name,
+    dateBlock: { start: instance.startDateTime, timezone: instance.series.timezone },
+    meta: "Series date",
+    accent: accentOf(null),
+    isSeries: true,
+    isDraft: false,
+    status: eventFillStatus(tallies, instance.series.capacity),
+    fill: instance.series.capacity ? { filled: tallies.confirmed, total: instance.series.capacity } : null,
+  };
+}
+
+/** The Next up card for one event. `canManage` must reflect the person's role in its organisation. */
+export async function loadNextUp(event: EventForRow, counts: RsvpCounts, canManage: boolean, now: Date): Promise<NonNullable<DashboardHome["next"]>> {
+  const dayAgo = new Date(now.getTime() - DAY_MS);
+  const [signupsLastDay, recent] = await Promise.all([
+    prisma.rSVP.count({ where: { eventId: event.id, createdAt: { gte: dayAgo } } }),
+    // Named attendees only: anonymous guests are counted but not shown as avatars.
+    prisma.rSVP.findMany({
+      where: { eventId: event.id, status: "CONFIRMED", OR: [{ guestName: { not: null } }, { user: { name: { not: null } } }] },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+      select: { guestName: true, user: { select: { name: true } } },
+    }),
+  ]);
+  return {
+    ...toEventRow(event, counts, canManage),
+    location: event.isOnline ? "Online" : event.location,
+    startDateTime: event.startDateTime,
+    timezone: event.timezone,
+    confirmed: countsFor(counts, event.id).confirmed,
+    capacity: event.capacity,
+    signupsLastDay,
+    checkInHref: canManage ? `/dashboard/${event.organisation.slug}/event/${event.id}/check-in` : null,
+    recentNames: recent.map((rsvp) => displayName(rsvp)).filter((name) => name !== "A guest").map(firstName),
+    publicPath: event.status === "PUBLISHED" ? `/${event.organisation.slug}/${event.slug}` : null,
+  };
+}
+
+/** Where to look for an event that is on now (two hours before start until it ends). */
+export function liveEventWhere(base: Prisma.EventWhereInput, now: Date): Prisma.EventWhereInput {
+  return { ...base, status: { in: LISTED }, startDateTime: { lte: new Date(now.getTime() + LIVE_LEAD_MS) }, endDateTime: { gte: now } };
+}
+
+/** Event-day panel data for one event. `canManage` must reflect the person's role in its organisation. */
+export async function loadLiveEvent(event: EventForRow, canManage: boolean, now: Date): Promise<HomeLiveEvent> {
+  const start = event.startDateTime;
+  const arrivalsStart = new Date(Math.max(start.getTime() - ARRIVAL_BUCKET_MS * 2, Math.min(now.getTime(), event.endDateTime.getTime()) - ARRIVAL_BUCKET_MS * ARRIVAL_BUCKETS));
+  const [confirmed, checkedIn, arrivalDates, door, sessions] = await Promise.all([
+    prisma.rSVP.count({ where: { eventId: event.id, status: "CONFIRMED" } }),
+    prisma.rSVP.count({ where: { eventId: event.id, checkedInAt: { not: null } } }),
+    prisma.rSVP.findMany({ where: { eventId: event.id, checkedInAt: { gte: arrivalsStart } }, select: { checkedInAt: true }, take: SAMPLE_LIMIT }),
+    prisma.rSVP.findMany({ where: { eventId: event.id, checkedInAt: { not: null } }, orderBy: { checkedInAt: "desc" }, take: 5, select: { id: true, checkedInAt: true, guestName: true, user: { select: { name: true } } } }),
+    prisma.eventSession.findMany({ where: { eventId: event.id, visibility: { not: "DRAFT" } }, orderBy: { startDateTime: "asc" }, take: 100, select: { id: true, title: true, startDateTime: true, endDateTime: true, delayMinutes: true } }),
+  ]);
+  const arrivals = intervalCounts(arrivalDates.flatMap((rsvp) => (rsvp.checkedInAt ? [rsvp.checkedInAt] : [])), arrivalsStart, ARRIVAL_BUCKET_MS, ARRIVAL_BUCKETS);
+  const stage = nowAndNext(sessions, now);
+  const base = `/dashboard/${event.organisation.slug}/event/${event.id}`;
+  return {
+    id: event.id,
+    title: event.title,
+    href: canManage ? base : null,
+    checkInHref: canManage ? `${base}/check-in` : null,
+    scheduleHref: canManage ? `${base}/schedule` : null,
+    timezone: event.timezone,
+    location: event.isOnline ? "Online" : event.location,
+    startDateTime: start,
+    endDateTime: event.endDateTime,
+    started: start <= now,
+    confirmed,
+    checkedIn,
+    arrivals: arrivals.map((count, index) => ({ label: new Date(arrivalsStart.getTime() + index * ARRIVAL_BUCKET_MS), count })),
+    door: door.map((rsvp) => ({ key: rsvp.id, who: displayName(rsvp), at: rsvp.checkedInAt as Date })),
+    onStage: {
+      now: stage.now ? { title: stage.now.title, start: stage.now.start, end: stage.now.end } : null,
+      next: stage.next ? { title: stage.next.title, start: stage.next.start } : null,
+    },
+  };
+}
 
 export async function getDashboardHome(userId: string, now = new Date()): Promise<DashboardHome> {
   const memberships = await prisma.membership.findMany({
@@ -178,7 +317,7 @@ export async function getDashboardHome(userId: string, now = new Date()): Promis
       where: { endDateTime: { gte: now }, series: { organisationId: { in: orgIds }, status: { in: LISTED } } },
       orderBy: { startDateTime: "asc" },
       take: LIST_LIMIT,
-      select: { id: true, startDateTime: true, series: { select: { id: true, title: true, timezone: true, capacity: true, organisation: { select: { slug: true, name: true } } } } },
+      select: instanceSelect,
     }),
     prisma.event.findMany({ where: { organisationId: { in: adminOrgIds }, status: "DRAFT" }, orderBy: { createdAt: "desc" }, take: LIST_LIMIT, select: eventSelect }),
     prisma.event.findMany({ where: { ...memberEvent, status: { in: LISTED }, endDateTime: { lt: now } }, orderBy: { startDateTime: "desc" }, take: LIST_LIMIT, select: eventSelect }),
@@ -222,9 +361,9 @@ export async function getDashboardHome(userId: string, now = new Date()): Promis
       select: { id: true, submittedAt: true, rsvp: { select: { guestName: true, user: { select: { name: true } } } }, form: { select: { event: { select: { title: true, timezone: true } } } } },
     }),
     prisma.event.findFirst({
-      where: { ...memberEvent, status: { in: LISTED }, startDateTime: { lte: new Date(now.getTime() + LIVE_LEAD_MS) }, endDateTime: { gte: now } },
+      where: liveEventWhere(memberEvent, now),
       orderBy: { startDateTime: "asc" },
-      select: { ...eventSelect, organisationId: true },
+      select: eventSelect,
     }),
     prisma.event.groupBy({ by: ["organisationId"], where: { ...memberEvent, status: { in: LISTED }, endDateTime: { gte: now } }, _count: { _all: true } }),
     prisma.membership.groupBy({ by: ["organisationId"], where: { organisationId: { in: orgIds } }, _count: { _all: true } }),
@@ -235,122 +374,23 @@ export async function getDashboardHome(userId: string, now = new Date()): Promis
   ]);
 
   // RSVP counts for every event and series date shown in a list.
-  const eventIds = [...new Set([...upcomingEvents, ...draftEvents, ...pastEvents].map((event) => event.id))];
-  const instanceIds = upcomingInstances.map((instance) => instance.id);
-  const [eventGroups, instanceGroups] = await Promise.all([
-    eventIds.length ? prisma.rSVP.groupBy({ by: ["eventId", "status"], where: { eventId: { in: eventIds } }, _count: { _all: true } }) : Promise.resolve([]),
-    instanceIds.length ? prisma.rSVP.groupBy({ by: ["eventInstanceId", "status"], where: { eventInstanceId: { in: instanceIds } }, _count: { _all: true } }) : Promise.resolve([]),
-  ]);
-  const eventCounts = tally(eventGroups, "eventId");
-  const instanceCounts = tally(instanceGroups, "eventInstanceId");
-  const empty = { confirmed: 0, waitlisted: 0, pending: 0 };
+  const counts = await loadRsvpCounts(
+    [...upcomingEvents, ...draftEvents, ...pastEvents].map((event) => event.id),
+    upcomingInstances.map((instance) => instance.id),
+  );
+  const manages = (organisationId: string) => adminOrgIds.includes(organisationId);
+  const eventRow = (event: EventForRow) => toEventRow(event, counts, manages(event.organisationId));
 
-  const eventRow = (event: EventForRow): HomeEventRow => {
-    const counts = eventCounts.get(event.id) ?? empty;
-    const draft = event.status === "DRAFT";
-    return {
-      key: `event-${event.id}`,
-      href: `/dashboard/${event.organisation.slug}/event/${event.id}`,
-      title: event.title,
-      organisationName: event.organisation.name,
-      dateBlock: { start: event.startDateTime, timezone: event.timezone },
-      meta: event.isOnline ? "Online" : event.location || "Venue to be confirmed",
-      accent: accentOf(event.page?.accentColor),
-      isSeries: false,
-      isDraft: draft,
-      status: draft ? { label: "Finish & publish", tone: "warning" } : eventFillStatus(counts, event.capacity),
-      fill: !draft && event.capacity ? { filled: counts.confirmed, total: event.capacity } : null,
-    };
-  };
-
-  const instanceRows: HomeEventRow[] = upcomingInstances.map((instance) => {
-    const counts = instanceCounts.get(instance.id) ?? empty;
-    return {
-      key: `instance-${instance.id}`,
-      href: `/dashboard/${instance.series.organisation.slug}/series/${instance.series.id}`,
-      title: instance.series.title,
-      organisationName: instance.series.organisation.name,
-      dateBlock: { start: instance.startDateTime, timezone: instance.series.timezone },
-      meta: "Series date",
-      accent: accentOf(null),
-      isSeries: true,
-      isDraft: false,
-      status: eventFillStatus(counts, instance.series.capacity),
-      fill: instance.series.capacity ? { filled: counts.confirmed, total: instance.series.capacity } : null,
-    };
-  });
-
-  const upcoming = [...upcomingEvents.map(eventRow), ...instanceRows]
+  const upcoming = [...upcomingEvents.map(eventRow), ...upcomingInstances.map((instance) => toInstanceRow(instance, counts, manages(instance.series.organisationId)))]
     .sort((a, b) => a.dateBlock.start.getTime() - b.dateBlock.start.getTime())
     .slice(0, LIST_LIMIT);
 
   // Next up: the soonest one-off event (series dates stay in the list).
   const nextEvent = upcomingEvents.find((event) => event.startDateTime > now) ?? null;
-  let next: DashboardHome["next"] = null;
-  if (nextEvent) {
-    const [signupsLastDay, recent] = await Promise.all([
-      prisma.rSVP.count({ where: { eventId: nextEvent.id, createdAt: { gte: dayAgo } } }),
-      // Named attendees only: anonymous guests are counted but not shown as avatars.
-      prisma.rSVP.findMany({
-        where: { eventId: nextEvent.id, status: "CONFIRMED", OR: [{ guestName: { not: null } }, { user: { name: { not: null } } }] },
-        orderBy: { createdAt: "desc" },
-        take: 4,
-        select: { guestName: true, user: { select: { name: true } } },
-      }),
-    ]);
-    const counts = eventCounts.get(nextEvent.id) ?? empty;
-    const membership = memberships.find((item) => item.organisation.slug === nextEvent.organisation.slug);
-    next = {
-      ...eventRow(nextEvent),
-      location: nextEvent.isOnline ? "Online" : nextEvent.location,
-      startDateTime: nextEvent.startDateTime,
-      timezone: nextEvent.timezone,
-      confirmed: counts.confirmed,
-      capacity: nextEvent.capacity,
-      signupsLastDay,
-      checkInHref: membership && isOrgAdmin(membership.role) ? `/dashboard/${nextEvent.organisation.slug}/event/${nextEvent.id}/check-in` : null,
-      recentNames: recent.map((rsvp) => displayName(rsvp)).filter((name) => name !== "A guest").map(firstName),
-      publicPath: nextEvent.status === "PUBLISHED" ? `/${nextEvent.organisation.slug}/${nextEvent.slug}` : null,
-    };
-  }
+  const next = nextEvent ? await loadNextUp(nextEvent, counts, adminOrgIds.includes(nextEvent.organisationId), now) : null;
 
   // Event-day mode.
-  let live: HomeLiveEvent | null = null;
-  if (liveCandidate) {
-    const start = liveCandidate.startDateTime;
-    const arrivalsStart = new Date(Math.max(start.getTime() - ARRIVAL_BUCKET_MS * 2, Math.min(now.getTime(), liveCandidate.endDateTime.getTime()) - ARRIVAL_BUCKET_MS * ARRIVAL_BUCKETS));
-    const [confirmed, checkedIn, arrivalDates, door, sessions] = await Promise.all([
-      prisma.rSVP.count({ where: { eventId: liveCandidate.id, status: "CONFIRMED" } }),
-      prisma.rSVP.count({ where: { eventId: liveCandidate.id, checkedInAt: { not: null } } }),
-      prisma.rSVP.findMany({ where: { eventId: liveCandidate.id, checkedInAt: { gte: arrivalsStart } }, select: { checkedInAt: true }, take: SAMPLE_LIMIT }),
-      prisma.rSVP.findMany({ where: { eventId: liveCandidate.id, checkedInAt: { not: null } }, orderBy: { checkedInAt: "desc" }, take: 5, select: { id: true, checkedInAt: true, guestName: true, user: { select: { name: true } } } }),
-      prisma.eventSession.findMany({ where: { eventId: liveCandidate.id, visibility: { not: "DRAFT" } }, orderBy: { startDateTime: "asc" }, take: 100, select: { id: true, title: true, startDateTime: true, endDateTime: true, delayMinutes: true } }),
-    ]);
-    const counts = intervalCounts(arrivalDates.flatMap((rsvp) => (rsvp.checkedInAt ? [rsvp.checkedInAt] : [])), arrivalsStart, ARRIVAL_BUCKET_MS, ARRIVAL_BUCKETS);
-    const stage = nowAndNext(sessions, now);
-    const canCheckIn = adminOrgIds.includes(liveCandidate.organisationId);
-    const base = `/dashboard/${liveCandidate.organisation.slug}/event/${liveCandidate.id}`;
-    live = {
-      id: liveCandidate.id,
-      title: liveCandidate.title,
-      href: base,
-      checkInHref: canCheckIn ? `${base}/check-in` : null,
-      scheduleHref: `${base}/schedule`,
-      timezone: liveCandidate.timezone,
-      location: liveCandidate.isOnline ? "Online" : liveCandidate.location,
-      startDateTime: start,
-      endDateTime: liveCandidate.endDateTime,
-      started: start <= now,
-      confirmed,
-      checkedIn,
-      arrivals: counts.map((count, index) => ({ label: new Date(arrivalsStart.getTime() + index * ARRIVAL_BUCKET_MS), count })),
-      door: door.map((rsvp) => ({ key: rsvp.id, who: displayName(rsvp), at: rsvp.checkedInAt as Date })),
-      onStage: {
-        now: stage.now ? { title: stage.now.title, start: stage.now.start, end: stage.now.end } : null,
-        next: stage.next ? { title: stage.next.title, start: stage.next.start } : null,
-      },
-    };
-  }
+  const live = liveCandidate ? await loadLiveEvent(liveCandidate, adminOrgIds.includes(liveCandidate.organisationId), now) : null;
 
   // Needs you (managers only).
   const pendingApprovals = pendingRsvps.length;

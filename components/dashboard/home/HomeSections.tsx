@@ -70,9 +70,11 @@ export function NextUpCard({ next, now }: { next: NonNullable<DashboardHome["nex
               </Link>
             </Button>
           ) : null}
-          <Button asChild variant="secondary">
-            <Link href={next.href}>Manage event</Link>
-          </Button>
+          {next.href ? (
+            <Button asChild variant="secondary">
+              <Link href={next.href}>Manage event</Link>
+            </Button>
+          ) : null}
           {next.publicPath ? <CopyEventLink path={next.publicPath} title={next.title} /> : null}
         </div>
       </div>
@@ -114,9 +116,11 @@ export function LiveEventPanel({ live, now }: { live: NonNullable<DashboardHome[
                 </Link>
               </Button>
             ) : null}
-            <Button asChild variant="secondary" size="lg">
-              <Link href={live.href}>Manage event</Link>
-            </Button>
+            {live.href ? (
+              <Button asChild variant="secondary" size="lg">
+                <Link href={live.href}>Manage event</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
         <div aria-hidden className="grid w-full max-w-[340px] grid-cols-12 gap-[7px] self-center">
@@ -142,9 +146,11 @@ export function LiveEventPanel({ live, now }: { live: NonNullable<DashboardHome[
                 <span className="font-semibold text-ink">{live.onStage.next.title}</span>
               </div>
             ) : null}
-            <Link href={live.scheduleHref} className="mt-auto self-start text-sm font-semibold text-ink underline-offset-4 hover:underline">
-              Live schedule
-            </Link>
+            {live.scheduleHref ? (
+              <Link href={live.scheduleHref} className="mt-auto self-start text-sm font-semibold text-ink underline-offset-4 hover:underline">
+                Live schedule
+              </Link>
+            ) : null}
           </section>
         ) : null}
 

@@ -399,6 +399,16 @@ Built in `app/dashboard/page.tsx` from `lib/dashboardHome.ts`; every number come
 - **Organisations:** cards with a dotted strip, logo, upcoming/member/role chips, and a dashed "New organisation" card.
 - **First run:** until the person has a published event, a four-step checklist (organisation → logo → first event → publish); with no events yet, it replaces the page under a peach welcome banner.
 
+**Organisation workspace** (`app/dashboard/[orgSlug]/page.tsx`, data from `lib/orgDashboard.ts`, every query scoped to the one organisation):
+
+- **Banner:** dotted strip, logo, name, description, `/slug` with Copy link and Public page, role and member count; Settings / New series / New event for managers.
+- **Needs you**, **event day** and **Next up** reuse the home components, scoped to this organisation. Next up sits beside a **mini month calendar** (`?month=YYYY-MM`) with a dot per event (in its accent) and per series date.
+- **Stats:** upcoming events, sign-ups over 30 days, turnout (checked in ÷ going over the last five events) and feedback over 30 days. No invented scores.
+- **Events:** link tabs Upcoming (default) / Drafts (managers) / Past, a GET search (`?q=`), "Show more" (`?show=n`), privacy and status chips, a fill meter, and quick Check-in and Copy link actions. Past rows show "34 of 40 came" and feedback. No countdown timers.
+- **Series** (`#series`) with the recurrence in words and the next date; **Team** with member initials, a role breakdown and Invite (owners).
+- **Roles:** members see no management links, check-in or pending-approval counts; rows are not links for them.
+- **New organisation:** with no events and no series, a four-step checklist (profile, first event, team, public page) replaces the page.
+
 ---
 
 ## 6. Content & voice
