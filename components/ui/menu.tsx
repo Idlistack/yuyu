@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from "react";
+import { cloneElement, forwardRef, isValidElement, type ComponentPropsWithoutRef, type ElementRef, type ReactElement, type ReactNode } from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
@@ -32,10 +32,23 @@ export const MenuContent = forwardRef<ElementRef<typeof DropdownMenuPrimitive.Co
 export const MenuItem = forwardRef<
   ElementRef<typeof DropdownMenuPrimitive.Item>,
   ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & { danger?: boolean; icon?: ReactNode; description?: ReactNode }
->(function MenuItem({ className, danger, icon, description, children, ...props }, ref) {
+>(function MenuItem({ className, danger, icon, description, children, asChild, ...props }, ref) {
+  const content = (inner: ReactNode) => (
+    <>
+      {icon ? <span aria-hidden className="inline-flex text-current">{icon}</span> : null}
+      <span className="min-w-0 flex-1">
+        {inner}
+        {description ? <span className="block text-caption text-ink-muted">{description}</span> : null}
+      </span>
+    </>
+  );
+  // With asChild (e.g. a Link), Radix needs exactly one element child, so the
+  // icon and label go inside that element instead of beside it.
+  const slotted = asChild && isValidElement(children) ? (children as ReactElement<{ children?: ReactNode }>) : null;
   return (
     <DropdownMenuPrimitive.Item
       ref={ref}
+      asChild={Boolean(slotted)}
       className={cn(
         "flex min-h-10 cursor-pointer select-none items-center gap-2.5 rounded-md px-3 py-2 text-body-ui outline-none data-[disabled]:pointer-events-none data-[disabled]:text-ink-disabled data-[highlighted]:bg-emphasis [&_svg]:size-[18px] [&_svg]:shrink-0",
         danger ? "text-danger-fg" : "text-ink",
@@ -43,11 +56,7 @@ export const MenuItem = forwardRef<
       )}
       {...props}
     >
-      {icon ? <span aria-hidden className="inline-flex text-current">{icon}</span> : null}
-      <span className="min-w-0 flex-1">
-        {children}
-        {description ? <span className="block text-caption text-ink-muted">{description}</span> : null}
-      </span>
+      {slotted ? cloneElement(slotted, undefined, content(slotted.props.children)) : content(children)}
     </DropdownMenuPrimitive.Item>
   );
 });
