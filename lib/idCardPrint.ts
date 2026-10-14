@@ -33,10 +33,56 @@ export type IdCardPrintSettings = {
   /** Design-surface preferences saved with this event's local card settings. */
   gridSizeMm: IdCardGridSizeMm;
   showGrid: boolean;
+  /** Shrink long attendee names (down to 60%) so they stay on one line. */
+  nameAutoFit: boolean;
+  showBadgeLabel: boolean;
+  showFooter: boolean;
 };
 
 export const A6_PORTRAIT = { widthMm: 105, heightMm: 148 };
 export const A6_LANDSCAPE = { widthMm: 148, heightMm: 105 };
+
+/** Common badge stocks. Portrait sizes; the designer offers the landscape turn. */
+export const ID_CARD_PAPER_PRESETS = [
+  { id: "a6", label: "A6", detail: "105 × 148 mm · sheet paper", widthMm: 105, heightMm: 148 },
+  { id: "4x6", label: "4 × 6 in", detail: "Label printer badge", widthMm: 101.6, heightMm: 152.4 },
+  { id: "3x4", label: "3 × 4 in", detail: "Lanyard pouch badge", widthMm: 76.2, heightMm: 101.6 },
+  { id: "4x3", label: "4 × 3 in", detail: "Landscape pouch badge", widthMm: 101.6, heightMm: 76.2 },
+  { id: "cr80", label: "ID card (CR80)", detail: "85.6 × 54 mm · PVC card", widthMm: 85.6, heightMm: 53.98 },
+] as const;
+
+export function matchPaperPreset(widthMm: number, heightMm: number) {
+  const close = (a: number, b: number) => Math.abs(a - b) < 0.6;
+  for (const preset of ID_CARD_PAPER_PRESETS) {
+    if (close(preset.widthMm, widthMm) && close(preset.heightMm, heightMm)) return { preset, rotated: false };
+    if (close(preset.widthMm, heightMm) && close(preset.heightMm, widthMm)) return { preset, rotated: true };
+  }
+  return null;
+}
+
+/** The small label above the heading scales with it: 8pt on A6, smaller on small cards. */
+export function badgeLabelPt(headerPt: number) {
+  return Math.min(9, Math.max(5.5, Math.round(headerPt * 0.31 * 2) / 2));
+}
+
+/** Layout scale relative to A6 (1 on A6), so small stock gets proportionally smaller text and margins. */
+export function paperScale(widthMm: number, heightMm: number) {
+  return Math.min(1.6, Math.max(0.45, Math.min(widthMm, heightMm) / 105));
+}
+
+const round1 = (value: number) => Math.round(value * 10) / 10;
+
+/**
+ * Point size that keeps `text` on one line within `widthMm`, never above
+ * `sizePt` and never below `minRatio` of it (then it wraps instead). Uses an
+ * average glyph width, which is close enough for names in sans-serif type.
+ */
+export function fitTextSizePt(text: string, widthMm: number, sizePt: number, bold: boolean, minRatio = 0.6) {
+  const chars = Math.max(1, text.trim().length);
+  const emPerChar = bold ? 0.6 : 0.54;
+  const fitting = widthMm / (chars * emPerChar * 0.3528);
+  return round1(Math.max(sizePt * minRatio, Math.min(sizePt, fitting)));
+}
 
 const MIN_DIMENSION_MM = 40;
 const MAX_DIMENSION_MM = 300;
@@ -78,61 +124,89 @@ export function defaultIdCardElementPositions(
   widthMm: number,
   heightMm: number,
 ): IdCardElementPositions {
-  const qrX = Math.max(4, widthMm - 32);
-  const qrY = Math.max(4, heightMm - 32);
+  // Tuned on A6 portrait; other stock scales margins with the paper and keeps
+  // the name block at the same relative height.
+  const k = paperScale(widthMm, heightMm);
+  const sizes = defaultIdCardElementSizes(template, widthMm, heightMm);
+  const at = (mm: number) => Math.max(3, round1(mm * k));
+  const down = (mm: number) => round1(mm * heightMm / 148);
+  const qrX = Math.max(4, round1(widthMm - sizes.qr - 10 * k));
+  const qrY = Math.max(4, round1(heightMm - sizes.qr - 10 * k));
+  const footerY = (mm: number) => Math.max(8, round1(heightMm - mm * k));
+  // Never start the name block inside the heading: estimate a one-line heading
+  // (label, heading, rule) and push name, email and answers down if needed.
+  const text = defaultIdCardElementTextSizes(template, widthMm, heightMm);
+  const headerBottom = (top: number) => top + badgeLabelPt(text.header) * 0.3528 * 1.2 + 2.5 * k + text.header * 0.3528 * 1.1 + 2 * k + 3;
+  const below = (top: number, ys: [number, number, number]) => {
+    const shift = Math.max(0, round1(headerBottom(top) - ys[0]));
+    return ys.map((y) => round1(y + shift)) as [number, number, number];
+  };
   if (template === "bold") {
+    const [nameY, emailY, detailsY] = below(at(9) + 4 * k, [down(45), down(57), down(68)]);
     return {
-      header: { xMm: 16, yMm: 9 },
-      name: { xMm: 16, yMm: 45 },
-      email: { xMm: 16, yMm: 57 },
-      details: { xMm: 16, yMm: 68 },
-      qr: { xMm: qrX, yMm: 8 },
-      footer: { xMm: 16, yMm: Math.max(8, heightMm - 9) },
-      logo: { xMm: Math.max(4, widthMm - 24), yMm: Math.max(4, heightMm - 28) },
+      header: { xMm: at(16), yMm: at(9) },
+      name: { xMm: at(16), yMm: nameY },
+      email: { xMm: at(16), yMm: emailY },
+      details: { xMm: at(16), yMm: detailsY },
+      qr: { xMm: qrX, yMm: at(8) },
+      footer: { xMm: at(16), yMm: footerY(9) },
+      logo: { xMm: Math.max(4, round1(widthMm - sizes.logo - 11 * k)), yMm: Math.max(4, round1(heightMm - sizes.logo - 15 * k)) },
     };
   }
   if (template === "minimal") {
+    const [nameY, emailY, detailsY] = below(at(10) + 4 * k, [down(48), down(60), down(72)]);
     return {
-      header: { xMm: 10, yMm: 10 },
-      name: { xMm: 10, yMm: 48 },
-      email: { xMm: 10, yMm: 60 },
-      details: { xMm: 10, yMm: 72 },
+      header: { xMm: at(10), yMm: at(10) },
+      name: { xMm: at(10), yMm: nameY },
+      email: { xMm: at(10), yMm: emailY },
+      details: { xMm: at(10), yMm: detailsY },
       qr: { xMm: qrX, yMm: qrY },
-      footer: { xMm: 10, yMm: Math.max(8, heightMm - 12) },
-      logo: { xMm: Math.max(4, widthMm - 23), yMm: 10 },
+      footer: { xMm: at(10), yMm: footerY(12) },
+      logo: { xMm: Math.max(4, round1(widthMm - sizes.logo - 10 * k)), yMm: at(10) },
     };
   }
+  const [nameY, emailY, detailsY] = below(at(9), [down(47), down(59), down(73)]);
   return {
-    header: { xMm: 9, yMm: 9 },
-    name: { xMm: 9, yMm: 47 },
-    email: { xMm: 9, yMm: 59 },
-    details: { xMm: 9, yMm: 73 },
+    header: { xMm: at(9), yMm: at(9) },
+    name: { xMm: at(9), yMm: nameY },
+    email: { xMm: at(9), yMm: emailY },
+    details: { xMm: at(9), yMm: detailsY },
     qr: { xMm: qrX, yMm: qrY },
-    footer: { xMm: 9, yMm: Math.max(8, heightMm - 12) },
-    logo: { xMm: Math.max(4, widthMm - 24), yMm: 9 },
+    footer: { xMm: at(9), yMm: footerY(12) },
+    logo: { xMm: Math.max(4, round1(widthMm - sizes.logo - 11 * k)), yMm: at(9) },
   };
 }
 
 export function defaultIdCardElementSizes(
   template: IdCardPrintSettings["template"],
   widthMm: number,
+  heightMm: number = A6_PORTRAIT.heightMm,
 ): IdCardElementSizes {
-  const textWidth = (reservedMm: number) => Math.max(20, widthMm - reservedMm);
+  const k = paperScale(widthMm, heightMm);
+  const qr = Math.min(40, Math.max(16, round1(22 * k)));
+  const logo = Math.min(20, Math.max(8, round1(13 * k)));
+  // On landscape stock the QR sits beside the text, so text stops short of it.
+  const landscape = widthMm > heightMm * 1.15;
+  const besideQr = Math.max(20, round1(widthMm - qr - 22 * k));
+  const textWidth = (reservedMm: number, nextToQr = false) => {
+    const width = Math.max(20, round1(widthMm - reservedMm * k));
+    return landscape && nextToQr ? Math.min(width, besideQr) : width;
+  };
   if (template === "bold") {
     return {
-      header: textWidth(40), name: textWidth(56), email: textWidth(56), details: textWidth(56),
-      qr: 22, footer: textWidth(25), logo: 13,
+      header: textWidth(40), name: textWidth(56, true), email: textWidth(56, true), details: textWidth(56, true),
+      qr, footer: textWidth(25, true), logo,
     };
   }
   if (template === "minimal") {
     return {
-      header: textWidth(43), name: textWidth(19), email: textWidth(19), details: textWidth(19),
-      qr: 22, footer: textWidth(49), logo: 13,
+      header: textWidth(43), name: textWidth(19, true), email: textWidth(19, true), details: textWidth(19, true),
+      qr, footer: textWidth(49, true), logo,
     };
   }
   return {
-    header: textWidth(33), name: textWidth(18), email: textWidth(18), details: textWidth(49),
-    qr: 22, footer: textWidth(49), logo: 13,
+    header: textWidth(33), name: textWidth(18, true), email: textWidth(18, true), details: textWidth(49, true),
+    qr, footer: textWidth(49, true), logo,
   };
 }
 
@@ -140,10 +214,24 @@ export function defaultIdCardElementBold(): IdCardElementBold {
   return { header: true, name: true, email: false, details: false, qr: false, footer: false, logo: false };
 }
 
-export function defaultIdCardElementTextSizes(template: IdCardPrintSettings["template"] = "classic"): IdCardElementTextSizes {
-  if (template === "bold") return { header: 28, name: 17, email: 10, details: 8.5, qr: 0, footer: 8, logo: 0 };
-  if (template === "minimal") return { header: 24, name: 15, email: 10, details: 8.5, qr: 0, footer: 8, logo: 0 };
-  return { header: 26, name: 16, email: 10, details: 8.5, qr: 0, footer: 8, logo: 0 };
+export function defaultIdCardElementTextSizes(
+  template: IdCardPrintSettings["template"] = "classic",
+  widthMm: number = A6_PORTRAIT.widthMm,
+  heightMm: number = A6_PORTRAIT.heightMm,
+): IdCardElementTextSizes {
+  const base = template === "bold"
+    ? { header: 28, name: 17, email: 10, details: 8.5, footer: 8 }
+    : template === "minimal"
+      ? { header: 24, name: 15, email: 10, details: 8.5, footer: 8 }
+      : { header: 26, name: 16, email: 10, details: 8.5, footer: 8 };
+  const k = paperScale(widthMm, heightMm);
+  const scaled = (pt: number, min: number) => Math.max(min, Math.round(pt * k * 2) / 2);
+  // Headings shrink a little faster than body text so small cards keep room for the name.
+  const headerScale = k < 1 ? k ** 1.4 : k;
+  return {
+    header: Math.max(10, Math.round(base.header * headerScale * 2) / 2), name: scaled(base.name, 9), email: scaled(base.email, 6),
+    details: scaled(base.details, 6), qr: 0, footer: scaled(base.footer, 6), logo: 0,
+  };
 }
 
 function boundedPosition(value: unknown, fallback: IdCardElementPosition, widthMm: number, heightMm: number) {
@@ -173,8 +261,8 @@ function elementPositions(
   ])) as IdCardElementPositions;
 }
 
-function elementSizes(value: unknown, template: IdCardPrintSettings["template"], widthMm: number) {
-  const fallback = defaultIdCardElementSizes(template, widthMm);
+function elementSizes(value: unknown, template: IdCardPrintSettings["template"], widthMm: number, heightMm: number) {
+  const fallback = defaultIdCardElementSizes(template, widthMm, heightMm);
   const input = value && typeof value === "object" && !Array.isArray(value)
     ? value as Partial<Record<IdCardLayoutElement, unknown>>
     : {};
@@ -211,8 +299,8 @@ function elementBold(value: unknown) {
   ])) as IdCardElementBold;
 }
 
-function elementTextSizes(value: unknown, template: IdCardPrintSettings["template"]) {
-  const fallback = defaultIdCardElementTextSizes(template);
+function elementTextSizes(value: unknown, template: IdCardPrintSettings["template"], widthMm: number, heightMm: number) {
+  const fallback = defaultIdCardElementTextSizes(template, widthMm, heightMm);
   const input = value && typeof value === "object" && !Array.isArray(value)
     ? value as Partial<Record<IdCardLayoutElement, unknown>>
     : {};
@@ -240,11 +328,14 @@ export function defaultIdCardPrintSettings(eventTitle: string, organisationName 
     printFieldKeys: [],
     printFieldLabels: {},
     elementPositions: defaultIdCardElementPositions("classic", A6_PORTRAIT.widthMm, A6_PORTRAIT.heightMm),
-    elementSizes: defaultIdCardElementSizes("classic", A6_PORTRAIT.widthMm),
+    elementSizes: defaultIdCardElementSizes("classic", A6_PORTRAIT.widthMm, A6_PORTRAIT.heightMm),
     elementBold: defaultIdCardElementBold(),
     elementTextSizes: defaultIdCardElementTextSizes("classic"),
     gridSizeMm: 5,
     showGrid: true,
+    nameAutoFit: true,
+    showBadgeLabel: true,
+    showFooter: true,
   };
 }
 
@@ -262,7 +353,7 @@ export function normalizeIdCardPrintSettings(
   const template = input.template === "bold" || input.template === "minimal" || input.template === "classic"
     ? input.template
     : fallback.template;
-  const sizes = elementSizes(input.elementSizes, template, widthMm);
+  const sizes = elementSizes(input.elementSizes, template, widthMm, heightMm);
   const positions = elementPositions(input.elementPositions, template, widthMm, heightMm);
   return {
     widthMm,
@@ -278,8 +369,39 @@ export function normalizeIdCardPrintSettings(
     elementPositions: fitElementPositions(positions, sizes, widthMm, heightMm),
     elementSizes: sizes,
     elementBold: elementBold(input.elementBold),
-    elementTextSizes: elementTextSizes(input.elementTextSizes, template),
+    elementTextSizes: elementTextSizes(input.elementTextSizes, template, widthMm, heightMm),
     gridSizeMm: gridSizeMm(input.gridSizeMm),
     showGrid: typeof input.showGrid === "boolean" ? input.showGrid : fallback.showGrid,
+    nameAutoFit: typeof input.nameAutoFit === "boolean" ? input.nameAutoFit : fallback.nameAutoFit,
+    showBadgeLabel: typeof input.showBadgeLabel === "boolean" ? input.showBadgeLabel : fallback.showBadgeLabel,
+    showFooter: typeof input.showFooter === "boolean" ? input.showFooter : fallback.showFooter,
   };
+}
+
+/** A fresh layout for `template` on the given paper: positions, sizes and text sizes together. */
+export function layoutForPaper(template: IdCardPrintSettings["template"], widthMm: number, heightMm: number) {
+  return {
+    elementPositions: defaultIdCardElementPositions(template, widthMm, heightMm),
+    elementSizes: defaultIdCardElementSizes(template, widthMm, heightMm),
+    elementTextSizes: defaultIdCardElementTextSizes(template, widthMm, heightMm),
+    elementBold: defaultIdCardElementBold(),
+  };
+}
+
+const DESIGN_FILE_KIND = "yuyu-id-card-design";
+
+/** A portable design file, for copying a badge design to another check-in desk. */
+export function exportIdCardDesign(settings: IdCardPrintSettings): string {
+  return JSON.stringify({ kind: DESIGN_FILE_KIND, version: 1, settings }, null, 2);
+}
+
+/** Read a design file; anything unexpected is normalised or rejected, never trusted. */
+export function importIdCardDesign(text: string, eventTitle: string, organisationName = ""): IdCardPrintSettings | null {
+  try {
+    const parsed = JSON.parse(text) as { kind?: unknown; settings?: unknown };
+    if (!parsed || parsed.kind !== DESIGN_FILE_KIND || !parsed.settings || typeof parsed.settings !== "object") return null;
+    return normalizeIdCardPrintSettings(parsed.settings, eventTitle, organisationName);
+  } catch {
+    return null;
+  }
 }

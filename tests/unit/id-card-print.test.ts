@@ -78,3 +78,45 @@ describe("ID card print settings", () => {
     });
   });
 });
+
+describe("ID card layout on real badge stock", () => {
+  it("shrinks long names to fit one line, but never below 60%", async () => {
+    const { fitTextSizePt } = await import("@/lib/idCardPrint");
+    expect(fitTextSizePt("Priya Raman", 87, 16, true)).toBe(16);
+    const long = fitTextSizePt("Alexandra Montgomery-Fitzgerald", 87, 16, true);
+    expect(long).toBeLessThan(16);
+    expect(long).toBeGreaterThanOrEqual(9.6);
+    expect(fitTextSizePt("x".repeat(200), 87, 16, true)).toBe(9.6);
+  });
+
+  it("keeps every item on a CR80 card, with the QR still scannable", async () => {
+    const { layoutForPaper } = await import("@/lib/idCardPrint");
+    for (const template of ["classic", "bold", "minimal"] as const) {
+      const layout = layoutForPaper(template, 85.6, 53.98);
+      for (const [element, at] of Object.entries(layout.elementPositions)) {
+        expect(at.xMm, `${template} ${element} x`).toBeLessThan(85.6);
+        expect(at.yMm, `${template} ${element} y`).toBeLessThan(53.98);
+      }
+      expect(layout.elementSizes.qr).toBeGreaterThanOrEqual(16);
+      expect(layout.elementPositions.qr.yMm + layout.elementSizes.qr).toBeLessThanOrEqual(53.98);
+      expect(layout.elementTextSizes.name).toBeLessThan(16);
+    }
+  });
+
+  it("recognises presets either way round", async () => {
+    const { matchPaperPreset } = await import("@/lib/idCardPrint");
+    expect(matchPaperPreset(85.6, 53.98)?.preset.id).toBe("cr80");
+    expect(matchPaperPreset(148, 105)).toMatchObject({ preset: { id: "a6" }, rotated: true });
+    expect(matchPaperPreset(90, 60)).toBeNull();
+  });
+
+  it("exports and imports designs, rejecting anything else", async () => {
+    const { exportIdCardDesign, importIdCardDesign } = await import("@/lib/idCardPrint");
+    const design = normalizeIdCardPrintSettings({ template: "bold", heading: "Summit", nameAutoFit: false }, "Open House");
+    expect(importIdCardDesign(exportIdCardDesign(design), "Open House")).toEqual(design);
+    expect(importIdCardDesign('{"settings":{}}', "Open House")).toBeNull();
+    expect(importIdCardDesign("not json", "Open House")).toBeNull();
+    // Old saved designs without the new options get the defaults.
+    expect(normalizeIdCardPrintSettings({ template: "classic" }, "Open House")).toMatchObject({ nameAutoFit: true, showBadgeLabel: true, showFooter: true });
+  });
+});
