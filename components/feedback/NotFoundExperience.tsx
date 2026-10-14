@@ -6,7 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Compass, Scissors, Search } from "lucide-react";
 import { chromeFor } from "@/components/chrome/ChromeSwitch";
-import { YuyuWordmark } from "@/components/chrome/SiteHeader";
+import { SiteHeader } from "@/components/chrome/SiteHeader";
+import { SiteFooter } from "@/components/chrome/SiteFooter";
+import { ThemedImage } from "@/components/ui/themed-image";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/field";
 import { accentStyle } from "@/lib/theme/accent";
@@ -122,12 +124,13 @@ export function NotFoundExperience() {
   const shortPath = pathname.length > 38 ? `${pathname.slice(0, 36)}…` : pathname;
 
   const content = (
-    <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[880px] flex-col items-center gap-10 px-4 pb-24 pt-8 sm:pt-14">
+    <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[1160px] flex-col items-center gap-12 px-4 pb-28 pt-14 sm:px-6 sm:pt-20 lg:pb-[140px] lg:pt-[120px] xl:px-0">
       <NotFoundPet />
-      <div className="flex flex-col items-center gap-3 text-center">
-        <p className="text-overline text-accent-text">Error 404 · Lost &amp; found</p>
-        <h1 className="text-display-m text-ink">This page isn’t on the programme</h1>
-        <p className="max-w-[520px] text-body-ui text-ink-secondary">
+      <div className="flex flex-col items-center gap-5 text-center">
+        <ThemedImage src="/landing/404-face-surprised.svg" darkSrc="/landing/404-face-surprised-dark.svg" width={128} height={128} className="size-28 sm:size-32" />
+        <p className="text-overline text-ink-muted">Error 404 · Lost &amp; found</p>
+        <h1 className="max-w-[760px] text-display-m text-ink">This page isn’t on the programme</h1>
+        <p className="max-w-[560px] text-body-l text-ink-secondary">
           We scanned the ticket for <span className="font-mono text-[0.92em] text-ink">{shortPath}</span> and couldn’t find a match. It may have moved, expired, or never existed.
         </p>
       </div>
@@ -142,12 +145,12 @@ export function NotFoundExperience() {
           className="relative flex flex-col sm:flex-row"
         >
           {/* Main part */}
-          <div className="relative min-w-0 flex-1 overflow-hidden rounded-t-xl border border-line bg-canvas shadow-raised sm:rounded-l-xl sm:rounded-tr-none sm:border-r-0">
-            <div className="bg-accent px-6 py-4 text-on-accent">
-              <p className="text-sm font-semibold opacity-90">Yuyu · Lost &amp; found</p>
-              <p className="font-display text-[24px] font-extrabold leading-tight tracking-[-0.02em]">Page not found</p>
+          <div className="relative min-w-0 flex-1 overflow-hidden rounded-t-[20px] border border-line bg-canvas shadow-float sm:rounded-l-[20px] sm:rounded-tr-none sm:border-r-0">
+            <div className="bg-accent px-6 py-5 text-on-accent">
+              <p className="text-label opacity-90">Yuyu · Lost &amp; found</p>
+              <p className="font-display text-[28px] font-extrabold leading-tight tracking-[-0.02em] sm:text-[32px]">Page not found</p>
             </div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-6 py-5">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-4 p-6">
               <div className="col-span-2">
                 <TicketField label="Requested" value={pathname} mono />
               </div>
@@ -176,10 +179,10 @@ export function NotFoundExperience() {
                   initial={reduceMotion ? false : { opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.35, delay: 0.15 }}
-                  className="flex h-full flex-col items-center justify-center gap-3 rounded-b-xl border border-dashed border-line-strong bg-subtle px-5 py-6 text-center sm:rounded-r-xl sm:rounded-bl-none"
+                  className="flex h-full flex-col items-center justify-center gap-3 rounded-b-[20px] border border-dashed border-line-strong bg-tint-peach px-5 py-6 text-center sm:rounded-r-[20px] sm:rounded-bl-none"
                 >
                   <p className="text-overline text-ink-muted">Your stub says</p>
-                  <p className="text-title text-ink">There’s plenty else on</p>
+                  <p className="font-display text-[20px] font-extrabold leading-tight text-ink">There’s plenty else on</p>
                   <Button asChild variant="accent" size="sm">
                     <Link href="/discover">
                       Discover events
@@ -196,9 +199,9 @@ export function NotFoundExperience() {
                   onDragEnd={onStubDragEnd}
                   style={{ x: stubX, rotate: stubRotate, transformOrigin: "0% 100%" }}
                   exit={reduceMotion ? { opacity: 0 } : { x: 220, y: 140, rotate: 38, opacity: 0, transition: { duration: 0.55, ease: [0.4, 0, 0.6, 1] } }}
-                  className="relative flex h-full cursor-grab touch-pan-y flex-col items-center justify-center gap-3 overflow-hidden rounded-b-xl border border-line bg-canvas px-5 py-5 shadow-raised active:cursor-grabbing sm:rounded-r-xl sm:rounded-bl-none sm:border-l-0"
+                  className="relative flex h-full cursor-grab touch-pan-y flex-col items-center justify-center gap-3 overflow-hidden rounded-b-[20px] border border-line bg-canvas px-5 py-5 shadow-float active:cursor-grabbing sm:rounded-r-[20px] sm:rounded-bl-none sm:border-l-0"
                 >
-                  <div className="relative w-[132px] rounded-md bg-white p-2">
+                  <div className="relative w-[132px] rounded-[10px] border border-line bg-white p-2">
                     <svg viewBox={`0 0 ${QR_SIZE} ${QR_SIZE}`} className="block w-full text-[#18181B]" shapeRendering="crispEdges" aria-hidden>
                       {qr.map(([x, y]) => (
                         <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="currentColor" />
@@ -230,7 +233,7 @@ export function NotFoundExperience() {
         </motion.div>
         {!torn ? (
           <div className="mt-3 flex justify-center">
-            <button type="button" onClick={() => setTorn(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-ink-secondary hover:bg-muted hover:text-ink">
+            <button type="button" onClick={() => setTorn(true)} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-line-strong bg-canvas px-4 text-label text-ink-secondary transition-colors hover:bg-subtle hover:text-ink">
               <Scissors aria-hidden className="size-4" />
               Tear off the stub
             </button>
@@ -239,15 +242,15 @@ export function NotFoundExperience() {
       </div>
 
       {/* Ways forward */}
-      <div className="flex w-full max-w-[520px] flex-col items-center gap-4">
+      <div className="flex w-full max-w-[560px] flex-col items-center gap-5">
         <form onSubmit={search} role="search" className="flex w-full gap-2">
           <label htmlFor="not-found-search" className="sr-only">Search events</label>
           <SearchInput id="not-found-search" placeholder="Looking for an event?" value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} />
-          <Button type="submit" variant="primary" startIcon={<Search />}>Search</Button>
+          <Button type="submit" variant="secondary" startIcon={<Search />}>Search</Button>
         </form>
-        <div className="flex flex-wrap justify-center gap-2.5">
-          <Button onClick={goBackOrHome} variant="secondary" startIcon={<ArrowLeft />}>Go back</Button>
-          <Button asChild variant="secondary">
+        <div className="flex flex-wrap justify-center gap-3">
+          <Button onClick={goBackOrHome} variant="primary" size="lg" startIcon={<ArrowLeft />}>Go back</Button>
+          <Button asChild variant="secondary" size="lg">
             <Link href="/discover">
               <Compass aria-hidden className="size-[18px]" />
               Discover events
@@ -259,14 +262,15 @@ export function NotFoundExperience() {
   );
 
   if (!needsChrome) return content;
+  // Routes that normally draw their own chrome (dashboard, organiser pages,
+  // sign-in) lose it on a root 404, so give them the full Yuyu site chrome.
   return (
     <>
-      <header className="px-4 py-5 sm:px-8">
-        <YuyuWordmark />
-      </header>
-      <main id="main-content" tabIndex={-1} className="flex-1 pb-16 focus:outline-none">
+      <SiteHeader />
+      <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
         {content}
       </main>
+      <SiteFooter />
     </>
   );
 }

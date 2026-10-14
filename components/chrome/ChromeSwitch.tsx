@@ -18,7 +18,7 @@ function matches(pathname: string, prefixes: string[]) {
 }
 
 /** Full-bleed marketing pages that lay out their own sections. */
-const FULL_BLEED = ["/", "/about", "/features"];
+const FULL_BLEED = ["/", "/about", "/features", "/discover"];
 
 export type ChromeKind = "site" | "auth" | "own";
 

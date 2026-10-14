@@ -1,52 +1,33 @@
-import Link from "next/link";
-import { cn } from "@/lib/cn";
+import { ThemedImage } from "@/components/ui/themed-image";
+import { LegalToc } from "./LegalToc";
 
 export type LegalSection = { id: string; title: string; body: string };
 
-/** Shared Privacy / Terms template (Figma "Privacy policy (Terms uses same template)"). */
-export function LegalPage({ current, title, updated, notice, sections }: { current: "privacy" | "terms"; title: string; updated: string; notice: string; sections: LegalSection[] }) {
+// The title block's bottom rule runs edge to edge (Figma 126:3275) while the page
+// sits in the 1160px column; a border-image outset paints it without adding scroll.
+const fullBleedRule = { borderImage: "linear-gradient(var(--yy-border), var(--yy-border)) 0 0 1 0 / 0 0 1px 0 / 0 100vmax" };
+
+/** Shared Privacy / Terms layout (Figma "Privacy page — desktop" 126:3231, "Terms page — desktop" 126:3390). */
+export function LegalPage({ title, updated, notice, sections }: { current?: "privacy" | "terms"; title: string; updated: string; notice: string; sections: LegalSection[] }) {
   return (
-    <div className="flex flex-col gap-10">
-      <header className="flex flex-col items-start gap-4">
-        <nav aria-label="Legal documents" className="flex gap-2">
-          {[
-            { key: "privacy", href: "/privacy", label: "Privacy" },
-            { key: "terms", href: "/terms", label: "Terms" },
-          ].map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              aria-current={item.key === current ? "page" : undefined}
-              className={cn(
-                "inline-flex min-h-9 items-center rounded-full border px-3.5 text-sm font-semibold transition-colors",
-                item.key === current ? "border-primary bg-primary text-on-primary" : "border-line-strong text-ink hover:bg-subtle",
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+    <div className="flex flex-col pb-2 sm:pb-12">
+      <header style={fullBleedRule} className="flex flex-col items-start gap-4 border-b border-line pb-10 sm:pt-6">
+        <p className="text-overline text-ink-muted">Legal</p>
         <h1 className="text-display-m text-ink">{title}</h1>
         <p className="text-body-ui text-ink-muted">Last updated {updated}</p>
+        <div role="note" className="flex max-w-[836px] items-start gap-3.5 rounded-[16px] bg-warning-bg px-5 py-4 text-warning-fg">
+          <ThemedImage src="/landing/legal-icon-alert.svg" darkSrc="/landing/legal-icon-alert-dark.svg" width={20} height={20} className="mt-0.5 size-5" />
+          <p className="text-body-ui">{notice}</p>
+        </div>
       </header>
 
-      <div className="grid gap-10 md:grid-cols-[260px_minmax(0,1fr)] md:gap-14">
-        <nav aria-labelledby="legal-toc" className="md:sticky md:top-24 md:self-start">
-          <p id="legal-toc" className="text-overline text-ink-muted">On this page</p>
-          <ul className="mt-3 flex flex-col gap-1.5">
-            {sections.map((section) => (
-              <li key={section.id}>
-                <a href={`#${section.id}`} className="text-sm text-ink-secondary underline-offset-4 hover:text-ink hover:underline">{section.title}</a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="flex min-w-0 max-w-[640px] flex-col gap-8">
-          <p className="rounded-lg bg-muted px-4 py-3.5 text-body-ui text-ink-secondary">{notice}</p>
+      <div className="grid gap-10 pt-12 md:grid-cols-[minmax(0,260px)_minmax(0,760px)] md:gap-14 lg:gap-20">
+        <LegalToc sections={sections.map(({ id, title: sectionTitle }) => ({ id, title: sectionTitle }))} />
+        <div className="flex min-w-0 flex-col gap-10">
           {sections.map((section) => (
-            <section key={section.id} id={section.id} className="scroll-mt-24">
-              <h2 className="text-h4 text-ink">{section.title}</h2>
-              <p className="mt-2 text-body text-ink-secondary">{section.body}</p>
+            <section key={section.id} id={section.id} aria-labelledby={`${section.id}-title`} className="flex scroll-mt-[100px] flex-col gap-3">
+              <h2 id={`${section.id}-title`} className="text-h3 text-ink">{section.title}</h2>
+              <p className="text-body text-ink-secondary">{section.body}</p>
             </section>
           ))}
         </div>

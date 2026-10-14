@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { CalendarRange, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { EventPrivacyType, EventStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import type { Metadata } from "next";
-import { PublicEventCard } from "@/components/events/PublicEventCard";
+import { DiscoverEventCard } from "@/components/discover/DiscoverEventCard";
+import { Container } from "@/components/landing/primitives";
 import { Button } from "@/components/ui/button";
-import { Callout, EmptyState } from "@/components/ui/display";
+import { Callout } from "@/components/ui/display";
 import { controlClasses } from "@/components/ui/styles";
 import { cn } from "@/lib/cn";
 import { INK_ACCENT } from "@/lib/theme/accent";
@@ -16,7 +18,7 @@ import { paginationWindow } from "@/lib/pagination";
 export const metadata: Metadata = {
   title: "Discover Events",
   description:
-    "Browse upcoming public events and find something worth attending.",
+    "Free events from communities on this Yuyu. Register in seconds, no account needed.",
 };
 
 const PAGE_SIZE = 12;
@@ -30,6 +32,22 @@ type SearchParams = Promise<{
   q?: string;
   page?: string;
 }>;
+
+/** YYYY-MM-DD for a UTC date (discovery date filters are whole UTC days). */
+function isoDay(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+/** "This week" (today + 6 days) and "This month" (today to month end) as from/to presets. */
+function datePresets(now = new Date()) {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const weekEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 6));
+  const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
+  return {
+    week: { from: isoDay(today), to: isoDay(weekEnd) },
+    month: { from: isoDay(today), to: isoDay(monthEnd) },
+  };
+}
 
 function buildQueryString(params: Record<string, string | undefined>): string {
   const p = new URLSearchParams();
@@ -46,6 +64,8 @@ export default async function DiscoverPage({
   searchParams: SearchParams;
 }) {
   const sp = await searchParams;
+  const session = await auth();
+  const getStartedHref = session?.user ? "/dashboard" : "/login";
   const sort = sp.sort === "popular" ? "popular" : "upcoming";
   const q = (sp.q?.trim() || "").slice(0, MAX_QUERY_LENGTH);
   const page = Math.min(MAX_DISCOVERY_PAGES, Math.max(1, parseInt(sp.page ?? "1", 10) || 1));
@@ -185,142 +205,209 @@ export default async function DiscoverPage({
   const pageHref = (target: number) => `/discover${buildQueryString({ ...baseParams, page: String(target) })}`;
   const sortHref = (target: "upcoming" | "popular") => `/discover${buildQueryString({ ...(q ? { q } : {}), ...(sp.from ? { from: sp.from } : {}), ...(sp.to ? { to: sp.to } : {}), ...(target !== "upcoming" ? { sort: target } : {}) })}`;
   const clearSearchHref = `/discover${buildQueryString({ ...(sort !== "upcoming" ? { sort } : {}), ...(sp.from ? { from: sp.from } : {}), ...(sp.to ? { to: sp.to } : {}) })}`;
+  const presets = datePresets();
+  const rangeHref = (range: { from: string; to: string } | null) => `/discover${buildQueryString({ ...(q ? { q } : {}), ...(sort !== "upcoming" ? { sort } : {}), ...(range ? { from: range.from, to: range.to } : {}) })}`;
+  const activeRange = !sp.from && !sp.to
+    ? "all"
+    : sp.from === presets.week.from && sp.to === presets.week.to
+      ? "week"
+      : sp.from === presets.month.from && sp.to === presets.month.to
+        ? "month"
+        : "custom";
+  const dateChips = [
+    { key: "all", label: "All", href: rangeHref(null) },
+    { key: "week", label: "This week", href: rangeHref(presets.week) },
+    { key: "month", label: "This month", href: rangeHref(presets.month) },
+  ] as const;
+  const resultsLabel = q
+    ? `${totalItems} ${totalItems === 1 ? "event matches" : "events match"} “${q}”`
+    : sort === "popular" ? "Popular events" : "Upcoming events";
+  const chipClasses = (active: boolean) =>
+    cn(
+      "inline-flex min-h-8 items-center rounded-full border px-3.5 text-[13px] font-bold leading-[1.4] transition-colors",
+      active ? "border-primary bg-primary text-on-primary" : "border-line-strong bg-canvas text-ink hover:bg-subtle",
+    );
 
   return (
-    <div className="flex flex-col gap-8">
-      <header>
+    <div className="flex flex-col">
+      {/* Title and search (Figma 125:2367) */}
+      <Container className="flex flex-col gap-6 pb-8 pt-12 lg:pt-16">
         <h1 className="text-display-m text-ink">Discover events</h1>
-        <p className="mt-2 text-body-l text-ink-secondary">Free, public events from communities on Yuyu.</p>
-      </header>
-
-      <div className="flex flex-col gap-3.5">
-        <form action="/discover" method="get" role="search" className="flex flex-col gap-2.5 lg:flex-row lg:items-end">
+        <p className="max-w-[720px] text-body-l text-ink-secondary">Free events from communities on this Yuyu. Register in seconds, no account needed.</p>
+        <form action="/discover" method="get" role="search" className="flex flex-col gap-4">
           {sort !== "upcoming" ? <input type="hidden" name="sort" value={sort} /> : null}
-          <div className="relative min-w-0 flex-1">
-            <label htmlFor="discover-q" className="sr-only">Search events</label>
-            <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-ink-muted" />
-            <input id="discover-q" name="q" type="search" defaultValue={q} placeholder="Search events" maxLength={MAX_QUERY_LENGTH} className={cn(controlClasses, "h-[52px] rounded-full pl-11 pr-12 [&::-webkit-search-cancel-button]:appearance-none")} />
-            {q ? (
-              <Link href={clearSearchHref} aria-label="Clear search" className="absolute right-2 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-ink-muted hover:text-ink">
-                <X aria-hidden className="size-4" />
-              </Link>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full min-w-0 sm:max-w-[560px]">
+              <label htmlFor="discover-q" className="sr-only">Search events</label>
+              <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-ink-muted" />
+              <input
+                id="discover-q"
+                name="q"
+                type="search"
+                defaultValue={q}
+                placeholder="Search events"
+                maxLength={MAX_QUERY_LENGTH}
+                className={cn(controlClasses, "h-[52px] rounded-full pl-[46px] pr-12 text-body [&::-webkit-search-cancel-button]:appearance-none")}
+              />
+              {q ? (
+                <Link href={clearSearchHref} aria-label="Clear search" className="absolute right-2 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-ink-muted hover:text-ink">
+                  <X aria-hidden className="size-4" />
+                </Link>
+              ) : null}
+            </div>
+            <Button type="submit" variant="primary" size="lg" className="h-[52px] shrink-0">Search</Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <nav aria-label="When" className="flex flex-wrap gap-2">
+              {dateChips.map((chip) => (
+                <Link key={chip.key} href={chip.href} aria-current={activeRange === chip.key ? "true" : undefined} className={chipClasses(activeRange === chip.key)}>
+                  {chip.label}
+                </Link>
+              ))}
+            </nav>
+            <details className="group" open={activeRange === "custom" || Boolean(dateRangeError)}>
+              <summary className={cn(chipClasses(activeRange === "custom"), "cursor-pointer list-none gap-1.5 [&::-webkit-details-marker]:hidden")}>
+                <CalendarRange aria-hidden className="size-3.5" />
+                Pick dates
+              </summary>
+              <fieldset className="mt-3 flex flex-wrap items-end gap-2.5">
+                <legend className="sr-only">Date range</legend>
+                <label className="flex w-[170px] flex-col rounded-[18px] border border-line-strong bg-canvas px-4 py-1.5 focus-within:border-[var(--yy-focus)]">
+                  <span className="text-xs text-ink-muted">From</span>
+                  <input name="from" type="date" defaultValue={sp.from ?? ""} className="bg-transparent text-[15px] text-ink outline-none" />
+                </label>
+                <label className="flex w-[170px] flex-col rounded-[18px] border border-line-strong bg-canvas px-4 py-1.5 focus-within:border-[var(--yy-focus)]">
+                  <span className="text-xs text-ink-muted">To</span>
+                  <input name="to" type="date" defaultValue={sp.to ?? ""} className="bg-transparent text-[15px] text-ink outline-none" />
+                </label>
+                <Button type="submit" variant="secondary">Apply dates</Button>
+              </fieldset>
+            </details>
+          </div>
+        </form>
+        {dateRangeError ? <Callout tone="warning" title={dateRangeError}>Date filtering was not applied.</Callout> : null}
+      </Container>
+
+      {/* Results (Figma 125:2391) */}
+      <Container className="flex flex-col gap-6 pb-16 pt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-label text-ink-secondary" aria-live="polite">{resultsLabel}</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            {totalItems > 0 ? (
+              <p className="text-caption text-ink-muted">
+                {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, totalItems)} of {totalItems}
+              </p>
+            ) : null}
+            <nav aria-label="Sort events" className="flex rounded-full bg-muted p-1">
+              {(["upcoming", "popular"] as const).map((option) => (
+                <Link
+                  key={option}
+                  href={sortHref(option)}
+                  aria-current={sort === option ? "true" : undefined}
+                  className={cn(
+                    "inline-flex min-h-8 items-center rounded-full px-3.5 text-[13px] font-bold transition-colors",
+                    sort === option ? "bg-canvas text-ink shadow-segment" : "text-ink-secondary hover:text-ink",
+                  )}
+                >
+                  {option === "upcoming" ? "Upcoming" : "Popular"}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        </div>
+
+        {pageItems.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 rounded-[20px] border border-line bg-canvas px-6 py-10 text-center">
+            <p className="text-label text-ink">Nothing matches just yet</p>
+            <p className="max-w-md text-body-ui text-ink-muted">Try clearing a filter or searching for something else.</p>
+            {hasActiveFilters ? (
+              <Button asChild variant="secondary" size="sm" className="mt-2">
+                <Link href="/discover">Clear filters</Link>
+              </Button>
             ) : null}
           </div>
-          <fieldset className="flex gap-2.5">
-            <legend className="sr-only">When</legend>
-            <label className="flex min-w-0 flex-1 flex-col rounded-[18px] border border-line-strong px-4 py-1.5 focus-within:border-[var(--yy-focus)] lg:w-[170px] lg:flex-none">
-              <span className="text-xs text-ink-muted">From</span>
-              <input name="from" type="date" defaultValue={sp.from ?? ""} className="bg-transparent text-[15px] text-ink outline-none" />
-            </label>
-            <label className="flex min-w-0 flex-1 flex-col rounded-[18px] border border-line-strong px-4 py-1.5 focus-within:border-[var(--yy-focus)] lg:w-[170px] lg:flex-none">
-              <span className="text-xs text-ink-muted">To</span>
-              <input name="to" type="date" defaultValue={sp.to ?? ""} className="bg-transparent text-[15px] text-ink outline-none" />
-            </label>
-          </fieldset>
-          <Button type="submit" variant="primary" size="lg" className="lg:h-[52px]">Search</Button>
-        </form>
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <nav aria-label="Sort events" className="flex gap-2">
-            {(["upcoming", "popular"] as const).map((option) => (
-              <Link
-                key={option}
-                href={sortHref(option)}
-                aria-current={sort === option ? "true" : undefined}
-                className={cn(
-                  "inline-flex min-h-9 items-center rounded-full border px-3.5 text-sm font-semibold transition-colors",
-                  sort === option ? "border-[1.5px] border-primary bg-primary text-on-primary" : "border-line-strong bg-canvas text-ink-secondary hover:bg-subtle hover:text-ink",
+        ) : (
+          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {pageItems.map((row) => (
+              <li key={row.id}>
+                {row.kind === "event" ? (
+                  <DiscoverEventCard
+                    event={{
+                      href: `/${row.orgSlug}/${row.event.slug}`,
+                      title: row.event.title,
+                      startDateTime: row.event.startDateTime,
+                      timezone: row.event.timezone,
+                      location: row.event.location,
+                      isOnline: row.event.isOnline,
+                      coverImageUrl: row.event.coverImageUrl,
+                      accentColor: row.event.page?.accentColor,
+                      organisationName: row.event.organisation.name,
+                      label: row.event.tags[0] ?? null,
+                      goingCount: row.event.showRegistrationCount ? goingByEvent.get(row.event.id) ?? 0 : null,
+                    }}
+                  />
+                ) : (
+                  <DiscoverEventCard
+                    event={{
+                      href: `/${row.orgSlug}/i/${row.instance.id}`,
+                      title: row.instance.series.title,
+                      startDateTime: row.instance.startDateTime,
+                      timezone: row.instance.series.timezone,
+                      fallbackAccent: INK_ACCENT,
+                      organisationName: row.instance.series.organisation.name,
+                      label: recurrenceChip(row.instance.series.recurrenceRule),
+                      recurrenceText: describeRecurrence(row.instance.series.recurrenceRule),
+                    }}
+                  />
                 )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {totalPages > 1 ? (
+          <nav aria-label="Pagination" className="flex flex-wrap items-center justify-center gap-1.5 pt-2">
+            {safePage > 1 ? (
+              <Button asChild variant="secondary">
+                <Link href={pageHref(safePage - 1)}><ChevronLeft aria-hidden className="size-4" />Previous</Link>
+              </Button>
+            ) : (
+              <Button variant="secondary" disabled><ChevronLeft aria-hidden className="size-4" />Previous</Button>
+            )}
+            {paginationWindow(safePage, totalPages).map((p) => (
+              <Link
+                key={p}
+                href={pageHref(p)}
+                aria-current={p === safePage ? "page" : undefined}
+                className={cn("inline-flex size-11 items-center justify-center rounded-full text-[15px] font-bold", p === safePage ? "bg-primary text-on-primary" : "text-ink-secondary hover:bg-muted")}
               >
-                {option === "upcoming" ? "Upcoming" : "Popular"}
+                {p}
               </Link>
             ))}
+            {safePage < totalPages ? (
+              <Button asChild variant="secondary">
+                <Link href={pageHref(safePage + 1)}>Next<ChevronRight aria-hidden className="size-4" /></Link>
+              </Button>
+            ) : (
+              <Button variant="secondary" disabled>Next<ChevronRight aria-hidden className="size-4" /></Button>
+            )}
           </nav>
-          {totalItems > 0 ? (
-            <p className="text-sm text-ink-muted" aria-live="polite">
-              {q ? <>{totalItems} {totalItems === 1 ? "event matches" : "events match"} “{q}”</> : <>Showing {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, totalItems)} of {totalItems} {totalItems === 1 ? "event" : "events"}</>}
-              {totalPages > 1 ? <> · Page {safePage} of {totalPages}</> : null}
-            </p>
-          ) : null}
+        ) : null}
+      </Container>
+
+      {/* Host your own (Figma 125:3219) */}
+      <Container className="pb-16 lg:pb-[88px]">
+        <div className="flex flex-col items-start gap-6 rounded-[24px] bg-tint-peach p-6 sm:p-8 md:flex-row md:items-center">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <h2 className="text-h3 text-ink">Running something?</h2>
+            <p className="max-w-[640px] text-body text-ink-secondary">Set up your organisation and publish your first free event in a few minutes.</p>
+          </div>
+          <Button asChild variant="primary" size="lg" className="shrink-0">
+            <Link href={getStartedHref}>Start organising</Link>
+          </Button>
         </div>
-      </div>
-
-      {dateRangeError ? <Callout tone="warning" title={dateRangeError}>Date filtering was not applied.</Callout> : null}
-
-      <h2 className="sr-only">{q ? "Search results" : "Upcoming events"}</h2>
-      {pageItems.length === 0 ? (
-        <EmptyState
-          title="Nothing matches just yet"
-          action={hasActiveFilters ? <Button asChild variant="secondary" size="sm"><Link href="/discover">Clear filters</Link></Button> : undefined}
-        >
-          Try clearing a filter or searching for something else.
-        </EmptyState>
-      ) : (
-        <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {pageItems.map((row) => (
-            <li key={row.id}>
-              {row.kind === "event" ? (
-                <PublicEventCard
-                  event={{
-                    href: `/${row.orgSlug}/${row.event.slug}`,
-                    title: row.event.title,
-                    startDateTime: row.event.startDateTime,
-                    timezone: row.event.timezone,
-                    location: row.event.location,
-                    isOnline: row.event.isOnline,
-                    coverImageUrl: row.event.coverImageUrl,
-                    accentColor: row.event.page?.accentColor,
-                    organisationName: row.event.organisation.name,
-                    goingCount: row.event.showRegistrationCount ? goingByEvent.get(row.event.id) ?? 0 : null,
-                  }}
-                />
-              ) : (
-                <PublicEventCard
-                  event={{
-                    href: `/${row.orgSlug}/i/${row.instance.id}`,
-                    title: row.instance.series.title,
-                    startDateTime: row.instance.startDateTime,
-                    timezone: row.instance.series.timezone,
-                    fallbackAccent: INK_ACCENT,
-                    organisationName: row.instance.series.organisation.name,
-                    recurrenceChip: recurrenceChip(row.instance.series.recurrenceRule),
-                    recurrenceText: describeRecurrence(row.instance.series.recurrenceRule),
-                  }}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {totalPages > 1 ? (
-        <nav aria-label="Pagination" className="flex flex-wrap items-center justify-center gap-1.5 pt-2">
-          {safePage > 1 ? (
-            <Button asChild variant="secondary" size="sm">
-              <Link href={pageHref(safePage - 1)}><ChevronLeft aria-hidden className="size-4" />Previous</Link>
-            </Button>
-          ) : (
-            <Button variant="secondary" size="sm" disabled><ChevronLeft aria-hidden className="size-4" />Previous</Button>
-          )}
-          {paginationWindow(safePage, totalPages).map((p) => (
-            <Link
-              key={p}
-              href={pageHref(p)}
-              aria-current={p === safePage ? "page" : undefined}
-              className={cn("inline-flex size-9 items-center justify-center rounded-full text-sm font-semibold", p === safePage ? "bg-primary text-on-primary" : "text-ink-secondary hover:bg-emphasis")}
-            >
-              {p}
-            </Link>
-          ))}
-          {safePage < totalPages ? (
-            <Button asChild variant="secondary" size="sm">
-              <Link href={pageHref(safePage + 1)}>Next<ChevronRight aria-hidden className="size-4" /></Link>
-            </Button>
-          ) : (
-            <Button variant="secondary" size="sm" disabled>Next<ChevronRight aria-hidden className="size-4" /></Button>
-          )}
-        </nav>
-      ) : null}
+      </Container>
     </div>
   );
 }

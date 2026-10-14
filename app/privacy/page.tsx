@@ -58,7 +58,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       current="privacy"
-      title="Privacy policy"
+      title="Privacy"
       updated="15 September 2026"
       notice="This policy explains the privacy practices built into Yuyu. It is a general product notice and must be reviewed and supplemented by each deployment operator for its legal jurisdiction, contact details, and actual hosting arrangements."
       sections={sections}
