@@ -142,7 +142,7 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
             <div className="group absolute bottom-0 right-0 flex w-[290px] max-w-[88%] flex-col gap-3.5 rounded-[24px] border border-line bg-canvas p-5 shadow-ticket sm:bottom-auto sm:left-[262px] sm:right-auto sm:top-[452px]">
               <div className="flex items-center gap-3">
                 <DotFace mood="cheering" size={54.4} />
-                <p className="font-display text-[22px] font-extrabold tracking-[-0.02em] text-ink">You’re in, Meera!</p>
+                <p className="font-display text-[22px] font-extrabold tracking-[-0.02em] text-ink">You’re in, Adithya!</p>
               </div>
               <ThemedImage src="/landing/ticket-perforation.svg" darkSrc="/landing/ticket-perforation-dark.svg" width={248} height={3} className="h-[3px] w-full" />
               <div className="flex items-center gap-3.5">
@@ -250,7 +250,7 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
               </span>
               <div className="flex flex-col gap-2">
                 <p className="text-[17px] font-bold text-white">Checked in</p>
-                <p className="font-display text-[40px] font-extrabold leading-tight tracking-[-0.03em] text-white">Meera Rao</p>
+                <p className="font-display text-[40px] font-extrabold leading-tight tracking-[-0.03em] text-white">Adithya Rao</p>
                 <div className="flex gap-2.5">
                   <span className="inline-flex h-11 items-center rounded-full bg-[#18181b] px-[18px] text-[15px] font-bold text-[#f4f4f5]">Next guest</span>
                   <span className="inline-flex h-11 items-center rounded-full border-[1.5px] border-white px-5 text-[15px] font-bold text-white">Undo</span>

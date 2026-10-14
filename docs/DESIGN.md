@@ -321,7 +321,7 @@ Used on: event cards, dashboard rows, event header, ticket, embed. Optional seri
 ### 4.10 Event registration card
 
 Right column on desktop (sticky top 24px), below title on mobile **plus a sticky bottom bar** with the Register button once the card scrolls away.
-Contents: "Join this event" (h3) · "5 going / 115 spots left" + progress bar (accent) · avatar stack + "Meera, Dev and 3 others" · accent button "Register — it's free" · secondary row Add to calendar / Share · host row (org logo, "Hosted by", name, →).
+Contents: "Join this event" (h3) · "5 going / 115 spots left" + progress bar (accent) · avatar stack + "Adithya, Dev and 3 others" · accent button "Register — it's free" · secondary row Add to calendar / Share · host row (org logo, "Hosted by", name, →).
 States: Open · Full ("Join the waitlist", warning) · Approval required ("Request to join") · Closed ("Registration closed", disabled + reason) · Registered ("You're in" success + View ticket).
 
 ### 4.11 Ticket
