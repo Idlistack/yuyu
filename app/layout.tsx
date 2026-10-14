@@ -16,6 +16,9 @@ export const metadata: Metadata = {
     template: "%s · Yuyu",
   },
   description: "Create organisations, publish events, and collect RSVPs.",
+  // The installed app's name on every platform (Android reads the manifest; iOS reads these).
+  applicationName: "Yuyu",
+  appleWebApp: { capable: true, title: "Yuyu", statusBarStyle: "default" },
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"),
   // Default social card for Yuyu's own pages; event pages set their own image.
   openGraph: { siteName: "Yuyu", images: [{ url: "/brand/og-default.png", width: 1200, height: 630, alt: "Yuyu" }] },

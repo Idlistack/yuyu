@@ -2,7 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Yuyu Event Management",
+    // A stable id so the installed app keeps its identity across hosts (e.g. a dev tunnel).
+    id: "/",
+    name: "Yuyu",
     short_name: "Yuyu",
     description: "Create, manage, register for, and check in to free community events.",
     start_url: "/dashboard",
