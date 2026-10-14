@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DotFace } from "@/components/brand/DotFace";
 import { DotMark } from "@/components/brand/DotMark";
+import type { DotFaceMood } from "@/components/brand/patterns";
 import { GitHubMark } from "@/components/ui/github-mark";
-import { ThemedImage } from "@/components/ui/themed-image";
 import { CONTRIBUTING_URL, DISCUSSIONS_URL, GITHUB_REPO, GITHUB_URL, NEW_ISSUE_URL, SETUP_GUIDE_URL } from "@/lib/openSource";
 import { Container, DotIcon, SectionHeading } from "../primitives";
 
@@ -13,13 +14,13 @@ const story = [
   "And because communities deserve to own their own data, Yuyu runs on your server, not ours.",
 ];
 
-const principles = [
-  { title: "Welcoming, like a neighbourhood", body: "Plain words, friendly shapes and room to breathe. Never an admin console.", face: "about-face-welcoming" },
-  { title: "The event leads", body: "Yuyu stays quiet so your colours, cover and logo carry the page.", face: "face-cheering" },
-  { title: "Simple for volunteers", body: "One obvious next step on every screen, and nothing destructive without asking first.", face: "about-face-simple" },
-  { title: "Free, and staying free", body: "Built only for free events. No payments, no fees, no ads.", face: "face-love" },
-  { title: "Your data stays yours", body: "Run it on your own server. Organisations are kept apart, and private links stay private.", face: "face-wink" },
-  { title: "Accessible by default", body: "Readable contrast and real controls that work with a keyboard, a screen reader and a small phone.", face: "about-face-accessible" },
+const principles: Array<{ title: string; body: string; face: DotFaceMood }> = [
+  { title: "Welcoming, like a neighbourhood", body: "Plain words, friendly shapes and room to breathe. Never an admin console.", face: "happy" },
+  { title: "The event leads", body: "Yuyu stays quiet so your colours, cover and logo carry the page.", face: "cheering" },
+  { title: "Simple for volunteers", body: "One obvious next step on every screen, and nothing destructive without asking first.", face: "done" },
+  { title: "Free, and staying free", body: "Built only for free events. No payments, no fees, no ads.", face: "love" },
+  { title: "Your data stays yours", body: "Run it on your own server. Organisations are kept apart, and private links stay private.", face: "wink" },
+  { title: "Accessible by default", body: "Readable contrast and real controls that work with a keyboard, a screen reader and a small phone.", face: "thinking" },
 ];
 
 const openCards = [
@@ -66,9 +67,7 @@ export function AboutPage({ getStartedHref }: { getStartedHref: string }) {
           <ul className="grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {principles.map((principle) => (
               <li key={principle.title} className="group flex flex-col items-center gap-[18px] rounded-[24px] bg-tint-peach px-6 py-7 text-center">
-                <span className="transition-transform duration-300 ease-out group-hover:-translate-y-1 group-hover:scale-105 motion-reduce:transition-none">
-                  <ThemedImage src={`/landing/${principle.face}.svg`} darkSrc={`/landing/${principle.face}-dark.svg`} width={109} height={109} className="size-[108.8px]" />
-                </span>
+                <DotFace mood={principle.face} size={108.8} />
                 <h3 className="font-display text-[22px] font-extrabold text-ink">{principle.title}</h3>
                 <p className="text-body-ui text-ink-secondary">{principle.body}</p>
               </li>

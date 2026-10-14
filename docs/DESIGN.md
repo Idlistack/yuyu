@@ -222,6 +222,7 @@ Flat by default: cards use a 1px `--yy-border`, no shadow.
 - Organisation logo: square, radius 9–28 depending on size; fallback = initials on the org accent.
 - Logos of sponsors: real logo in a 40×40 tile; fallback dashed tile. Never repeat the name twice.
 - **Dot illustrations** (Yuyu's own pages only): 7×7 dot icons and faces from `components/brand` or `/public/landing`. Every landing SVG has a `-dark.svg` twin, swapped by `ThemedImage` with CSS only (no JS, no flash).
+- **Faces are always live `DotFace` grids, never images.** On hover of the face or its `.group` card, the dots ripple out from the centre, the eyes blink and the face lifts 4px with a −4° tilt (`.yy-face` in `globals.css`). This is mouse-only (`hover: hover`) and fully still under reduced motion. Pass `hover={false}` where a face must stay still.
 - **Faces carry meaning, not decoration.** `EmptyState` takes a `mood`: Sleepy for empty lists, Sad for errors and not-found, Cheering for "You're in", Wink for checked in, Waiting for the waitlist, Thinking for loading. Keep the existing words beside the face. Organiser surfaces (org page, event schedule) don't show faces.
 - **404:** a dot-grid page with a small companion that follows the pointer (or taps on touch) and settles when idle. It is decorative (`aria-hidden`) and still under reduced motion.
 

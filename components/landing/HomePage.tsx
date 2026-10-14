@@ -3,6 +3,8 @@ import { Bug, GitPullRequest, Lightbulb, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GitHubMark } from "@/components/ui/github-mark";
 import { ThemedImage } from "@/components/ui/themed-image";
+import { DotFace } from "@/components/brand/DotFace";
+import type { DotFaceMood } from "@/components/brand/patterns";
 import { DotMark } from "@/components/brand/DotMark";
 import { CONTRIBUTING_URL, DISCUSSIONS_URL, GITHUB_REPO, GITHUB_URL, NEW_ISSUE_URL, SETUP_GUIDE_URL } from "@/lib/openSource";
 import { accentStyle } from "@/lib/theme/accent";
@@ -29,11 +31,11 @@ const features = [
   { title: "Teams and co-organisers", body: "Invite your crew with the right access, from full admin to door volunteer.", icon: "icon-guests" },
 ];
 
-const moments = [
-  { title: "You’re in!", body: "The moment someone registers.", face: "face-cheering" },
-  { title: "Checked in", body: "A friendly hello at the door.", face: "face-wink" },
-  { title: "On the waitlist", body: "Honest, and we tell them when a spot opens.", face: "face-waiting" },
-  { title: "Loved it", body: "Feedback that takes ten seconds to give.", face: "face-love" },
+const moments: Array<{ title: string; body: string; face: DotFaceMood }> = [
+  { title: "You’re in!", body: "The moment someone registers.", face: "cheering" },
+  { title: "Checked in", body: "A friendly hello at the door.", face: "wink" },
+  { title: "On the waitlist", body: "Honest, and we tell them when a spot opens.", face: "waiting" },
+  { title: "Loved it", body: "Feedback that takes ten seconds to give.", face: "love" },
 ];
 
 const doorPoints = [
@@ -83,10 +85,6 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
       <section aria-labelledby="hero-title">
         <Container className="grid items-center gap-14 pb-20 pt-12 lg:grid-cols-2 lg:pt-[72px]">
           <div className="flex flex-col items-start gap-7">
-            <p className="inline-flex items-center gap-2.5 rounded-full bg-tint-peach py-1.5 pl-2.5 pr-3.5 text-[14px] font-bold text-ink">
-              <img src="/landing/badge-dot.svg" alt="" width={10} height={10} className="size-2.5" />
-              Free · Open source · Runs on your own server
-            </p>
             <h1 id="hero-title" className="max-w-[552px] text-display-xl text-ink">Host events people show up to.</h1>
             <p className="max-w-[552px] text-body-l text-ink-secondary">
               Yuyu gives clubs, meetups and community groups everything to run free events: a beautiful event page, registrations and waitlists, tickets, check-in at the door and feedback afterwards.
@@ -141,9 +139,9 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
               </div>
             </div>
 
-            <div className="absolute bottom-0 right-0 flex w-[290px] max-w-[88%] flex-col gap-3.5 rounded-[24px] border border-line bg-canvas p-5 shadow-ticket sm:bottom-auto sm:left-[262px] sm:right-auto sm:top-[452px]">
+            <div className="group absolute bottom-0 right-0 flex w-[290px] max-w-[88%] flex-col gap-3.5 rounded-[24px] border border-line bg-canvas p-5 shadow-ticket sm:bottom-auto sm:left-[262px] sm:right-auto sm:top-[452px]">
               <div className="flex items-center gap-3">
-                <ThemedImage src="/landing/face-cheering-small.svg" darkSrc="/landing/face-cheering-small-dark.svg" width={54} height={54} className="size-[54px]" />
+                <DotFace mood="cheering" size={54.4} />
                 <p className="font-display text-[22px] font-extrabold tracking-[-0.02em] text-ink">You’re in, Meera!</p>
               </div>
               <ThemedImage src="/landing/ticket-perforation.svg" darkSrc="/landing/ticket-perforation-dark.svg" width={248} height={3} className="h-[3px] w-full" />
@@ -214,9 +212,7 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
           <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {moments.map((moment) => (
               <li key={moment.title} className="group flex flex-col items-center gap-[18px] rounded-[24px] bg-tint-peach px-6 py-7 text-center">
-                <span className="transition-transform duration-300 ease-out group-hover:-translate-y-1 group-hover:scale-105 motion-reduce:transition-none">
-                  <ThemedImage src={`/landing/${moment.face}.svg`} darkSrc={`/landing/${moment.face}-dark.svg`} width={109} height={109} className="size-[108.8px]" />
-                </span>
+                <DotFace mood={moment.face} size={108.8} />
                 <h3 className="font-display text-[22px] font-extrabold text-ink">{moment.title}</h3>
                 <p className="text-body-ui text-ink-secondary">{moment.body}</p>
               </li>
@@ -248,9 +244,9 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
               <span className="text-body-ui text-ink-secondary">58 / 60 checked in</span>
               <span className="rounded-full bg-warning-bg px-[11px] py-1 text-[13px] font-bold leading-[1.4] text-warning-fg">Offline · syncs later</span>
             </div>
-            <div className="flex flex-col items-start gap-7 rounded-[24px] bg-success-solid p-7 sm:flex-row sm:items-center">
+            <div className="group flex flex-col items-start gap-7 rounded-[24px] bg-success-solid p-7 sm:flex-row sm:items-center">
               <span className="shrink-0 rounded-[20px] bg-white p-4">
-                <img src="/landing/face-wink-station.svg" alt="" width={95} height={95} className="size-[95.2px]" />
+                <DotFace mood="wink" size={95.2} colors={{ X: "#FFB547", O: "#18181B" }} />
               </span>
               <div className="flex flex-col gap-2">
                 <p className="text-[17px] font-bold text-white">Checked in</p>

@@ -7,7 +7,7 @@ import { DotFace } from "@/components/brand/DotFace";
 import { DotIcon } from "@/components/brand/DotIcon";
 import { FACES, FACE_MOODS, ICONS, ICON_NAMES, MARK, MARK_BRIGHT, parsePattern } from "@/components/brand/patterns";
 
-const cells = (html: string) => html.match(/<span style="border-radius:50%[^"]*"><\/span>/g) ?? [];
+const cells = (html: string) => html.match(/<span (?:class="[^"]*" )?style="border-radius:50%[^"]*"><\/span>/g) ?? [];
 
 describe("dot sign patterns", () => {
   it("draws the Y on a 5×5 grid with six marigold dots and one ink host", () => {
@@ -83,5 +83,21 @@ describe("DotFace and DotIcon", () => {
   it("render their Figma patterns", () => {
     expect(cells(renderToStaticMarkup(createElement(DotFace, { mood: "sleepy", size: 85 })))).toHaveLength(49);
     expect(cells(renderToStaticMarkup(createElement(DotIcon, { name: "date" })))).toHaveLength(49);
+  });
+});
+
+describe("DotFace hover", () => {
+  it("marks every dot for the ripple and only the eyes for the blink", () => {
+    const html = renderToStaticMarkup(createElement(DotFace, { mood: "happy", size: 85 }));
+    expect(html).toContain('class="yy-face');
+    expect(html.match(/yy-face-dot/g)).toHaveLength(49);
+    // Happy has two eyes on row 2.
+    expect(html.match(/yy-face-eye/g)).toHaveLength(2);
+    expect(html).toContain("--yy-face-delay:0ms");
+  });
+
+  it("skips the blink for faces without eyes and can be turned off", () => {
+    expect(renderToStaticMarkup(createElement(DotFace, { mood: "love" }))).not.toContain("yy-face-eye");
+    expect(renderToStaticMarkup(createElement(DotFace, { mood: "happy", hover: false }))).not.toContain("yy-face");
   });
 });

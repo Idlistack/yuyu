@@ -385,3 +385,34 @@
 .yy-dot-loader-cell {
   animation: yy-dot-light 1.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
 }
+
+/* Dot faces (components/brand/DotFace.tsx): on hover of the face or a .group
+   card, dots ripple out from the centre, the eyes blink and the face lifts.
+   Mouse only, and nothing moves under reduced motion. */
+@keyframes yy-face-ripple {
+  0%, 100% { scale: 1; }
+  40% { scale: 1.16; }
+}
+@keyframes yy-face-blink {
+  0%, 50%, 74%, 100% { transform: none; }
+  62% { transform: scaleY(0.15); }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .yy-face {
+    transition: transform 320ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .yy-face:hover,
+  .group:hover .yy-face {
+    transform: translateY(-4px) rotate(-4deg);
+  }
+  .yy-face:hover .yy-face-dot,
+  .group:hover .yy-face-dot {
+    animation: yy-face-ripple 560ms cubic-bezier(0.45, 0, 0.2, 1) var(--yy-face-delay, 0ms) both;
+  }
+  .yy-face:hover .yy-face-eye,
+  .group:hover .yy-face-eye {
+    animation:
+      yy-face-ripple 560ms cubic-bezier(0.45, 0, 0.2, 1) var(--yy-face-delay, 0ms) both,
+      yy-face-blink 900ms ease-in-out both;
+  }
+}
