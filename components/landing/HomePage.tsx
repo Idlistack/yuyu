@@ -1,12 +1,11 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemedImage } from "@/components/ui/themed-image";
 import { YuyuMark } from "@/components/ui/display";
 import { accentStyle } from "@/lib/theme/accent";
-import { cn } from "@/lib/cn";
 import { ColourPreview } from "./ColourPreview";
+import { Container, DotIcon, SectionHeading } from "./primitives";
 
 const GITHUB_URL = "https://github.com/twilighty-abhi/yuyu";
 const SETUP_GUIDE_URL = `${GITHUB_URL}/blob/main/docs/DEPLOYMENT_DOCKER.md`;
@@ -68,24 +67,6 @@ const faqs = [
   { q: "Can I run it on my own server?", a: "Yes. Yuyu ships as a Docker image with a Helm chart. You will need PostgreSQL, Redis, S3-compatible storage and an SMTP provider." },
   { q: "What happens if the internet drops at the venue?", a: "Download the guest list before doors open and keep checking people in. Everything syncs when the connection comes back." },
 ];
-
-function Container({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("mx-auto w-full max-w-[1160px] px-4 sm:px-6 xl:px-0", className)}>{children}</div>;
-}
-
-function SectionHeading({ overline, title, lead, className }: { overline: string; title: string; lead?: string; className?: string }) {
-  return (
-    <div className={cn("flex max-w-[680px] flex-col gap-2", className)}>
-      <p className="text-overline text-ink-muted">{overline}</p>
-      <h2 className="text-display-m text-ink">{title}</h2>
-      {lead ? <p className="text-body-l text-ink-secondary">{lead}</p> : null}
-    </div>
-  );
-}
-
-function DotIcon({ name, size = 54 }: { name: string; size?: number }) {
-  return <ThemedImage src={`/landing/${name}.svg`} darkSrc={`/landing/${name}-dark.svg`} width={size} height={size} className="size-[54px]" />;
-}
 
 /** Yuyu's homepage (Figma "Landing page — desktop", 117:289). */
 export function HomePage({ getStartedHref }: { getStartedHref: string }) {
