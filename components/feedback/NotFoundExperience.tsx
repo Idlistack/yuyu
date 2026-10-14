@@ -10,6 +10,7 @@ import { YuyuWordmark } from "@/components/chrome/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/field";
 import { accentStyle } from "@/lib/theme/accent";
+import { NotFoundPet } from "@/components/feedback/NotFoundPet";
 
 const QR_SIZE = 21;
 const TEAR_DISTANCE = 90;
@@ -121,7 +122,8 @@ export function NotFoundExperience() {
   const shortPath = pathname.length > 38 ? `${pathname.slice(0, 36)}…` : pathname;
 
   const content = (
-    <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[880px] flex-col items-center gap-10 px-4 pb-6 pt-8 sm:pt-14">
+    <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[880px] flex-col items-center gap-10 px-4 pb-24 pt-8 sm:pt-14">
+      <NotFoundPet />
       <div className="flex flex-col items-center gap-3 text-center">
         <p className="text-overline text-accent-text">Error 404 · Lost &amp; found</p>
         <h1 className="text-display-m text-ink">This page isn’t on the programme</h1>
