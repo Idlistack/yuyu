@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type PointerEvent } from "react";
+import { useMemo, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion, useMotionTemplate, useMotionValue, useReducedMotion, useSpring, useTransform, type PanInfo } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Compass, Scissors, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, Compass, Scissors } from "lucide-react";
 import { chromeFor } from "@/components/chrome/ChromeSwitch";
 import { SiteHeader } from "@/components/chrome/SiteHeader";
 import { SiteFooter } from "@/components/chrome/SiteFooter";
 import { Button } from "@/components/ui/button";
-import { SearchInput } from "@/components/ui/field";
 import { accentStyle } from "@/lib/theme/accent";
+import { cn } from "@/lib/cn";
 import { NotFoundPet } from "@/components/feedback/NotFoundPet";
 
 const QR_SIZE = 21;
@@ -66,7 +66,13 @@ export function NotFoundExperience() {
   const reduceMotion = useReducedMotion();
   const qr = useFakeQr(pathname);
   const [torn, setTorn] = useState(false);
-  const [query, setQuery] = useState("");
+  // Ripped edges appear a frame before the stub leaves, so the departing stub keeps them.
+  const [ripping, setRipping] = useState(false);
+  const tearOff = () => {
+    if (ripping) return;
+    setRipping(true);
+    requestAnimationFrame(() => setTorn(true));
+  };
 
   // 3D tilt and a light sheen that follow the pointer.
   const tiltX = useMotionValue(0);
@@ -79,7 +85,9 @@ export function NotFoundExperience() {
 
   // Dragging the stub to the right tears it off.
   const stubX = useMotionValue(0);
-  const stubRotate = useTransform(stubX, [0, TEAR_DISTANCE * 1.4], [0, 9]);
+  // The stub stays hinged at the perforation: it resists, tilts and dips a little as it is pulled.
+  const stubRotate = useTransform(stubX, [0, TEAR_DISTANCE], [0, 12]);
+  const stubY = useTransform(stubX, [0, TEAR_DISTANCE], [0, 8]);
   const perforationScale = useTransform(stubX, [0, TEAR_DISTANCE], [1, 0.96]);
 
   const onTilt = (event: PointerEvent<HTMLDivElement>) => {
@@ -98,7 +106,7 @@ export function NotFoundExperience() {
   };
 
   const onStubDragEnd = (_: unknown, info: PanInfo) => {
-    if (info.offset.x > TEAR_DISTANCE || info.velocity.x > 700) setTorn(true);
+    if (info.offset.x > TEAR_DISTANCE * 0.4 || info.velocity.x > 500) tearOff();
   };
 
   const goBackOrHome = () => {
@@ -114,11 +122,6 @@ export function NotFoundExperience() {
     router.push("/");
   };
 
-  const search = (event: FormEvent) => {
-    event.preventDefault();
-    const q = query.trim();
-    router.push(q ? `/discover?q=${encodeURIComponent(q)}` : "/discover");
-  };
 
   const shortPath = pathname.length > 38 ? `${pathname.slice(0, 36)}…` : pathname;
 
@@ -141,8 +144,9 @@ export function NotFoundExperience() {
           style={reduceMotion ? undefined : { rotateX, rotateY, transformStyle: "preserve-3d" }}
           className="relative flex flex-col sm:flex-row"
         >
-          {/* Main part */}
-          <div className="relative min-w-0 flex-1 overflow-hidden rounded-t-[20px] border border-line bg-canvas shadow-float sm:rounded-l-[20px] sm:rounded-tr-none sm:border-r-0">
+          {/* Main part (a drop-shadow wrapper, so the ripped edge keeps its shadow) */}
+          <div className={cn("relative min-w-0 flex-1", ripping ? "yy-ticket-shadow" : "")}>
+          <div className={cn("relative h-full overflow-hidden rounded-t-[20px] border border-line bg-canvas sm:rounded-l-[20px] sm:rounded-tr-none sm:border-r-0", ripping ? "yy-ripped-right" : "shadow-float")}>
             <div className="bg-accent px-5 py-3.5 text-on-accent">
               <p className="text-label opacity-90">Yuyu · Lost &amp; found</p>
               <p className="font-display text-[24px] font-extrabold leading-tight tracking-[-0.02em] sm:text-[26px]">Page not found</p>
@@ -155,6 +159,7 @@ export function NotFoundExperience() {
               <TicketField label="Admits" value="No one, yet" />
             </dl>
             {!reduceMotion ? <motion.div aria-hidden className="pointer-events-none absolute inset-0" style={{ backgroundImage: sheen }} /> : null}
+          </div>
           </div>
 
           {/* Perforation */}
@@ -169,14 +174,14 @@ export function NotFoundExperience() {
 
           {/* Stub (drag right, or use the button, to tear it off) */}
           <div className="relative sm:w-[176px]">
-            <AnimatePresence initial={false}>
+            <AnimatePresence initial={false} mode="popLayout">
               {torn ? (
                 <motion.div
                   key="revealed"
                   initial={reduceMotion ? false : { opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.35, delay: 0.15 }}
-                  className="flex h-full flex-col items-center justify-center gap-3 rounded-b-[20px] border border-dashed border-line-strong bg-tint-peach px-5 py-6 text-center sm:rounded-r-[20px] sm:rounded-bl-none"
+                  transition={{ duration: 0.35, delay: reduceMotion ? 0 : 0.4 }}
+                  className="flex h-full flex-col items-center justify-center gap-3 rounded-b-[20px] border border-dashed sm:ml-2 border-line-strong bg-tint-peach px-5 py-6 text-center sm:rounded-r-[20px] sm:rounded-bl-none"
                 >
                   <p className="text-overline text-ink-muted">Your stub says</p>
                   <p className="font-display text-[20px] font-extrabold leading-tight text-ink">There’s plenty else on</p>
@@ -192,11 +197,23 @@ export function NotFoundExperience() {
                   key="stub"
                   drag={reduceMotion ? false : "x"}
                   dragConstraints={{ left: 0, right: 0 }}
-                  dragElastic={{ left: 0, right: 0.9 }}
                   onDragEnd={onStubDragEnd}
-                  style={{ x: stubX, rotate: stubRotate, transformOrigin: "0% 100%" }}
-                  exit={reduceMotion ? { opacity: 0 } : { x: 220, y: 140, rotate: 38, opacity: 0, transition: { duration: 0.55, ease: [0.4, 0, 0.6, 1] } }}
-                  className="relative flex h-full cursor-grab touch-pan-y flex-col items-center justify-center gap-2 overflow-hidden rounded-b-[20px] border border-line bg-canvas px-5 py-5 shadow-float active:cursor-grabbing sm:rounded-r-[20px] sm:rounded-bl-none sm:border-l-0"
+                  dragElastic={{ left: 0, right: 0.35 }}
+                  style={{ x: stubX, y: stubY, rotate: stubRotate, transformOrigin: "0% 100%" }}
+                  exit={reduceMotion
+                    ? { opacity: 0, transition: { duration: 0.2 } }
+                    : {
+                        // Peel at the perforation, then drop away.
+                        x: [null, 46, 340],
+                        y: [null, 16, 260],
+                        rotate: [null, 16, 58],
+                        opacity: [1, 1, 0],
+                        transition: { duration: 0.85, times: [0, 0.28, 1], ease: [0.3, 0, 0.5, 1] },
+                      }}
+                  className={cn(
+                    "relative flex h-full cursor-grab touch-pan-y flex-col items-center justify-center gap-2 overflow-hidden rounded-b-[20px] border border-line bg-canvas px-5 py-5 active:cursor-grabbing sm:rounded-r-[20px] sm:rounded-bl-none sm:border-l-0",
+                    ripping ? "yy-ripped-left" : "shadow-float",
+                  )}
                 >
                   <div className="relative w-[104px] rounded-[10px] border border-line bg-white p-2">
                     <svg viewBox={`0 0 ${QR_SIZE} ${QR_SIZE}`} className="block w-full text-[#18181B]" shapeRendering="crispEdges" aria-hidden>
@@ -230,7 +247,7 @@ export function NotFoundExperience() {
         </motion.div>
         {!torn ? (
           <div className="mt-2.5 flex justify-center">
-            <button type="button" onClick={() => setTorn(true)} className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line-strong bg-canvas px-4 text-label text-ink-secondary transition-colors hover:bg-subtle hover:text-ink">
+            <button type="button" onClick={tearOff} className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line-strong bg-canvas px-4 text-label text-ink-secondary transition-colors hover:bg-subtle hover:text-ink">
               <Scissors aria-hidden className="size-4" />
               Tear off the stub
             </button>
@@ -239,12 +256,7 @@ export function NotFoundExperience() {
       </div>
 
       {/* Ways forward */}
-      <div className="flex w-full max-w-[560px] flex-col items-center gap-3 lg:max-w-[880px] lg:flex-row lg:justify-center">
-        <form onSubmit={search} role="search" className="flex w-full gap-2 lg:w-[420px]">
-          <label htmlFor="not-found-search" className="sr-only">Search events</label>
-          <SearchInput id="not-found-search" placeholder="Looking for an event?" value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} />
-          <Button type="submit" variant="secondary" startIcon={<Search />}>Search</Button>
-        </form>
+      <div className="flex w-full justify-center">
         <div className="flex shrink-0 flex-wrap justify-center gap-2">
           <Button onClick={goBackOrHome} variant="primary" startIcon={<ArrowLeft />}>Go back</Button>
           <Button asChild variant="secondary">
