@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { KeyRound } from "lucide-react";
+import { ExternalLink, KeyRound } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { canDeleteOrg, requireOrgRole } from "@/lib/permissions";
 import { EditOrgForm } from "@/components/org/EditOrgForm";
 import { CopyOrganisationUrl } from "@/components/org/CopyOrganisationUrl";
 import { DeleteOrganisationButton } from "@/components/dashboard/DeleteOrganisationButton";
+import { OrgPageHeader } from "@/components/dashboard/org/OrgPageHeader";
 import { Button } from "@/components/ui/button";
-import { DangerZone, PageHeader, SettingsRow } from "@/components/ui/display";
+import { Chip } from "@/components/ui/display";
+import { cn } from "@/lib/cn";
 
 import type { Metadata } from "next";
 
@@ -16,6 +18,8 @@ export const metadata: Metadata = {
   title: "Settings",
   description: "Edit organisation details.",
 };
+
+const sectionCard = "scroll-mt-20 rounded-2xl border border-line bg-canvas p-5 sm:p-6 lg:scroll-mt-8";
 
 export default async function OrgSettingsPage({ params }: Props) {
   const { orgSlug } = await params;
@@ -31,50 +35,130 @@ export default async function OrgSettingsPage({ params }: Props) {
     return <p className="text-body-ui text-ink-muted">Organisation not found.</p>;
   }
 
+  const isOwner = membership.role === "OWNER";
+  const canDelete = canDeleteOrg(membership);
+  // Owner-only, tenant-scoped counts. "Active" means the client is enabled and
+  // holds at least one credential that is neither revoked nor expired.
+  const now = new Date();
+  const [totalApiClients, activeApiClients] = isOwner
+    ? await Promise.all([
+        prisma.apiClient.count({ where: { organisationId: organisation.id } }),
+        prisma.apiClient.count({
+          where: {
+            organisationId: organisation.id,
+            status: "ACTIVE",
+            credentials: { some: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } },
+          },
+        }),
+      ])
+    : [0, 0];
+
+  const sections = [
+    { id: "profile", label: "Profile" },
+    { id: "public-page", label: "Public page" },
+    ...(isOwner ? [{ id: "api-access", label: "API access" }] : []),
+    ...(canDelete ? [{ id: "danger-zone", label: "Danger zone", danger: true }] : []),
+  ];
+
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        kicker="Organisation settings"
-        title="Shape your workspace"
-        description={`Update the details people see when they visit ${org.name}. Changes are visible on the public organisation page as soon as you save them.`}
+    <div className="flex flex-col gap-7">
+      <OrgPageHeader
+        organisation={{ name: org.name, slug: org.slug, logoUrl: org.logoUrl }}
+        title="Settings"
+        description={`What people see on your public page, and how ${org.name} connects to other tools.`}
       />
 
-      <EditOrgForm
-        organisationSlug={org.slug}
-        initial={{
-          name: org.name,
-          description: org.description ?? "",
-          logoUrl: org.logoUrl,
-        }}
-      />
+      <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
+        <nav aria-label="Settings sections" className="min-w-0 lg:sticky lg:top-8 lg:self-start">
+          <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+            {sections.map((section) => (
+              <li key={section.id} className="shrink-0">
+                <a
+                  href={`#${section.id}`}
+                  className={cn(
+                    "flex min-h-10 items-center whitespace-nowrap rounded-xl px-3 text-body-ui font-semibold transition-colors hover:bg-muted",
+                    "danger" in section && section.danger ? "text-danger-fg" : "text-ink-secondary hover:text-ink",
+                  )}
+                >
+                  {section.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-      <div className="border-t border-line">
-        <SettingsRow title="Organisation URL" description="About this workspace">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-subtle px-3.5 py-2.5">
-            <span className="font-semibold text-ink">/{org.slug}</span>
-            <CopyOrganisationUrl slug={org.slug} />
-          </div>
-        </SettingsRow>
+        <div className="flex min-w-0 flex-col gap-6">
+          <EditOrgForm
+            id="profile"
+            organisationSlug={org.slug}
+            initial={{
+              name: org.name,
+              description: org.description ?? "",
+              logoUrl: org.logoUrl,
+            }}
+          />
 
-        {membership.role === "OWNER" ? (
-          <SettingsRow title="API access" description="Manage machine clients, scopes, and rotatable credentials.">
-            <Button asChild variant="secondary" size="sm">
-              <Link href={`/dashboard/${org.slug}/settings/api`}>
-                <KeyRound aria-hidden className="size-4" />
-                Manage API access
+          <section id="public-page" aria-labelledby="public-page-title" className={cn(sectionCard, "flex flex-col gap-4 md:flex-row md:items-center")}>
+            <div className="min-w-0 flex-1">
+              <h2 id="public-page-title" className="text-h4 text-ink">Public page</h2>
+              <p className="mt-0.5 text-body-ui text-ink-muted">One link that always lists what is coming up. The address can&apos;t be changed.</p>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="max-w-full truncate rounded-full bg-muted px-3.5 py-2 font-mono text-sm text-ink-secondary">/{org.slug}</span>
+              <CopyOrganisationUrl slug={org.slug} />
+              <Link
+                href={`/${org.slug}`}
+                className="inline-flex min-h-9 items-center gap-1 px-2 text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink hover:underline"
+              >
+                Open
+                <ExternalLink aria-hidden className="size-3.5" />
               </Link>
-            </Button>
-          </SettingsRow>
-        ) : null}
-      </div>
+            </div>
+          </section>
 
-      {canDeleteOrg(membership) ? (
-        <DangerZone
-          title="Danger zone"
-          description="Permanently delete this organisation and all of its events, registrations, and memberships."
-          action={<DeleteOrganisationButton organisationSlug={org.slug} />}
-        />
-      ) : null}
+          {isOwner ? (
+            <section id="api-access" aria-labelledby="api-access-title" className={cn(sectionCard, "flex flex-col gap-4 md:flex-row md:items-center")}>
+              <div className="min-w-0 flex-1">
+                <h2 id="api-access-title" className="text-h4 text-ink">API access</h2>
+                <p className="mt-0.5 text-body-ui text-ink-muted">Let another system read your events with a scoped, rotatable key.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Chip tone={activeApiClients > 0 ? "success" : "neutral"}>
+                  {totalApiClients === 0
+                    ? "No clients yet"
+                    : activeApiClients === 0
+                      ? "No active clients"
+                      : `${activeApiClients} active ${activeApiClients === 1 ? "client" : "clients"}`}
+                </Chip>
+                <Button asChild variant="secondary">
+                  <Link href={`/dashboard/${org.slug}/settings/api`}>
+                    <KeyRound aria-hidden className="size-4" />
+                    Manage API access
+                  </Link>
+                </Button>
+              </div>
+            </section>
+          ) : null}
+
+          {canDelete ? (
+            <section
+              id="danger-zone"
+              aria-labelledby="danger-zone-title"
+              className={cn(sectionCard, "flex flex-col gap-4 border-[1.5px] border-danger-border md:flex-row md:items-center")}
+            >
+              <div className="min-w-0 flex-1">
+                <h2 id="danger-zone-title" className="text-h4 text-danger-fg">Delete organisation</h2>
+                <p className="mt-0.5 text-body-ui text-ink-secondary">
+                  Permanently removes {org.name} with all of its events, registrations and memberships. You&apos;ll be asked to type the name to confirm.
+                </p>
+              </div>
+              <div className="shrink-0">
+                <DeleteOrganisationButton organisationSlug={org.slug} organisationName={org.name} />
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

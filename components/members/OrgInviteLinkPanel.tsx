@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { Copy, Link2, Trash2 } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Copy, Link2 } from "lucide-react";
+import { DotFace } from "@/components/brand/DotFace";
 import { Button } from "@/components/ui/button";
-import { Card, Chip } from "@/components/ui/display";
+import { Chip } from "@/components/ui/display";
 import { createOrgInvite, revokeOrgInvite } from "@/app/actions/org-invites";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
@@ -11,137 +13,136 @@ import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 export type OrgInviteRow = {
   id: string;
   token: string;
-  createdAt: string;
-  expiresAt: string | null;
+  /** Pre-formatted on the server ("2 days ago") so it hydrates identically. */
+  createdLabel: string;
 };
 
+function lowerFirst(text: string) {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/**
+ * Single-use organisation invite links (OWNER/ADMIN only; the actions
+ * re-check the role). Only the newest link's URL is ever rendered.
+ */
 export function OrgInviteLinkPanel(props: {
   organisationSlug: string;
   baseUrl: string;
   invites: OrgInviteRow[];
 }) {
   const { organisationSlug, baseUrl } = props;
+  const router = useRouter();
   const [invites, setInvites] = useState<OrgInviteRow[]>(props.invites);
   const [pending, startTransition] = useTransition();
   const { showToast } = useToast();
-  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<OrgInviteRow | null>(null);
 
   const latest = invites[0] ?? null;
-  const latestUrl = useMemo(() => {
-    if (!latest) return "";
-    return `${baseUrl}/join/org/${latest.token}`;
-  }, [baseUrl, latest]);
+  const latestUrl = latest ? `${baseUrl}/join/org/${latest.token}` : "";
+
+  function createLink() {
+    startTransition(async () => {
+      const res = await createOrgInvite({ organisationSlug });
+      if (!res.ok) {
+        showToast(res.error, "error");
+        return;
+      }
+      const { inviteId, token } = res.data as { inviteId: string; token: string };
+      setInvites((prev) => [{ id: inviteId, token, createdLabel: "Just now" }, ...prev]);
+      showToast("Invite link created", "success");
+      router.refresh();
+    });
+  }
 
   return (
-    <Card as="section" className="flex flex-col gap-4">
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-title text-ink">Invite link</h2>
-          <Chip size="sm" tone="outline">Single-use</Chip>
+    <section aria-labelledby="invite-title" className="flex min-w-0 flex-col gap-3.5 rounded-2xl bg-tint-peach p-5">
+      <div className="flex items-center gap-3">
+        <DotFace mood="cheering" size={52} className="shrink-0" />
+        <div className="min-w-0">
+          <h2 id="invite-title" className="text-h4 text-ink">Invite people</h2>
+          <p className="text-body-ui text-ink-secondary">Each link adds one person as a member. Make them an admin after they join.</p>
         </div>
-        <p className="mt-1 text-body-ui text-ink-muted">
-          Generate a one-time link to add someone as a member. Only admins and
-          the owner can create links.
-        </p>
       </div>
 
-      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
-        <div className="min-w-0 flex-1">
-          <label htmlFor="org-invite-url" className="sr-only">Latest invite URL</label>
-          <input
-            id="org-invite-url"
-            readOnly
-            value={latestUrl || "No invite generated yet."}
-            className="block w-full truncate rounded-md border border-line bg-subtle px-3.5 py-[11px] font-mono text-sm text-ink-secondary"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="primary"
-            disabled={!latestUrl || pending}
-            startIcon={<Copy />}
-            onClick={() => {
-              void navigator.clipboard
-                .writeText(latestUrl)
-                .then(() => showToast("Copied link", "success"))
-                .catch(() => showToast("Could not copy link", "error"));
-            }}
-          >
-            Copy link
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={pending}
-            startIcon={<Link2 />}
-            onClick={() => {
-              startTransition(async () => {
-                const res = await createOrgInvite({ organisationSlug });
-                if (!res.ok) {
-                  showToast(res.error, "error");
-                  return;
-                }
-                const inviteId = (res.data as { inviteId: string }).inviteId;
-                const token = (res.data as { token: string }).token;
-                const row: OrgInviteRow = {
-                  id: inviteId,
-                  token,
-                  createdAt: new Date().toISOString(),
-                  expiresAt: null,
-                };
-                setInvites((prev) => [row, ...prev]);
-                showToast("Invite link generated", "success");
-              });
-            }}
-          >
-            Generate link
-          </Button>
-          {latest ? (
-            <Button
-              variant="dangerQuiet"
-              disabled={pending}
-              startIcon={<Trash2 />}
-              onClick={() => setConfirmRevoke(true)}
-            >
-              Revoke latest
+      <div className="flex flex-col gap-2">
+        <label htmlFor="org-invite-url" className="text-label text-ink">Newest link</label>
+        <input
+          id="org-invite-url"
+          readOnly
+          value={latestUrl}
+          placeholder="No open link yet"
+          onFocus={(event) => event.currentTarget.select()}
+          className="block min-h-11 w-full min-w-0 truncate rounded-md border border-line bg-canvas px-3.5 font-mono text-[13px] text-ink-secondary placeholder:font-sans placeholder:text-ink-muted"
+        />
+        <div className="flex flex-wrap gap-2">
+          {latestUrl ? (
+            <>
+              <Button
+                variant="primary"
+                disabled={pending}
+                startIcon={<Copy />}
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(latestUrl)
+                    .then(() => showToast("Copied link", "success"))
+                    .catch(() => showToast("Could not copy link", "error"));
+                }}
+              >
+                Copy link
+              </Button>
+              <Button variant="secondary" loading={pending} loadingLabel="Creating link" startIcon={<Link2 />} onClick={createLink}>
+                New link
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" loading={pending} loadingLabel="Creating link" startIcon={<Link2 />} onClick={createLink}>
+              Create link
             </Button>
-          ) : null}
+          )}
         </div>
       </div>
 
-      <ConfirmationDialog
-        open={confirmRevoke}
-        title="Revoke invite link?"
-        message="Anyone who has this link will no longer be able to use it to join the organisation."
-        confirmLabel="Revoke link"
-        loading={pending}
-        onCancel={() => setConfirmRevoke(false)}
-        onConfirm={() => {
-          if (!latest) return;
-          startTransition(async () => {
-            const res = await revokeOrgInvite({
-              organisationSlug,
-              inviteId: latest.id,
-            });
-            if (!res.ok) return showToast(res.error, "error");
-            setInvites((prev) => prev.filter((x) => x.id !== latest.id));
-            setConfirmRevoke(false);
-            showToast("Invite revoked", "success");
-          });
-        }}
-      />
-
-      {invites.length > 1 ? (
+      {invites.length > 0 ? (
         <div className="flex flex-col gap-1.5 border-t border-line pt-3">
-          <p className="text-caption text-ink-muted">Recent unused links</p>
-          <ul className="flex flex-col gap-1">
-            {invites.slice(1, 6).map((i) => (
-              <li key={i.id} className="break-all font-mono text-[13px] text-ink-muted">
-                {`${baseUrl}/join/org/${i.token}`}
+          <h3 className="text-overline text-ink-muted">Open links · {invites.length}</h3>
+          <ul className="flex flex-col">
+            {invites.map((invite, index) => (
+              <li key={invite.id} className="flex min-w-0 items-center gap-2.5">
+                <span className="min-w-0 flex-1 truncate text-body-ui text-ink">Created {lowerFirst(invite.createdLabel)}</span>
+                {index === 0 ? <Chip size="sm" tone="outline" className="shrink-0">Newest</Chip> : null}
+                <Button size="sm" variant="dangerQuiet" disabled={pending} onClick={() => setRevokeTarget(invite)}>
+                  Revoke
+                  <span className="sr-only"> link created {lowerFirst(invite.createdLabel)}</span>
+                </Button>
               </li>
             ))}
           </ul>
         </div>
       ) : null}
-    </Card>
+
+      <ConfirmationDialog
+        open={revokeTarget !== null}
+        title="Revoke invite link?"
+        message="Anyone who has this link will no longer be able to use it to join the organisation."
+        confirmLabel="Revoke link"
+        loading={pending}
+        onCancel={() => setRevokeTarget(null)}
+        onConfirm={() => {
+          const target = revokeTarget;
+          if (!target) return;
+          startTransition(async () => {
+            const res = await revokeOrgInvite({ organisationSlug, inviteId: target.id });
+            if (!res.ok) {
+              showToast(res.error, "error");
+              return;
+            }
+            setInvites((prev) => prev.filter((x) => x.id !== target.id));
+            setRevokeTarget(null);
+            showToast("Invite revoked", "success");
+            router.refresh();
+          });
+        }}
+      />
+    </section>
   );
 }

@@ -9,16 +9,19 @@ import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/display";
 import { NativeSelect } from "@/components/ui/field";
+import { ROLE_LABELS } from "@/components/members/memberSummary";
 
-const ROLE_LABELS: Record<MembershipRole, string> = { OWNER: "Owner", ADMIN: "Admin", MEMBER: "Member" };
+const ROLE_TONES = { OWNER: "ink", ADMIN: "warning", MEMBER: "neutral" } as const satisfies Record<MembershipRole, string>;
 
 export function MemberRoleActions(props: {
   organisationSlug: string;
   targetUserId: string;
   role: MembershipRole;
   actorRole: MembershipRole;
+  /** Used to label the role select and removal dialog for this row. */
+  memberName?: string;
 }) {
-  const { organisationSlug, targetUserId, role, actorRole } = props;
+  const { organisationSlug, targetUserId, role, actorRole, memberName } = props;
   const router = useRouter();
   const { showToast } = useToast();
   const [pending, startTransition] = useTransition();
@@ -30,14 +33,14 @@ export function MemberRoleActions(props: {
     (actorRole === "ADMIN" && role === "MEMBER");
 
   if (!canEditRoles && !canRemove) {
-    return <Chip size="sm" tone={role === "OWNER" ? "ink" : "neutral"}>{ROLE_LABELS[role]}</Chip>;
+    return <Chip size="sm" tone={ROLE_TONES[role]}>{ROLE_LABELS[role]}</Chip>;
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {canEditRoles ? (
         <NativeSelect
-          aria-label="Role"
+          aria-label={memberName ? `Role for ${memberName}` : "Role"}
           value={role}
           disabled={pending}
           className="w-auto min-w-[120px] py-2 text-sm"
@@ -62,16 +65,17 @@ export function MemberRoleActions(props: {
           <option value="MEMBER">Member</option>
         </NativeSelect>
       ) : (
-        <Chip size="sm">{ROLE_LABELS[role]}</Chip>
+        <Chip size="sm" tone={ROLE_TONES[role]}>{ROLE_LABELS[role]}</Chip>
       )}
       {canRemove ? (
         <Button size="sm" variant="dangerQuiet" disabled={pending} onClick={() => setConfirmRemove(true)}>
           Remove
+          {memberName ? <span className="sr-only"> {memberName}</span> : null}
         </Button>
       ) : null}
       <ConfirmationDialog
         open={confirmRemove}
-        title="Remove organisation member?"
+        title={memberName ? `Remove ${memberName}?` : "Remove organisation member?"}
         message="This person will immediately lose access to the organisation and its events."
         confirmLabel="Remove member"
         loading={pending}
