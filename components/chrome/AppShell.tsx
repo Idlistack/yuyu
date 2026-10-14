@@ -10,7 +10,6 @@ import {
   CalendarDays,
   ChevronsUpDown,
   Home,
-  KeyRound,
   LogOut,
   Menu as MenuIcon,
   Moon,
@@ -178,7 +177,6 @@ function SidebarContents({
   const current = slug ? organisations.find((organisation) => organisation.slug === slug) ?? null : null;
   const base = current ? `/dashboard/${current.slug}` : "";
   const isAdmin = current?.role === "OWNER" || current?.role === "ADMIN";
-  const isOwner = current?.role === "OWNER";
   const isMember = current && current.role !== "COLLABORATOR";
   const onEventsPage = Boolean(current) && (pathname === base || pathname.startsWith(`${base}/event/`));
 
@@ -258,12 +256,8 @@ function SidebarContents({
               <NavItem href={`${base}/members`} icon={<Users />} active={pathname.startsWith(`${base}/members`)} collapsed={collapsed} onNavigate={onNavigate}>Members</NavItem>
             ) : null}
             {isAdmin ? (
-              <>
-                <NavItem href={`${base}/settings`} icon={<Settings />} active={pathname === `${base}/settings`} collapsed={collapsed} onNavigate={onNavigate}>Settings</NavItem>
-                {isOwner ? (
-                  <NavItem href={`${base}/settings/api`} icon={<KeyRound />} active={pathname.startsWith(`${base}/settings/api`)} indent collapsed={collapsed} onNavigate={onNavigate}>API access</NavItem>
-                ) : null}
-              </>
+              // API access lives inside Settings (owners only), not in the menu.
+              <NavItem href={`${base}/settings`} icon={<Settings />} active={pathname.startsWith(`${base}/settings`)} collapsed={collapsed} onNavigate={onNavigate}>Settings</NavItem>
             ) : null}
           </nav>
         </>

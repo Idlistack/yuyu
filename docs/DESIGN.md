@@ -342,7 +342,7 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
 
 - **Sidebar** 224px, `--yy-bg-subtle`, right border; collapses to a 68px icon rail with tooltips (remembered in the `yy-sidebar` cookie so the server renders the same width). Top: Yuyu lockup (dot mark when collapsed) and the collapse button. The organisation switcher is a card with a dotted strip; the active item is a raised canvas pill. Two modes:
   - *Outside an org:* Home · ORGANISATIONS list (logo + name) · + New organisation.
-  - *Inside an org:* org switcher (logo, name, role, ⇅) · Events · Series · Members · Settings (sub: General, API access).
+  - *Inside an org:* org switcher (logo, name, role, ⇅) · Events · Series · Members · Settings. API access is reached from Settings (owners only), not the menu.
   - Bottom: "View public page ↗" and an account card that opens a menu: Account settings, Light/Dark mode, Sign out.
   - Active item: canvas fill with a border, 600 weight, `aria-current="page"`.
   - Below `md`: sidebar collapses to a top bar + menu sheet.
