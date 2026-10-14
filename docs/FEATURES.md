@@ -32,6 +32,7 @@ Google OAuth users rely on the Google account's MFA policy; the application TOTP
 - Optional display of confirmed registration counts.
 - Parallel programme tracks for rooms, stages, and streams; live delays cascade only within the affected track, while same-track time overlaps remain visible as organiser warnings.
 - Event cloning, publishing, slug changes, and deletion.
+- Optional event short links (`/aB3x9Kq`): organisation owners and admins create one on demand from the event dashboard and can regenerate it, which retires the old code. The link follows slug changes, and the event page still applies its own privacy and invite rules.
 - Verified email ownership is required before creating events, recurring series, clones, or event cover images.
 - Private event and series email allowlists.
 - Cover images are decoded, resized, metadata-stripped, and re-encoded to WebP before storage.

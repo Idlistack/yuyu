@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { OpenTabButton } from "../EventDashboardTabs";
 import { GlanceCard, ReadinessCard, ShareCard, SignupsCard, TeamCard } from "../overview/OverviewSections";
 import { WaitingForYou } from "../overview/WaitingForYou";
+import { ShortLinkControl } from "../overview/ShortLinkControl";
 import { eventPhase, readinessHeading, readinessItems, signupTrend } from "../overview/readiness";
 
 /**
@@ -51,7 +52,26 @@ export async function OverviewPanel({ ctx }: { ctx: EventDashboardContext }) {
 
   const aside = (
     <>
-      <ShareCard url={`${ctx.origin}${path}`} path={path} title={event.title} published={event.status === "PUBLISHED"} canEmbed />
+      <ShareCard
+        url={`${ctx.origin}${path}`}
+        path={path}
+        title={event.title}
+        published={event.status === "PUBLISHED"}
+        canEmbed
+        shortLink={
+          event.shortCode || permissions.isAdmin ? (
+            <ShortLinkControl
+              organisationSlug={organisation.slug}
+              eventId={event.id}
+              title={event.title}
+              origin={ctx.origin}
+              initialCode={event.shortCode}
+              canManage={permissions.isAdmin}
+              published={event.status === "PUBLISHED"}
+            />
+          ) : undefined
+        }
+      />
       <GlanceCard event={event} now={now} canEditDetails={permissions.canEditDetails} />
       {team ? <TeamCard team={team} /> : null}
     </>

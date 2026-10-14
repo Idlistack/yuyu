@@ -21,7 +21,8 @@ export type Bucket =
   | "apiWrite"
   | "dataExport"
   | "ticketStatus"
-  | "ticketEvents";
+  | "ticketEvents"
+  | "shortLink";
 
 const limits: Record<Bucket, { max: number; windowMs: number }> = {
   global: { max: 300, windowMs: 60_000 },
@@ -46,6 +47,8 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   // address, so these stay generous while still bounding polling/reconnects.
   ticketStatus: { max: 120, windowMs: 60_000 },
   ticketEvents: { max: 60, windowMs: 60_000 },
+  // Public short-link lookups. Kept tight so the code space cannot be scanned.
+  shortLink: { max: 30, windowMs: 60_000 },
 };
 
 // Local fallback store

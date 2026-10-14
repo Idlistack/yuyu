@@ -91,7 +91,7 @@ export function SignupsCard({ trend }: { trend: SignupTrend }) {
 
 /* ---------- Share ---------- */
 
-export function ShareCard({ url, path, title, published, canEmbed }: { url: string; path: string; title: string; published: boolean; canEmbed: boolean }) {
+export function ShareCard({ url, path, title, published, canEmbed, shortLink }: { url: string; path: string; title: string; published: boolean; canEmbed: boolean; shortLink?: ReactNode }) {
   return (
     <section aria-labelledby="overview-share-title" className={card}>
       <h2 id="overview-share-title" className="text-h4 text-ink">
@@ -110,6 +110,7 @@ export function ShareCard({ url, path, title, published, canEmbed }: { url: stri
           </OpenTabButton>
         ) : null}
       </div>
+      {shortLink ? <div className="border-t border-line pt-3">{shortLink}</div> : null}
     </section>
   );
 }
