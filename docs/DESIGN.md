@@ -387,7 +387,17 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
 
 ### 5.3 Dashboard home & lists
 
-Greeting + h1 · warning callout if something needs attention · 4 stat tiles · two columns: event rows (tabs Upcoming / Drafts n / Past) and Recent activity.
+Built in `app/dashboard/page.tsx` from `lib/dashboardHome.ts`; every number comes from a real query scoped to the person's memberships.
+
+- **Greeting:** a dot face (Happy normally, Cheering during an event, Sleepy when nothing is planned), a time-of-day greeting in the viewer's timezone, and one sentence built from real numbers ("Demo Summit is tomorrow, and 12 people signed up in the last day.").
+- **Needs you:** one warning callout for pending approvals and drafts, only from organisations the person manages (OWNER/ADMIN). The sidebar shows the same approval count as a badge per organisation.
+- **Next up:** the soonest event in its own accent (`yy-accent-scope` + `yy-cover-placeholder`), with a 25-dot capacity meter, sign-ups in the last day, named attendees (anonymous guests are counted but never shown), and Open check-in (managers only), Manage event and Copy link (published events only).
+- **Event day:** from two hours before start until the end, Next up becomes a dark live band: checked-in count with a seat-dot grid, On stage now/next (honouring live delays), Arrivals per 15 minutes and At the door.
+- **Stats:** Upcoming events, sign-ups, check-ins and feedback over the last seven rolling days, each with a small dot-column chart and a week-over-week hint. No invented scores.
+- **Your events:** tabs Upcoming / Drafts (managers only) / Past; rows with the event's accent date block, a status chip (approvals → full/waitlist → going) and a 10-dot fill meter. Drafts use the dashed border.
+- **Activity:** sign-ups, waitlist joins, check-ins and feedback, newest first, one line each with a mood face. Names only, never emails.
+- **Organisations:** cards with a dotted strip, logo, upcoming/member/role chips, and a dashed "New organisation" card.
+- **First run:** until the person has a published event, a four-step checklist (organisation → logo → first event → publish); with no events yet, it replaces the page under a peach welcome banner.
 
 ---
 

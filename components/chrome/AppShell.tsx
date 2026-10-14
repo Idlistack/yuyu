@@ -138,7 +138,13 @@ function SidebarContents({ user, organisations, onNavigate }: { user: ShellUser;
               className="flex min-h-10 items-center gap-2.5 rounded-md px-3 text-[15px] text-ink-secondary transition-colors hover:bg-emphasis/70 hover:text-ink"
             >
               <OrgLogo name={organisation.name} src={organisation.logoUrl} size="sm" className="size-6 rounded-[7px] text-[10px]" />
-              <span className="min-w-0 truncate">{organisation.name}</span>
+              <span className="min-w-0 flex-1 truncate">{organisation.name}</span>
+              {organisation.pendingApprovals > 0 ? (
+                <span className="shrink-0 rounded-full bg-warning-bg px-[7px] text-xs font-bold leading-5 text-warning-fg" title={`${organisation.pendingApprovals} waiting for approval`}>
+                  {organisation.pendingApprovals}
+                  <span className="sr-only"> waiting for approval</span>
+                </span>
+              ) : null}
             </Link>
           ))}
           <NavItem href="/dashboard/org/new" icon={<Plus />} active={pathname === "/dashboard/org/new"} onNavigate={onNavigate}>New organisation</NavItem>

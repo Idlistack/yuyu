@@ -181,6 +181,13 @@
     background-image: radial-gradient(circle, rgba(255, 255, 255, 0.17) 1.5px, transparent 1.6px);
     background-size: 22px 22px;
   }
+
+  /* Quiet dotted band at the top of dashboard organisation cards. */
+  .yy-dot-strip {
+    background-color: var(--yy-bg-muted);
+    background-image: radial-gradient(circle, var(--yy-border-strong) 1.5px, transparent 1.6px);
+    background-size: 16px 16px;
+  }
 }
 
 .skip-link {
