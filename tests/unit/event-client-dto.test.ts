@@ -25,6 +25,7 @@ describe("event browser DTO", () => {
       listedPublicly: false,
       registrationClosesAt: null,
       registrationLeadMinutes: null,
+      shortCode: null,
       checkInStationPinHash: "bcrypt-secret",
       checkInStationPinEncrypted: "encrypted-secret",
       checkInStationSecretVersion: 7,

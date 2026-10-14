@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -12,6 +12,7 @@ import { Callout, Chip, EmptyState, OrgLogo } from "@/components/ui/display";
 
 import type { Metadata } from "next";
 import { listedEventAudienceWhere } from "@/lib/eventVisibility";
+import { resolveShortLinkSegment } from "@/lib/shortLinkResolve";
 
 type Props = { params: Promise<{ orgSlug: string }> };
 const PUBLIC_COLLECTION_LIMIT = 250;
@@ -47,7 +48,13 @@ export default async function OrganisationPage({ params }: Props) {
       _count: { select: { memberships: true } },
     },
   });
-  if (!org) notFound();
+  if (!org) {
+    // Layout and page render in parallel; share the layout's memoised
+    // short-link decision so this page can never 404 ahead of its redirect.
+    const destination = await resolveShortLinkSegment(orgSlug);
+    if (destination) redirect(destination);
+    notFound();
+  }
 
   const session = await auth();
   const now = new Date();

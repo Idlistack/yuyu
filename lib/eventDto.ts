@@ -27,6 +27,7 @@ export function toEventClientDto(event: Event): EventClientDto {
     listedPublicly: event.listedPublicly,
     registrationClosesAt: event.registrationClosesAt,
     registrationLeadMinutes: event.registrationLeadMinutes,
+    shortCode: event.shortCode,
     createdAt: event.createdAt,
   };
 }

@@ -17,6 +17,7 @@ Dynamic segments are shown as `:name` for readability.
 | `/:orgSlug/:eventSlug/feedback` | Event feedback form when open |
 | `/:orgSlug/:eventSlug/check-in` | PIN-protected venue check-in station; usable by trusted on-site staff without an account |
 | `/:orgSlug/i/:instanceId` | Recurring-series instance and RSVP |
+| `/:shortCode` | Event short link: a 7-character code (letters and digits, always at least one uppercase letter, so it never matches a lowercase organisation slug) that temporarily redirects to the event's current public page. Unknown or unpublished codes return the same not-found page as an unknown organisation; lookups are rate-limited |
 | `/ticket/:token` | Attendee ticket status and QR page |
 | `/join/org/:token` | Accept an organisation invitation |
 | `/login` | Password and Google sign-in/signup |

@@ -294,6 +294,9 @@ model Event {
   /// Encrypted solely so organisation admins can retrieve the current venue PIN.
   checkInStationPinEncrypted String?
   checkInStationSecretVersion Int @default(0)
+  /// Optional 7-character share code served at /{shortCode}. Always contains
+  /// an uppercase letter so it can never equal a (lowercase) organisation slug.
+  shortCode             String?          @unique
   createdAt             DateTime         @default(now())
 
   organisation     Organisation           @relation(fields: [organisationId], references: [id], onDelete: Cascade)
