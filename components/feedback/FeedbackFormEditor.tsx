@@ -3,24 +3,12 @@
 import { useState, useTransition } from "react";
 import type { RegistrationFieldType } from "@prisma/client";
 import { RegistrationFieldType as FieldType } from "@prisma/client";
-import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Checkbox from "@mui/material/Checkbox";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import IconButton from "@mui/material/IconButton";
-import MenuItem from "@mui/material/MenuItem";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import { Copy, LayoutTemplate, Pencil, Plus, Trash2 } from "lucide-react";
+import { Button, IconButton } from "@/components/ui/button";
+import { CheckboxField } from "@/components/ui/choice";
+import { Callout, Chip, EmptyState } from "@/components/ui/display";
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
+import { Field as FormField, Input, NativeSelect } from "@/components/ui/field";
 import { applyFeedbackTemplate, deleteFeedbackField, saveFeedbackField, saveFeedbackSettings } from "@/app/actions/feedback-form";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
@@ -143,85 +131,101 @@ export function FeedbackFormEditor(props: {
     });
   };
   return (
-    <Stack spacing={3}>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}>
-        <Box>
-          <Typography variant="h5">Feedback form</Typography>
-          <Typography color="text.secondary" variant="body2">Share this link manually. It never sends system email.</Typography>
-        </Box>
-        <Button startIcon={<ContentCopyIcon />} variant="outlined" onClick={() => void navigator.clipboard.writeText(props.feedbackUrl).then(() => { setMessageIsError(false); setMessage("Feedback link copied."); }, () => { setMessageIsError(true); setMessage("Could not copy the feedback link."); })}>Copy feedback link</Button>
-      </Stack>
-      {message ? <Alert severity={messageIsError ? "error" : "info"} onClose={() => setMessage(null)}>{message}</Alert> : null}
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack spacing={1.5}>
-          <Box>
-            <Typography variant="h6">Start with a template</Typography>
-            <Typography variant="body2" color="text.secondary">Use a ready-made question set, then tailor it to this event. Applying a template replaces unanswered questions and closes the form for review.</Typography>
-          </Box>
-          <Box><Button variant="outlined" onClick={() => setTemplateDialog(true)} disabled={pending}>Browse feedback templates</Button></Box>
-        </Stack>
-      </Paper>
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack spacing={2}>
-          <TextField label="Form title" value={title} onChange={(event) => { setTitle(event.target.value); markDirty(); }} fullWidth />
-          <TextField label="Thank-you message" value={thankYouMessage} onChange={(event) => { setThankYouMessage(event.target.value); markDirty(); }} fullWidth />
-          <FormControlLabel control={<Checkbox checked={isOpen} onChange={(_, checked) => { setIsOpen(checked); markDirty(); }} />} label="Open this feedback link" />
-          <FormControlLabel control={<Checkbox checked={certificateEnabled} onChange={(_, checked) => { setCertificateEnabled(checked); markDirty(); }} />} label="Offer a JPEG certificate after submission" />
-          {certificateEnabled && <CertificateBuilder organisationSlug={props.organisationSlug} eventId={props.eventId} value={certificateTemplate} onChange={(value) => { setCertificateTemplate(value); markDirty(); }} disabled={pending} onBusyChange={setCertificateBusy} />}
-          <Button variant="contained" onClick={saveSettings} disabled={pending || certificateBusy || !dirty}>{pending ? "Saving…" : "Save settings"}</Button>
-        </Stack>
-      </Paper>
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-        <Typography variant="h6">Questions</Typography>
-        <Button variant="contained" onClick={() => openFieldDialog()} disabled={pending}>Add question</Button>
-      </Stack>
-      {fields.length === 0 ? <Typography color="text.secondary">Add at least one question before opening the form.</Typography> : fields.map((field) => (
-        <Paper key={field.id} variant="outlined" sx={{ p: 2 }}>
-          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-            <Box>
-              <Typography>{field.label}{field.required ? " *" : ""}</Typography>
-              <Typography variant="caption" color="text.secondary">{field.type}{field.options.length ? ` · ${field.options.join(", ")}` : ""}</Typography>
-            </Box>
-            <Stack direction="row" spacing={0.5}>
-              <IconButton aria-label={`Edit ${field.label}`} disabled={pending} onClick={() => openFieldDialog(field)}><EditOutlinedIcon /></IconButton>
-              <IconButton aria-label={`Delete ${field.label}`} disabled={pending} onClick={() => setDeleteField(field)}><DeleteOutlineIcon /></IconButton>
-            </Stack>
-          </Stack>
-        </Paper>
-      ))}
-      <Dialog open={dialog} onClose={() => !pending && setDialog(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editingField ? "Edit feedback question" : "Add feedback question"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Question" value={label} onChange={(event) => setLabel(event.target.value)} autoFocus fullWidth />
-            <TextField select label="Answer type" value={type} onChange={(event) => setType(event.target.value as RegistrationFieldType)} fullWidth>
-              {Object.values(FieldType).filter((item) => item !== "EMAIL" && item !== "PHONE" && item !== "DATE").map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-            </TextField>
-            {["SELECT", "MULTI_SELECT", "RADIO"].includes(type) ? <TextField label="Options (comma separated)" value={options} onChange={(event) => setOptions(event.target.value)} fullWidth /> : null}
-            <FormControlLabel control={<Checkbox checked={required} onChange={(_, checked) => setRequired(checked)} />} label="Required" />
-          </Stack>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-h3 text-ink">Feedback form</h2>
+          <p className="mt-1 text-body-ui text-ink-muted">Share this link manually. It never sends system email.</p>
+        </div>
+        <Button variant="secondary" startIcon={<Copy />} onClick={() => void navigator.clipboard.writeText(props.feedbackUrl).then(() => { setMessageIsError(false); setMessage("Feedback link copied."); }, () => { setMessageIsError(true); setMessage("Could not copy the feedback link."); })}>Copy feedback link</Button>
+      </div>
+      {message ? <Callout tone={messageIsError ? "danger" : "info"} role={messageIsError ? "alert" : "status"} action={<Button size="sm" variant="quiet" onClick={() => setMessage(null)}>Dismiss</Button>}>{message}</Callout> : null}
+      <section className="flex flex-col items-start gap-3 rounded-lg border border-line bg-canvas p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-h4 text-ink">Start with a template</h3>
+          <p className="mt-1 text-body-ui text-ink-muted">Use a ready-made question set, then tailor it to this event. Applying a template replaces unanswered questions and closes the form for review.</p>
+        </div>
+        <Button variant="secondary" startIcon={<LayoutTemplate />} onClick={() => setTemplateDialog(true)} disabled={pending} className="shrink-0">Browse feedback templates</Button>
+      </section>
+      <section className="flex flex-col gap-4 rounded-lg border border-line bg-canvas p-5">
+        <FormField label="Form title">
+          <Input value={title} onChange={(event) => { setTitle(event.target.value); markDirty(); }} />
+        </FormField>
+        <FormField label="Thank-you message">
+          <Input value={thankYouMessage} onChange={(event) => { setThankYouMessage(event.target.value); markDirty(); }} />
+        </FormField>
+        <CheckboxField label="Open this feedback link" checked={isOpen} onCheckedChange={(checked) => { setIsOpen(checked === true); markDirty(); }} />
+        <CheckboxField label="Offer a JPEG certificate after submission" checked={certificateEnabled} onCheckedChange={(checked) => { setCertificateEnabled(checked === true); markDirty(); }} />
+        {certificateEnabled && <CertificateBuilder organisationSlug={props.organisationSlug} eventId={props.eventId} value={certificateTemplate} onChange={(value) => { setCertificateTemplate(value); markDirty(); }} disabled={pending} onBusyChange={setCertificateBusy} />}
+        <Button variant="primary" onClick={saveSettings} disabled={pending || certificateBusy || !dirty} className="self-start">{pending ? "Saving…" : "Save settings"}</Button>
+      </section>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-h4 text-ink">Questions</h3>
+        <Button variant="primary" startIcon={<Plus />} onClick={() => openFieldDialog()} disabled={pending}>Add question</Button>
+      </div>
+      {fields.length === 0 ? <EmptyState>Add at least one question before opening the form.</EmptyState> : (
+        <ul className="flex flex-col gap-2.5">
+          {fields.map((field) => (
+            <li key={field.id} className="flex items-center gap-3 rounded-lg border border-line bg-canvas px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-label text-ink">{field.label}{field.required ? " *" : ""}</p>
+                <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-caption text-ink-muted">
+                  <Chip size="sm">{field.type}</Chip>
+                  {field.options.length ? <span>{field.options.join(", ")}</span> : null}
+                </p>
+              </div>
+              <IconButton label={`Edit ${field.label}`} size="sm" disabled={pending} onClick={() => openFieldDialog(field)}><Pencil /></IconButton>
+              <IconButton label={`Delete ${field.label}`} size="sm" variant="danger" disabled={pending} onClick={() => setDeleteField(field)}><Trash2 /></IconButton>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Dialog open={dialog} onOpenChange={(next) => { if (!next && !pending) setDialog(false); }}>
+        <DialogContent size="md">
+          <DialogHeader title={editingField ? "Edit feedback question" : "Add feedback question"} />
+          <DialogBody className="flex flex-col gap-4">
+            <FormField label="Question">
+              <Input value={label} onChange={(event) => setLabel(event.target.value)} autoFocus />
+            </FormField>
+            <FormField label="Answer type">
+              <NativeSelect value={type} onChange={(event) => setType(event.target.value as RegistrationFieldType)}>
+                {Object.values(FieldType).filter((item) => item !== "EMAIL" && item !== "PHONE" && item !== "DATE").map((item) => <option key={item} value={item}>{item}</option>)}
+              </NativeSelect>
+            </FormField>
+            {["SELECT", "MULTI_SELECT", "RADIO"].includes(type) ? (
+              <FormField label="Options (comma separated)">
+                <Input value={options} onChange={(event) => setOptions(event.target.value)} />
+              </FormField>
+            ) : null}
+            <CheckboxField label="Required" checked={required} onCheckedChange={(checked) => setRequired(checked === true)} />
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setDialog(false)} disabled={pending}>Cancel</Button>
+            <Button variant="primary" onClick={saveField} disabled={pending || !label.trim()}>{editingField ? "Save question" : "Add question"}</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions><Button onClick={() => setDialog(false)} disabled={pending}>Cancel</Button><Button onClick={saveField} disabled={pending || !label.trim()} variant="contained">{editingField ? "Save question" : "Add question"}</Button></DialogActions>
       </Dialog>
-      <Dialog open={templateDialog} onClose={() => !pending && setTemplateDialog(false)} fullWidth maxWidth="md">
-        <DialogTitle>Choose a feedback template</DialogTitle>
-        <DialogContent>
-          <Stack spacing={1.5} sx={{ mt: 1 }}>
-            {feedbackTemplates.map((template) => (
-              <Paper key={template.id} variant="outlined" sx={{ p: 2 }}>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}>
-                  <Box>
-                    <Typography variant="subtitle1">{template.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">{template.description}</Typography>
-                    <Typography variant="caption" color="text.secondary">{template.fields.length} questions · {template.title}</Typography>
-                  </Box>
-                  <Button variant="contained" onClick={() => applyTemplate(template)} disabled={pending}>Use template</Button>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
+      <Dialog open={templateDialog} onOpenChange={(next) => { if (!next && !pending) setTemplateDialog(false); }}>
+        <DialogContent size="lg">
+          <DialogHeader title="Choose a feedback template" />
+          <DialogBody>
+            <ul className="flex flex-col gap-2.5">
+              {feedbackTemplates.map((template) => (
+                <li key={template.id} className="flex flex-col gap-3 rounded-lg border border-line p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[16px] font-bold text-ink">{template.name}</p>
+                    <p className="text-body-ui text-ink-secondary">{template.description}</p>
+                    <p className="text-caption text-ink-muted">{template.fields.length} questions · {template.title}</p>
+                  </div>
+                  <Button variant="primary" size="sm" onClick={() => applyTemplate(template)} disabled={pending} className="shrink-0">Use template</Button>
+                </li>
+              ))}
+            </ul>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setTemplateDialog(false)} disabled={pending}>Cancel</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions><Button onClick={() => setTemplateDialog(false)} disabled={pending}>Cancel</Button></DialogActions>
       </Dialog>
       <ConfirmationDialog
         open={Boolean(deleteField)}
@@ -232,6 +236,6 @@ export function FeedbackFormEditor(props: {
         onCancel={() => setDeleteField(null)}
         onConfirm={confirmDelete}
       />
-    </Stack>
+    </div>
   );
 }

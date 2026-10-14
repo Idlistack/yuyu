@@ -1,21 +1,8 @@
 "use client";
 
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Divider from "@mui/material/Divider";
-import Grid from "@mui/material/Grid";
-import LinearProgress from "@mui/material/LinearProgress";
-import Chip from "@mui/material/Chip";
-import type { Theme } from "@mui/material/styles";
-import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
-import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import HourglassTopOutlinedIcon from "@mui/icons-material/HourglassTopOutlined";
-import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
-import PlaylistAddOutlinedIcon from "@mui/icons-material/PlaylistAddOutlined";
-import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
-import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import { Ban, CheckCircle2, Hourglass, ListPlus, QrCode, TrendingUp, Users } from "lucide-react";
+import { Card, Chip, StatTile } from "@/components/ui/display";
+import { cn } from "@/lib/cn";
 
 type Analytics = {
   total: number;
@@ -35,54 +22,43 @@ function fmtPct(value: number) {
   return `${Math.round(value * 10) / 10}%`;
 }
 
-function metricCardBg(theme: Theme, tint: "mint" | "lavender") {
-  const a = tint === "mint" ? "124,245,182" : "185,174,255";
-  const b = tint === "mint" ? "185,174,255" : "124,245,182";
-  const base =
-    theme.palette.mode === "dark"
-      ? "rgba(255,255,255,0.02)"
-      : "rgba(255,255,255,0.55)";
-  return `linear-gradient(145deg, ${base}, rgba(${a},0.10), rgba(${b},0.06))`;
-}
+// Status colours come from the V1 status tokens so the chart follows light/dark mode.
+const SERIES = {
+  confirmed: { label: "Confirmed", stroke: "stroke-success-solid", fill: "bg-success-solid", text: "text-success-fg" },
+  pending: { label: "Pending", stroke: "stroke-warning-solid", fill: "bg-warning-solid", text: "text-warning-fg" },
+  waitlisted: { label: "Waitlisted", stroke: "stroke-primary", fill: "bg-primary", text: "text-ink" },
+  rejected: { label: "Rejected", stroke: "stroke-danger-solid", fill: "bg-danger-solid", text: "text-danger-fg" },
+  other: { label: "Other", stroke: "stroke-line-strong", fill: "bg-line-strong", text: "text-ink-muted" },
+} as const;
+type SeriesKey = keyof typeof SERIES;
 
-function DonutChart(props: {
-  size?: number;
-  thickness?: number;
-  parts: { label: string; value: number; color: string }[];
-}) {
+function DonutChart(props: { size?: number; thickness?: number; parts: { key: SeriesKey; value: number }[] }) {
   const { size = 160, thickness = 16, parts } = props;
   const total = parts.reduce((acc, p) => acc + Math.max(0, p.value), 0);
   const r = (size - thickness) / 2;
   const c = 2 * Math.PI * r;
   let offset = 0;
   const center = size / 2;
+  const summary = parts.map((p) => `${SERIES[p.key].label} ${p.value}`).join(", ");
 
   return (
-    <Box sx={{ width: size, height: size, position: "relative" }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle
-          cx={center}
-          cy={center}
-          r={r}
-          fill="none"
-          stroke="rgba(255,255,255,0.08)"
-          strokeWidth={thickness}
-        />
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`Responses by status: ${summary}`}>
+        <circle cx={center} cy={center} r={r} fill="none" className="stroke-track" strokeWidth={thickness} />
         {total > 0
           ? parts.map((p) => {
               const v = Math.max(0, p.value);
               const seg = (v / total) * c;
-              const dash = `${seg} ${c - seg}`;
               const el = (
                 <circle
-                  key={p.label}
+                  key={p.key}
                   cx={center}
                   cy={center}
                   r={r}
                   fill="none"
-                  stroke={p.color}
+                  className={SERIES[p.key].stroke}
                   strokeWidth={thickness}
-                  strokeDasharray={dash}
+                  strokeDasharray={`${seg} ${c - seg}`}
                   strokeDashoffset={-offset}
                   strokeLinecap="round"
                   transform={`rotate(-90 ${center} ${center})`}
@@ -93,70 +69,45 @@ function DonutChart(props: {
             })
           : null}
       </svg>
-      <Box
-        sx={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "column",
-          pointerEvents: "none",
-        }}
-      >
-        <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1 }}>
-          {total}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          responses
-        </Typography>
-      </Box>
-    </Box>
+      <div aria-hidden className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display text-[28px] font-extrabold leading-none text-ink">{total}</span>
+        <span className="text-caption text-ink-muted">responses</span>
+      </div>
+    </div>
   );
 }
 
-function SparkBars(props: {
-  values: { label: string; value: number; color: string }[];
-  max?: number;
-}) {
-  const { values, max } = props;
-  const m =
-    max ??
-    values.reduce((acc, v) => Math.max(acc, Math.max(0, v.value)), 0) ??
-    0;
-
+function SparkBars(props: { values: { key: SeriesKey; value: number }[] }) {
+  const { values } = props;
+  const m = values.reduce((acc, v) => Math.max(acc, Math.max(0, v.value)), 0);
   return (
-    <Stack direction="row" spacing={0.75} sx={{ alignItems: "flex-end" }}>
+    <div className="flex items-end gap-1.5">
       {values.map((v) => {
         const h = m > 0 ? Math.max(6, Math.round((Math.max(0, v.value) / m) * 46)) : 6;
-        return (
-          <Box
-            key={v.label}
-            title={`${v.label}: ${v.value}`}
-            sx={{
-              width: 10,
-              height: h,
-              borderRadius: 999,
-              background: v.color,
-              opacity: v.value > 0 ? 0.95 : 0.35,
-              boxShadow: v.value > 0 ? "0 8px 20px rgba(0,0,0,0.18)" : "none",
-            }}
-          />
-        );
+        return <span key={v.key} title={`${SERIES[v.key].label}: ${v.value}`} className={cn("block w-2.5 rounded-full", SERIES[v.key].fill, v.value > 0 ? "opacity-95" : "opacity-35")} style={{ height: h }} />;
       })}
-    </Stack>
+    </div>
+  );
+}
+
+function PipelineRow({ label, value, total, series }: { label: string; value: number; total: number; series: SeriesKey }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between text-body-ui">
+        <span className="text-ink-secondary">{label}</span>
+        <span className="font-bold text-ink">{value}</span>
+      </div>
+      <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct(value, total))} className="h-2.5 overflow-hidden rounded-full bg-track">
+        <div className={cn("h-full rounded-full transition-[width] duration-[360ms] ease-yy", SERIES[series].fill)} style={{ width: `${pct(value, total)}%` }} />
+      </div>
+    </div>
   );
 }
 
 export function EventAnalyticsPanel(props: { analytics: Analytics }) {
   const { analytics } = props;
 
-  const nonConfirmed =
-    analytics.total -
-    analytics.confirmed -
-    analytics.waitlisted -
-    analytics.pendingApproval -
-    analytics.rejected;
+  const nonConfirmed = analytics.total - analytics.confirmed - analytics.waitlisted - analytics.pendingApproval - analytics.rejected;
   const other = Math.max(0, nonConfirmed);
 
   const checkInRate = pct(analytics.checkedIn, analytics.confirmed);
@@ -164,327 +115,93 @@ export function EventAnalyticsPanel(props: { analytics: Analytics }) {
   const waitlistRate = pct(analytics.waitlisted, analytics.total);
   const pendingRate = pct(analytics.pendingApproval, analytics.total);
 
+  const rates: Array<{ key: SeriesKey; icon: typeof CheckCircle2; value: string }> = [
+    { key: "confirmed", icon: CheckCircle2, value: analytics.total > 0 ? fmtPct(confirmRate) : "—" },
+    { key: "pending", icon: Hourglass, value: analytics.total > 0 ? fmtPct(pendingRate) : "—" },
+    { key: "waitlisted", icon: ListPlus, value: analytics.total > 0 ? fmtPct(waitlistRate) : "—" },
+    { key: "rejected", icon: Ban, value: String(analytics.rejected) },
+  ];
+
   return (
-    <Stack spacing={2.5}>
-      <Paper
-        variant="outlined"
-        sx={(theme) => ({
-          p: 2.5,
-          background: metricCardBg(theme, "mint"),
-          overflow: "hidden",
-          position: "relative",
-        })}
-      >
-        <Box
-          sx={{
-            position: "absolute",
-            inset: -80,
-            background:
-              "radial-gradient(circle at 20% 20%, rgba(124,245,182,0.18), transparent 55%), radial-gradient(circle at 80% 40%, rgba(185,174,255,0.16), transparent 60%)",
-            pointerEvents: "none",
-          }}
-        />
-        <Stack spacing={2} sx={{ position: "relative" }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
-          >
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <InsightsOutlinedIcon color="primary" />
-              <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                  Analytics
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                  Live snapshot of RSVPs and check-ins.
-                </Typography>
-              </Box>
-            </Stack>
-            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-              <Chip
-                size="small"
-                variant="outlined"
-                icon={<PeopleAltOutlinedIcon />}
-                label={`${analytics.total} responses`}
-              />
-              <Chip
-                size="small"
-                variant="outlined"
-                icon={<QrCode2OutlinedIcon />}
-                label={
-                  analytics.confirmed > 0
-                    ? `${fmtPct(checkInRate)} check-in rate`
-                    : "— check-in rate"
-                }
-              />
-            </Stack>
-          </Stack>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-2.5">
+          <TrendingUp aria-hidden className="mt-1 size-5 text-ink-muted" />
+          <div>
+            <h2 className="text-h3 text-ink">Analytics</h2>
+            <p className="text-body-ui text-ink-muted">Live snapshot of RSVPs and check-ins.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Chip tone="outline" icon={<Users />}>{analytics.total} responses</Chip>
+          <Chip tone="outline" icon={<QrCode />}>{analytics.confirmed > 0 ? `${fmtPct(checkInRate)} check-in rate` : "— check-in rate"}</Chip>
+        </div>
+      </div>
 
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 7 }}>
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: 2,
-                  height: "100%",
-                  backgroundColor: "rgba(255,255,255,0.02)",
-                }}
-              >
-                <Typography variant="subtitle2" color="text.secondary">
-                  RSVP pipeline
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  Confirmed, waiting, pending, and rejected at a glance.
-                </Typography>
-                <Divider sx={{ my: 1.5 }} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Total responses" value={analytics.total} hint="RSVP submissions so far" />
+        <StatTile label="Confirmed" value={analytics.confirmed} hint={analytics.total > 0 ? `${fmtPct(confirmRate)} of responses` : "—"} />
+        <StatTile label="Checked in" value={analytics.checkedIn} hint={analytics.confirmed > 0 ? `${fmtPct(checkInRate)} of confirmed` : "—"} progress={analytics.confirmed > 0 ? { value: analytics.checkedIn, max: analytics.confirmed, tone: "success" } : undefined} />
+        <StatTile label="Needs action" value={analytics.pendingApproval} hint="Pending approvals" tone={analytics.pendingApproval > 0 ? "attention" : "default"} />
+      </div>
 
-                <Stack spacing={1.25}>
-                  <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography variant="body2">Confirmed</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {analytics.confirmed}
-                    </Typography>
-                  </Stack>
-                  <LinearProgress
-                    variant="determinate"
-                    value={pct(analytics.confirmed, analytics.total)}
-                    sx={{
-                      height: 10,
-                      borderRadius: 999,
-                      "& .MuiLinearProgress-bar": { borderRadius: 999 },
-                    }}
-                    color="success"
-                  />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <Card>
+          <h3 className="text-h4 text-ink">RSVP pipeline</h3>
+          <p className="mt-1 text-body-ui text-ink-muted">Confirmed, waiting, pending, and rejected at a glance.</p>
+          <div className="mt-4 flex flex-col gap-3.5 border-t border-line pt-4">
+            <PipelineRow label="Confirmed" value={analytics.confirmed} total={analytics.total} series="confirmed" />
+            <PipelineRow label="Pending approval" value={analytics.pendingApproval} total={analytics.total} series="pending" />
+            <PipelineRow label="Waitlisted" value={analytics.waitlisted} total={analytics.total} series="waitlisted" />
+            <PipelineRow label="Rejected" value={analytics.rejected} total={analytics.total} series="rejected" />
+          </div>
+        </Card>
 
-                  <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography variant="body2">Pending approval</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {analytics.pendingApproval}
-                    </Typography>
-                  </Stack>
-                  <LinearProgress
-                    variant="determinate"
-                    value={pct(analytics.pendingApproval, analytics.total)}
-                    sx={{
-                      height: 10,
-                      borderRadius: 999,
-                      "& .MuiLinearProgress-bar": { borderRadius: 999 },
-                    }}
-                    color="warning"
-                  />
-
-                  <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography variant="body2">Waitlisted</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {analytics.waitlisted}
-                    </Typography>
-                  </Stack>
-                  <LinearProgress
-                    variant="determinate"
-                    value={pct(analytics.waitlisted, analytics.total)}
-                    sx={{
-                      height: 10,
-                      borderRadius: 999,
-                      "& .MuiLinearProgress-bar": { borderRadius: 999 },
-                    }}
-                    color="info"
-                  />
-
-                  <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography variant="body2">Rejected</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {analytics.rejected}
-                    </Typography>
-                  </Stack>
-                  <LinearProgress
-                    variant="determinate"
-                    value={pct(analytics.rejected, analytics.total)}
-                    sx={{
-                      height: 10,
-                      borderRadius: 999,
-                      "& .MuiLinearProgress-bar": { borderRadius: 999 },
-                    }}
-                    color="error"
-                  />
-                </Stack>
-              </Paper>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: 2,
-                  height: "100%",
-                  backgroundColor: "rgba(255,255,255,0.02)",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  gap: 2,
-                }}
-              >
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Distribution
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Breakdown of responses by status.
-                  </Typography>
-                </Box>
-
-                <Stack
-                  direction={{ xs: "column", sm: "row", md: "column" }}
-                  spacing={2}
-                  sx={{ alignItems: "center", justifyContent: "center" }}
-                >
-                  <DonutChart
-                    parts={[
-                      { label: "Confirmed", value: analytics.confirmed, color: "#7CF5B6" },
-                      { label: "Pending", value: analytics.pendingApproval, color: "#FFB74D" },
-                      { label: "Waitlisted", value: analytics.waitlisted, color: "#8AB4F8" },
-                      { label: "Rejected", value: analytics.rejected, color: "#FF6B6B" },
-                      { label: "Other", value: other, color: "rgba(255,255,255,0.28)" },
-                    ]}
-                  />
-                  <Stack spacing={1} sx={{ width: "100%" }}>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Quick view
-                      </Typography>
-                      <SparkBars
-                        values={[
-                          { label: "Confirmed", value: analytics.confirmed, color: "#7CF5B6" },
-                          { label: "Pending", value: analytics.pendingApproval, color: "#FFB74D" },
-                          { label: "Waitlisted", value: analytics.waitlisted, color: "#8AB4F8" },
-                          { label: "Rejected", value: analytics.rejected, color: "#FF6B6B" },
-                        ]}
-                      />
-                    </Stack>
-                    <Divider />
-                    <Stack spacing={0.75}>
-                      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                          <CheckCircleOutlineOutlinedIcon sx={{ fontSize: 18, color: "#7CF5B6" }} />
-                          <Typography variant="body2">Confirmed</Typography>
-                        </Stack>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          {analytics.total > 0 ? fmtPct(confirmRate) : "—"}
-                        </Typography>
-                      </Stack>
-                      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                          <HourglassTopOutlinedIcon sx={{ fontSize: 18, color: "#FFB74D" }} />
-                          <Typography variant="body2">Pending</Typography>
-                        </Stack>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          {analytics.total > 0 ? fmtPct(pendingRate) : "—"}
-                        </Typography>
-                      </Stack>
-                      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                          <PlaylistAddOutlinedIcon sx={{ fontSize: 18, color: "#8AB4F8" }} />
-                          <Typography variant="body2">Waitlisted</Typography>
-                        </Stack>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          {analytics.total > 0 ? fmtPct(waitlistRate) : "—"}
-                        </Typography>
-                      </Stack>
-                      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                          <CancelOutlinedIcon sx={{ fontSize: 18, color: "#FF6B6B" }} />
-                          <Typography variant="body2">Rejected</Typography>
-                        </Stack>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          {analytics.rejected}
-                        </Typography>
-                      </Stack>
-                    </Stack>
-                  </Stack>
-                </Stack>
-              </Paper>
-            </Grid>
-          </Grid>
-        </Stack>
-      </Paper>
-
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Paper
-            variant="outlined"
-            sx={(theme) => ({
-              p: 2,
-              height: "100%",
-              background: metricCardBg(theme, "mint"),
-            })}
-          >
-            <Stack spacing={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                Total responses
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-                {analytics.total}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                RSVP submissions so far
-              </Typography>
-            </Stack>
-          </Paper>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Paper
-            variant="outlined"
-            sx={(theme) => ({
-              p: 2,
-              height: "100%",
-              background: metricCardBg(theme, "lavender"),
-            })}
-          >
-            <Stack spacing={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                Confirmed
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-                {analytics.confirmed}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {analytics.total > 0 ? `${fmtPct(confirmRate)} of responses` : "—"}
-              </Typography>
-            </Stack>
-          </Paper>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
-            <Stack spacing={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                Checked in
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-                {analytics.checkedIn}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {analytics.confirmed > 0 ? `${fmtPct(checkInRate)} of confirmed` : "—"}
-              </Typography>
-            </Stack>
-          </Paper>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
-            <Stack spacing={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                Needs action
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-                {analytics.pendingApproval}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Pending approvals
-              </Typography>
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
-    </Stack>
+        <Card className="flex flex-col gap-4">
+          <div>
+            <h3 className="text-h4 text-ink">Distribution</h3>
+            <p className="mt-1 text-body-ui text-ink-muted">Breakdown of responses by status.</p>
+          </div>
+          <div className="flex flex-col items-center gap-5 sm:flex-row lg:flex-col">
+            <DonutChart
+              parts={[
+                { key: "confirmed", value: analytics.confirmed },
+                { key: "pending", value: analytics.pendingApproval },
+                { key: "waitlisted", value: analytics.waitlisted },
+                { key: "rejected", value: analytics.rejected },
+                { key: "other", value: other },
+              ]}
+            />
+            <div className="flex w-full flex-col gap-2">
+              <div className="flex items-center justify-between gap-2 border-b border-line pb-2">
+                <span className="text-caption text-ink-muted">Quick view</span>
+                <SparkBars
+                  values={[
+                    { key: "confirmed", value: analytics.confirmed },
+                    { key: "pending", value: analytics.pendingApproval },
+                    { key: "waitlisted", value: analytics.waitlisted },
+                    { key: "rejected", value: analytics.rejected },
+                  ]}
+                />
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {rates.map((rate) => {
+                  const Icon = rate.icon;
+                  return (
+                    <li key={rate.key} className="flex items-center justify-between text-body-ui">
+                      <span className="flex items-center gap-2 text-ink-secondary">
+                        <Icon aria-hidden className={cn("size-[18px]", SERIES[rate.key].text)} />
+                        {SERIES[rate.key].label}
+                      </span>
+                      <span className="font-bold text-ink">{rate.value}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
   );
 }
-

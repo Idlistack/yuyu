@@ -3,19 +3,10 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { EventClientDto } from "@/lib/eventDto";
-import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
-import Divider from "@mui/material/Divider";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import FileCopyOutlinedIcon from "@mui/icons-material/FileCopyOutlined";
-import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
+import { Copy, CopyPlus, Link2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, Chip, DangerZone } from "@/components/ui/display";
+import { Field, Input } from "@/components/ui/field";
 import { cloneEvent, deleteEvent, updateEventSlug } from "@/app/actions/event";
 import { useToast } from "@/components/feedback/ToastProvider";
 
@@ -120,215 +111,94 @@ export function EventManageMore(props: {
     });
   };
 
+  const copySnippet = (value: string) => {
+    void copyToClipboard(value).then(() => showToast("Copied embed snippet", "success"));
+  };
+
   return (
-    <Stack spacing={2.5}>
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack spacing={1.25}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <FileCopyOutlinedIcon color="primary" />
-            <Typography variant="h6" component="h2">
-              Clone event
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary">
-            Create a new event with the same information as this one. RSVP guest
-            list and invites won’t be copied.
-          </Typography>
-          <Box>
-            <Button variant="contained" onClick={doClone} disabled={pending}>
-              Clone event
-            </Button>
-          </Box>
-        </Stack>
-      </Paper>
+    <div className="flex flex-col gap-5">
+      <Card>
+        <CardHeader
+          title={<span className="inline-flex items-center gap-2"><CopyPlus aria-hidden className="size-5 text-ink-muted" />Clone event</span>}
+          description="Create a new event with the same information as this one. RSVP guest list and invites won’t be copied."
+          className="mb-3"
+        />
+        <Button variant="primary" onClick={doClone} disabled={pending}>
+          Clone event
+        </Button>
+      </Card>
 
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack spacing={1.25}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <LinkOutlinedIcon color="primary" />
-            <Typography variant="h6" component="h2">
-              Event page
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary">
-            Change your public URL. If you’ve already shared the old link, it may
-            stop working.
-          </Typography>
-
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} useFlexGap>
-            <TextField
-              label="Public URL slug"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              size="small"
-              fullWidth
-              helperText="lowercase letters, numbers, hyphens"
-              disabled={pending}
-            />
-            <Button
-              variant="outlined"
-              onClick={doUpdateSlug}
-              disabled={pending || slug.trim() === event.slug}
-              sx={{ flexShrink: 0 }}
-            >
+      <Card>
+        <CardHeader
+          title={<span className="inline-flex items-center gap-2"><Link2 aria-hidden className="size-5 text-ink-muted" />Event page</span>}
+          description="Change your public URL. If you’ve already shared the old link, it may stop working."
+          className="mb-3"
+        />
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start">
+          <Field label="Public URL slug" helperText="lowercase letters, numbers, hyphens" className="flex-1">
+            <Input value={slug} onChange={(e) => setSlug(e.target.value)} disabled={pending} />
+          </Field>
+          <div className="flex gap-2 sm:pt-[26px]">
+            <Button variant="secondary" onClick={doUpdateSlug} disabled={pending || slug.trim() === event.slug}>
               Update
             </Button>
             <Button
-              variant="outlined"
-              startIcon={<ContentCopyOutlinedIcon />}
+              variant="secondary"
+              startIcon={<Copy />}
               onClick={() => {
                 void copyToClipboard(publicUrl).then(() => {
                   showToast("Copied URL", "success");
                 });
               }}
               disabled={pending}
-              sx={{ flexShrink: 0 }}
             >
               Copy
             </Button>
-          </Stack>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Chip size="sm" tone="outline">Public URL</Chip>
+          <code className="break-all font-mono text-sm text-ink-secondary">{publicUrl}</code>
+        </div>
+      </Card>
 
-          <Stack
-            direction="row"
-            spacing={1}
-            useFlexGap
-            sx={{ flexWrap: "wrap", pt: 0.5 }}
-          >
-            <Chip size="small" label="Public URL" variant="outlined" />
-            <Typography
-              variant="body2"
-              sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
-            >
-              {publicUrl}
-            </Typography>
-          </Stack>
-        </Stack>
-      </Paper>
-
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack spacing={1.25}>
-          <Typography variant="h6" component="h2">
-            Embed event
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Add a button or an embedded page to your website.
-          </Typography>
-
-          <Stack spacing={1}>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={1}
-              sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
-            >
-              <Box>
-                <Typography variant="subtitle2">Add a registration button</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Shows “Register for {event.title}” and opens the event page in a new tab.
-                </Typography>
-              </Box>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<ContentCopyOutlinedIcon />}
-                onClick={() => {
-                  void copyToClipboard(embedButtonSnippet).then(() =>
-                    showToast("Copied embed snippet", "success"),
-                  );
-                }}
-              >
+      <Card>
+        <CardHeader title="Embed event" description="Add a button or an embedded page to your website." className="mb-3" />
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-label text-ink">Add a registration button</h3>
+                <p className="text-sm text-ink-muted">Shows “Register for {event.title}” and opens the event page in a new tab.</p>
+              </div>
+              <Button size="sm" variant="secondary" startIcon={<Copy />} onClick={() => copySnippet(embedButtonSnippet)}>
                 Copy registration button
               </Button>
-            </Stack>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2,
-                bgcolor: "action.hover",
-                fontFamily: "monospace",
-                fontSize: 12,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
-            >
-              {embedButtonSnippet}
-            </Paper>
-          </Stack>
-
-          <Divider />
-
-          <Stack spacing={1}>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={1}
-              sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
-            >
-              <Typography variant="subtitle2">Embed Event Page</Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<ContentCopyOutlinedIcon />}
-                onClick={() => {
-                  void copyToClipboard(embedPageSnippet).then(() =>
-                    showToast("Copied embed snippet", "success"),
-                  );
-                }}
-              >
+            </div>
+            <pre className="whitespace-pre-wrap break-words rounded-md border border-line bg-subtle p-3 font-mono text-xs text-ink-secondary">{embedButtonSnippet}</pre>
+          </div>
+          <div className="flex flex-col gap-2 border-t border-line pt-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-label text-ink">Embed event page</h3>
+              <Button size="sm" variant="secondary" startIcon={<Copy />} onClick={() => copySnippet(embedPageSnippet)}>
                 Copy snippet
               </Button>
-            </Stack>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2,
-                bgcolor: "action.hover",
-                fontFamily: "monospace",
-                fontSize: 12,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
-            >
-              {embedPageSnippet}
-            </Paper>
-          </Stack>
-        </Stack>
-      </Paper>
+            </div>
+            <pre className="whitespace-pre-wrap break-words rounded-md border border-line bg-subtle p-3 font-mono text-xs text-ink-secondary">{embedPageSnippet}</pre>
+          </div>
+        </div>
+      </Card>
 
-      <Paper variant="outlined" sx={{ p: 3, borderColor: "error.main" }}>
-        <Stack spacing={1.25}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <DeleteOutlineOutlinedIcon color="error" />
-            <Typography variant="h6" component="h2">
-              Delete event
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary">
-            Permanently deletes this event and its registrations. This can’t be
-            undone.
-          </Typography>
-          <Alert severity="warning" variant="outlined">
-            Type <strong>{event.slug}</strong> to confirm.
-          </Alert>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} useFlexGap>
-            <TextField
-              label="Confirm"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              size="small"
-              fullWidth
-              disabled={pending}
-            />
-            <Button
-              variant="contained"
-              color="error"
-              onClick={doDelete}
-              disabled={pending || confirmText.trim() !== event.slug}
-              sx={{ flexShrink: 0 }}
-            >
-              Delete event
-            </Button>
-          </Stack>
-        </Stack>
-      </Paper>
-    </Stack>
+      <DangerZone title="Delete event" description="Permanently deletes this event and its registrations. This can’t be undone.">
+        <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-end">
+          <Field label={<>Type <span className="font-mono">{event.slug}</span> to confirm</>} className="flex-1">
+            <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} disabled={pending} autoComplete="off" />
+          </Field>
+          <Button variant="danger" onClick={doDelete} disabled={pending || confirmText.trim() !== event.slug}>
+            Delete event
+          </Button>
+        </div>
+      </DangerZone>
+    </div>
   );
 }

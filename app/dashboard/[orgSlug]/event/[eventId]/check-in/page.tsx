@@ -1,6 +1,4 @@
 import { notFound } from "next/navigation";
-import Typography from "@mui/material/Typography";
-import Stack from "@mui/material/Stack";
 import { prisma } from "@/lib/db";
 import { EventPermission } from "@prisma/client";
 import { isOrgAdmin, requireOrgDashboardAccess } from "@/lib/permissions";
@@ -77,10 +75,8 @@ export default async function EventCheckInPage({ params }: Props) {
   const origin = await getRequestOrigin();
   const stationUrl = `${origin}/${organisation.slug}/${event.slug}/check-in`;
   return (
-    <Stack spacing={2}>
-      <Typography variant="h5" component="h1" sx={{ fontWeight: 600 }}>
-        Check-in · {event.title}
-      </Typography>
+    <div className="flex flex-col gap-6">
+      <h1 className="text-h1 break-words text-ink">Check-in · {event.title}</h1>
       <EventCheckInClient
         organisationSlug={organisation.slug}
         organisationName={organisation.name}
@@ -92,6 +88,6 @@ export default async function EventCheckInPage({ params }: Props) {
         recent={recent}
       />
       {isAdmin ? <CheckInStationSettings organisationSlug={organisation.slug} eventId={event.id} stationUrl={stationUrl} enabled={Boolean(event.checkInStationPinHash)} /> : null}
-    </Stack>
+    </div>
   );
 }

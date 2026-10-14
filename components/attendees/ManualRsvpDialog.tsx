@@ -2,23 +2,12 @@
 
 import { useState, useTransition } from "react";
 import type { RegistrationFieldType } from "@prisma/client";
-import Alert from "@mui/material/Alert";
-import Button from "@mui/material/Button";
-import Checkbox from "@mui/material/Checkbox";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import FormControl from "@mui/material/FormControl";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import FormLabel from "@mui/material/FormLabel";
-import MenuItem from "@mui/material/MenuItem";
-import Radio from "@mui/material/Radio";
-import RadioGroup from "@mui/material/RadioGroup";
-import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import { UserPlus } from "lucide-react";
+import { AttendeeAnswerField } from "@/components/attendees/AttendeeAnswerField";
+import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/display";
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
+import { Field, Input } from "@/components/ui/field";
 import { addManualRsvp } from "@/app/actions/rsvp-admin";
 import { useToast } from "@/components/feedback/ToastProvider";
 
@@ -30,10 +19,6 @@ export type ManualRsvpField = {
   required: boolean;
   options: string[];
 };
-
-function requiredLabel(field: ManualRsvpField) {
-  return field.required ? `${field.label} *` : field.label;
-}
 
 export function ManualRsvpDialog(props: {
   organisationSlug: string;
@@ -54,71 +39,10 @@ export function ManualRsvpDialog(props: {
     setAnswers((current) => ({ ...current, [key]: value }));
   };
 
-  const renderField = (field: ManualRsvpField) => {
-    const value = answers[field.key];
-    if (field.type === "CHECKBOX") {
-      return (
-        <FormControlLabel
-          key={field.key}
-          control={<Checkbox checked={value === true} onChange={(_, checked) => setAnswer(field.key, checked)} />}
-          label={requiredLabel(field)}
-        />
-      );
-    }
-    if (field.type === "MULTI_SELECT") {
-      const selected = Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-      return (
-        <FormControl key={field.key} required={field.required} component="fieldset">
-          <FormLabel component="legend">{requiredLabel(field)}</FormLabel>
-          <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", columnGap: 0.5, rowGap: 0 }}>
-            {field.options.map((option) => (
-              <FormControlLabel
-                key={option}
-                control={<Checkbox checked={selected.includes(option)} onChange={(_, checked) => setAnswer(field.key, checked ? [...selected, option] : selected.filter((item) => item !== option))} />}
-                label={option}
-              />
-            ))}
-          </Stack>
-        </FormControl>
-      );
-    }
-    if (field.type === "RADIO") {
-      return (
-        <FormControl key={field.key} required={field.required} component="fieldset">
-          <FormLabel component="legend">{requiredLabel(field)}</FormLabel>
-          <RadioGroup value={typeof value === "string" ? value : ""} onChange={(event) => setAnswer(field.key, event.target.value)}>
-            {field.options.map((option) => <FormControlLabel key={option} value={option} control={<Radio />} label={option} />)}
-          </RadioGroup>
-        </FormControl>
-      );
-    }
-    if (field.type === "SELECT") {
-      return (
-        <TextField key={field.key} label={requiredLabel(field)} select required={field.required} value={typeof value === "string" ? value : ""} onChange={(event) => setAnswer(field.key, event.target.value)} fullWidth>
-          <MenuItem value=""><em>Choose one</em></MenuItem>
-          {field.options.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
-        </TextField>
-      );
-    }
-    return (
-      <TextField
-        key={field.key}
-        label={requiredLabel(field)}
-        type={field.type === "EMAIL" ? "email" : field.type === "PHONE" ? "tel" : field.type === "NUMBER" ? "number" : field.type === "DATE" ? "date" : "text"}
-        multiline={field.type === "TEXTAREA"}
-        minRows={field.type === "TEXTAREA" ? 3 : undefined}
-        required={field.required}
-        value={typeof value === "string" || typeof value === "number" ? value : ""}
-        onChange={(event) => setAnswer(field.key, event.target.value)}
-        slotProps={field.type === "DATE" ? { inputLabel: { shrink: true } } : undefined}
-        fullWidth
-      />
-    );
-  };
-
   return (
-    <Dialog open onClose={() => !pending && onClose()} fullWidth maxWidth="sm">
-      <form onSubmit={(event) => {
+    <Dialog open onOpenChange={(next) => { if (!next && !pending) onClose(); }}>
+      <DialogContent size="md">
+      <form className="flex min-h-0 flex-col" onSubmit={(event) => {
         event.preventDefault();
         setError(null);
         startTransition(async () => {
@@ -139,25 +63,25 @@ export function ManualRsvpDialog(props: {
           onClose();
         });
       }}>
-        <DialogTitle>Add attendee</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 0.5 }}>
-            {error ? <Alert severity="error">{error}</Alert> : null}
-            <Typography variant="body2" color="text.secondary">
-              Add a guest RSVP and send their ticket confirmation. Capacity and event registration rules still apply.
-            </Typography>
-            <TextField label="Name" value={name} onChange={(event) => setName(event.target.value)} autoFocus required fullWidth />
-            <TextField label="Email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required fullWidth />
-            {fields.map(renderField)}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose} color="inherit" disabled={pending}>Cancel</Button>
-          <Button type="submit" variant="contained" startIcon={<PersonAddOutlinedIcon />} disabled={pending}>
+        <DialogHeader title="Add attendee" description="Add a guest RSVP and send their ticket confirmation. Capacity and event registration rules still apply." />
+        <DialogBody className="flex flex-col gap-4">
+          {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
+          <Field label="Name" required>
+            <Input value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+          </Field>
+          <Field label="Email" required>
+            <Input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+          </Field>
+          {fields.map((field) => <AttendeeAnswerField key={field.key} field={field} value={answers[field.key]} onChange={(value) => setAnswer(field.key, value)} />)}
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="secondary" onClick={onClose} disabled={pending}>Cancel</Button>
+          <Button type="submit" variant="primary" startIcon={<UserPlus />} loading={pending}>
             Add attendee
           </Button>
-        </DialogActions>
+        </DialogFooter>
       </form>
+      </DialogContent>
     </Dialog>
   );
 }

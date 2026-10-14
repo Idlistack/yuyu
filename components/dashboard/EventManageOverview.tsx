@@ -2,29 +2,10 @@
 
 import type { EventClientDto } from "@/lib/eventDto";
 import Link from "next/link";
-import Alert from "@mui/material/Alert";
-import Avatar from "@mui/material/Avatar";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardActionArea from "@mui/material/CardActionArea";
-import CardContent from "@mui/material/CardContent";
-import Chip from "@mui/material/Chip";
-import Divider from "@mui/material/Divider";
-import Grid from "@mui/material/Grid";
-import LinearProgress from "@mui/material/LinearProgress";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
-import EditCalendarOutlinedIcon from "@mui/icons-material/EditCalendarOutlined";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
-import MailOutlineOutlinedIcon from "@mui/icons-material/MailOutlineOutlined";
-import QrCodeScannerOutlinedIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
-import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import { ArrowRight, ArrowUpRight, CalendarCog, ChevronRight, Mail, QrCode, TrendingUp, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, Callout, Card, Chip, DetailList, StatTile, type ChipTone } from "@/components/ui/display";
+import { formatRelativeTime } from "@/lib/format/datetime";
 import type { AttendeeRow } from "@/components/attendees/AttendeeTable";
 import { PublishEventButton } from "@/components/event/PublishEventButton";
 
@@ -119,14 +100,22 @@ function attendeeEmail(row: AttendeeRow) {
   return row.user?.email ?? row.guestEmail ?? "—";
 }
 
-function initials(row: AttendeeRow) {
-  const n = attendeeLabel(row);
-  const parts = n.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
+function statusTone(s: AttendeeRow["status"]): ChipTone {
+  switch (s) {
+    case "CONFIRMED":
+      return "success";
+    case "WAITLISTED":
+    case "PENDING_APPROVAL":
+      return "warning";
+    case "REJECTED":
+      return "danger";
+    default:
+      return "neutral";
   }
-  return n.slice(0, 2).toUpperCase();
 }
+
+/** Overview shortcuts open these tabs of the event manager. */
+export type OverviewTab = "details" | "guests" | "analytics" | "invites" | "check-in";
 
 type InviteRow = { id: string; email: string; createdAt: string };
 
@@ -144,7 +133,7 @@ export function EventManageOverview(props: {
   invites: InviteRow[];
   recentRegistrations: AttendeeRow[];
   referenceTime: string;
-  onOpenTab: (index: number) => void;
+  onOpenTab: (tab: OverviewTab) => void;
 }) {
   const { organisationSlug, event, analytics, invites, recentRegistrations, referenceTime, onOpenTab } =
     props;
@@ -168,470 +157,162 @@ export function EventManageOverview(props: {
 
   const publicHref = `/${organisationSlug}/${event.slug}`;
 
-  const shortcuts = [
-    {
-      tab: 1,
-      title: "Details",
-      description: "Title, schedule, location, cover image, and publishing.",
-      icon: EditCalendarOutlinedIcon,
-    },
-    {
-      tab: 2,
-      title: "Attendees",
-      description: "RSVPs, approvals, waitlist, and guest management.",
-      icon: GroupsOutlinedIcon,
-    },
-    {
-      tab: 3,
-      title: "Analytics",
-      description: "Response counts and pipeline at a glance.",
-      icon: InsightsOutlinedIcon,
-    },
-    {
-      tab: 4,
-      title: "Invites",
-      description: "Email invites and outreach for this event.",
-      icon: MailOutlineOutlinedIcon,
-    },
-    {
-      tab: 5,
-      title: "Check-in",
-      description: "QR scanning, manual codes, search, and attendance export.",
-      icon: QrCodeScannerOutlinedIcon,
-    },
-  ] as const;
+  const shortcuts: Array<{ tab: OverviewTab; title: string; description: string; icon: typeof Users }> = [
+    { tab: "details", title: "Details", description: "Title, schedule, location, cover image, and publishing.", icon: CalendarCog },
+    { tab: "guests", title: "Attendees", description: "RSVPs, approvals, waitlist, and guest management.", icon: Users },
+    { tab: "analytics", title: "Analytics", description: "Response counts and pipeline at a glance.", icon: TrendingUp },
+    { tab: "invites", title: "Invites", description: "Email invites and outreach for this event.", icon: Mail },
+    { tab: "check-in", title: "Check-in", description: "QR scanning, manual codes, search, and attendance export.", icon: QrCode },
+  ];
+
+  const shortDate = (value: string) =>
+    formatDashboardDate(new Date(value), { month: "short", day: "numeric", year: "numeric", timeZone: event.timezone });
 
   return (
-    <Stack spacing={3}>
+    <div className="flex flex-col gap-6">
       {isDraft ? (
-        <Paper
-          variant="outlined"
-          sx={{
-            p: 3,
-            borderRadius: "12px",
-            backgroundColor: "#1C1C1E",
-            borderColor: "rgba(255, 255, 255, 0.08)",
-            boxShadow: "none",
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            sx={{
-              justifyContent: "space-between",
-              alignItems: { xs: "stretch", sm: "center" },
-            }}
-          >
-            <Stack spacing={0.5}>
-              <Typography variant="body1" sx={{ fontWeight: 600, color: "#FFFFFF" }}>
-                This event is currently in Draft
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#8E8E93" }}>
-                Publish this event to allow guests to register, view details, and receive tickets.
-              </Typography>
-            </Stack>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => onOpenTab(1)}
-                sx={{
-                  color: "#FFFFFF",
-                  borderColor: "rgba(255, 255, 255, 0.12)",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.04)",
-                    borderColor: "rgba(255, 255, 255, 0.2)",
-                  },
-                }}
-              >
-                Edit Details
+        <Callout
+          tone="warning"
+          title="This event is currently in Draft"
+          action={
+            <>
+              <Button size="sm" variant="secondary" onClick={() => onOpenTab("details")}>
+                Edit details
               </Button>
-              <PublishEventButton
-                organisationSlug={organisationSlug}
-                eventSlug={event.slug}
-              />
-            </Stack>
-          </Stack>
-        </Paper>
+              <PublishEventButton organisationSlug={organisationSlug} eventSlug={event.slug} />
+            </>
+          }
+        >
+          Publish this event to allow guests to register, view details, and receive tickets.
+        </Callout>
       ) : null}
-      {hasEnded && !isDraft ? (
-        <Alert severity="success" variant="outlined">
-          This event has ended. Thank you for hosting.
-        </Alert>
-      ) : null}
+      {hasEnded && !isDraft ? <Callout tone="success">This event has ended. Thank you for hosting.</Callout> : null}
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 7 }}>
-          <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
-            <Stack spacing={1.5}>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                }}
-              >
-                <Typography variant="subtitle2" color="text.secondary">
-                  Event recap
-                </Typography>
-                <Stack
-                  direction="row"
-                  spacing={0.75}
-                  useFlexGap
-                  sx={{ flexWrap: "wrap" }}
-                >
-                  {event.status !== "PUBLISHED" ? (
-                    <Chip size="small" label={event.status} variant="outlined" />
-                  ) : null}
-                  <Chip
-                    size="small"
-                    label={privacyLabel(event.privacyType)}
-                    variant="outlined"
-                  />
-                </Stack>
-              </Stack>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{ alignItems: "flex-start" }}
-              >
-                <CalendarMonthOutlinedIcon
-                  sx={{ mt: 0.25, color: "text.secondary", fontSize: 20 }}
-                />
-                <Box>
-                  <Typography variant="body2">{whenPrimary}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {endHint}
-                  </Typography>
-                </Box>
-              </Stack>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{ alignItems: "flex-start" }}
-              >
-                {event.isOnline ? (
-                  <VideocamOutlinedIcon
-                    sx={{ mt: 0.25, color: "text.secondary", fontSize: 20 }}
-                  />
-                ) : (
-                  <PlaceOutlinedIcon
-                    sx={{ mt: 0.25, color: "text.secondary", fontSize: 20 }}
-                  />
-                )}
-                <Typography variant="body2">
-                  {event.isOnline
-                    ? "Online event"
-                    : event.location.trim() || "Location TBD"}
-                </Typography>
-              </Stack>
-              <Divider />
-              <Stack
-                direction="row"
-                spacing={2}
-                useFlexGap
-                sx={{ flexWrap: "wrap" }}
-              >
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Confirmed
-                  </Typography>
-                  <Typography variant="h5" component="p">
-                    {analytics.confirmed}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Capacity
-                  </Typography>
-                  <Typography variant="h5" component="p">
-                    {cap ?? "—"}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Total responses
-                  </Typography>
-                  <Typography variant="h5" component="p">
-                    {analytics.total}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Stack>
-          </Paper>
-        </Grid>
-        <Grid size={{ xs: 12, md: 5 }}>
-          <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Guests
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 1 }}>
-              <Box component="span" sx={{ fontWeight: 600 }}>
-                {analytics.confirmed} going
-              </Box>
-              {cap != null ? (
-                <Box component="span" color="text.secondary">
-                  {" "}
-                  · cap {cap}
-                </Box>
-              ) : null}
-            </Typography>
-            {fillPct != null ? (
-              <LinearProgress
-                variant="determinate"
-                value={fillPct}
-                sx={{
-                  height: 8,
-                  borderRadius: 1,
-                  mb: 1,
-                  "& .MuiLinearProgress-bar": { borderRadius: 1 },
-                }}
-                color={fillPct >= 100 ? "warning" : "success"}
-              />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          label="Going"
+          value={
+            <>
+              {analytics.confirmed}
+              {cap != null ? <span className="text-lg font-bold text-ink-muted"> / {cap}</span> : null}
+            </>
+          }
+          hint={fillPct == null ? "Set a capacity in Details to track fill." : `${analytics.total} total responses`}
+          progress={cap != null && cap > 0 ? { value: analytics.confirmed, max: cap, tone: fillPct != null && fillPct >= 100 ? "warning" : "accent" } : undefined}
+        />
+        <StatTile label="Waitlist" value={analytics.waitlisted} />
+        <StatTile label="Waiting for approval" value={analytics.pendingApproval} tone={analytics.pendingApproval > 0 ? "attention" : "default"} hint={analytics.rejected > 0 ? `${analytics.rejected} rejected` : undefined} />
+        <StatTile label="Invites sent" value={invites.length} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <section aria-labelledby="latest-registrations">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 id="latest-registrations" className="text-h3 text-ink">Latest registrations</h2>
+              <button type="button" onClick={() => onOpenTab("guests")} className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-ink underline underline-offset-4">
+                All guests <ArrowRight aria-hidden className="size-4" />
+              </button>
+            </div>
+            {recentRegistrations.length === 0 ? (
+              <Card padding="md">
+                <p className="text-body-ui text-ink-muted">No registrations yet. Share your event page to collect RSVPs.</p>
+              </Card>
             ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Set a capacity in Details to track fill.
-              </Typography>
+              <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-canvas">
+                {recentRegistrations.map((row) => (
+                  <li key={row.id} className="flex items-center gap-3 px-4 py-3">
+                    <Avatar name={attendeeLabel(row)} size="md" tone={statusTone(row.status) === "success" ? "success" : statusTone(row.status) === "warning" ? "warning" : "neutral"} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-semibold text-ink">{attendeeLabel(row)}</p>
+                      <p className="truncate text-sm text-ink-muted">{attendeeEmail(row)}</p>
+                    </div>
+                    <Chip size="sm" tone={statusTone(row.status)} className="hidden sm:inline-flex">{statusLabel(row.status)}</Chip>
+                    <span className="hidden w-24 shrink-0 text-right text-sm text-ink-muted md:block" title={shortDate(row.createdAt)}>
+                      {formatRelativeTime(row.createdAt, event.timezone, now)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block" }}
-            >
-              {analytics.waitlisted} waitlisted · {analytics.pendingApproval}{" "}
-              pending approval
-              {analytics.rejected > 0
-                ? ` · ${analytics.rejected} rejected`
-                : ""}
-            </Typography>
-            <Button
-              size="small"
-              sx={{ mt: 1.5 }}
-              onClick={() => onOpenTab(2)}
-              endIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />}
-            >
-              All guests
+          </section>
+
+          <Card as="section" aria-labelledby="overview-invites">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 id="overview-invites" className="text-h4 text-ink">Invites</h2>
+                <p className="mt-1 text-body-ui text-ink-muted">Invite subscribers and contacts by email. Track outreach from the Invites tab.</p>
+                <p className="mt-2 text-body-ui text-ink"><strong>{invites.length}</strong> email invites sent</p>
+              </div>
+              <Button variant="primary" onClick={() => onOpenTab("invites")} className="shrink-0">
+                Invite guests
+              </Button>
+            </div>
+            {invites.length > 0 ? (
+              <div className="mt-4">
+                <p className="mb-1 text-overline text-ink-muted">Recent invitations</p>
+                <ul className="divide-y divide-line">
+                  {invites.slice(0, 5).map((inv) => (
+                    <li key={inv.id} className="flex items-center justify-between gap-3 py-2">
+                      <span className="min-w-0 flex-1 truncate text-body-ui text-ink">{inv.email}</span>
+                      <span className="shrink-0 text-caption text-ink-muted">{shortDate(inv.createdAt)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </Card>
+        </div>
+
+        <aside className="flex flex-col gap-6">
+          <section aria-labelledby="at-a-glance">
+            <h2 id="at-a-glance" className="mb-3 text-h3 text-ink">At a glance</h2>
+            <Card padding="md">
+              <DetailList
+                className="sm:grid-cols-[max-content_minmax(0,1fr)]"
+                items={[
+                  { label: "When", value: <>{whenPrimary}<span className="block text-caption text-ink-muted">{endHint}</span></> },
+                  { label: "Where", value: event.isOnline ? "Online event" : event.location.trim() || "Location TBD" },
+                  { label: "Who can join", value: privacyLabel(event.privacyType) },
+                  ...(event.status !== "PUBLISHED" ? [{ label: "Status", value: event.status }] : []),
+                  { label: "Capacity", value: cap ?? "—" },
+                ]}
+              />
+            </Card>
+          </section>
+
+          <section aria-labelledby="manage-shortcuts">
+            <h2 id="manage-shortcuts" className="mb-3 text-h3 text-ink">Manage this event</h2>
+            <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-canvas">
+              {shortcuts.map((shortcut) => {
+                const Icon = shortcut.icon;
+                return (
+                  <li key={shortcut.tab}>
+                    <button type="button" onClick={() => onOpenTab(shortcut.tab)} className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-subtle">
+                      <Icon aria-hidden className="mt-0.5 size-5 shrink-0 text-ink-muted" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-semibold text-ink">{shortcut.title}</span>
+                        <span className="block text-sm text-ink-muted">{shortcut.description}</span>
+                      </span>
+                      <ChevronRight aria-hidden className="mt-0.5 size-4 shrink-0 text-ink-muted" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          <Card padding="sm" className="flex flex-col gap-3">
+            <p className="text-body-ui text-ink-secondary">Preview the public event page as guests see it.</p>
+            <Button asChild variant="secondary" className="self-start">
+              <Link href={publicHref}>
+                Event page
+                <ArrowUpRight aria-hidden className="size-4" />
+              </Link>
             </Button>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          sx={{
-            alignItems: { xs: "stretch", sm: "flex-start" },
-            justifyContent: "space-between",
-          }}
-        >
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              Invites
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Invite subscribers and contacts by email. Track outreach from the
-              Invites tab.
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 1.5 }}>
-              <strong>{invites.length}</strong> email invites sent
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            onClick={() => onOpenTab(4)}
-            sx={{ alignSelf: { sm: "center" }, flexShrink: 0 }}
-          >
-            Invite guests
-          </Button>
-        </Stack>
-        {invites.length > 0 ? (
-          <Stack spacing={1} sx={{ mt: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              Recent invitations
-            </Typography>
-            <Stack divider={<Divider flexItem />} spacing={1}>
-              {invites.slice(0, 5).map((inv) => (
-                <Stack
-                  key={inv.id}
-                  direction="row"
-                  spacing={1}
-                  sx={{
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography variant="body2" noWrap sx={{ flex: 1 }}>
-                    {inv.email}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {formatDashboardDate(new Date(inv.createdAt), {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      timeZone: event.timezone,
-                    })}
-                  </Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </Stack>
-        ) : null}
-      </Paper>
-
-      <Box>
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{
-            alignItems: "center",
-            justifyContent: "space-between",
-            mb: 1.5,
-          }}
-        >
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            Recent registrations
-          </Typography>
-          <Button size="small" onClick={() => onOpenTab(2)}>
-            All guests →
-          </Button>
-        </Stack>
-        {recentRegistrations.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 3 }}>
-            <Typography color="text.secondary" variant="body2">
-              No registrations yet. Share your event page to collect RSVPs.
-            </Typography>
-          </Paper>
-        ) : (
-          <Paper variant="outlined" sx={{ overflow: "hidden" }}>
-            <Stack divider={<Divider />} spacing={0}>
-              {recentRegistrations.map((row) => (
-                <Stack
-                  key={row.id}
-                  direction="row"
-                  spacing={1.5}
-                  sx={{ alignItems: "center", px: 2, py: 1.25 }}
-                >
-                  <Avatar sx={{ width: 36, height: 36, fontSize: 14 }}>
-                    {initials(row)}
-                  </Avatar>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" noWrap>
-                      {attendeeLabel(row)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap>
-                      {attendeeEmail(row)}
-                    </Typography>
-                  </Box>
-                  <Chip
-                    size="small"
-                    label={statusLabel(row.status)}
-                    color={
-                      row.status === "CONFIRMED"
-                        ? "success"
-                        : row.status === "WAITLISTED"
-                          ? "info"
-                          : row.status === "PENDING_APPROVAL"
-                            ? "warning"
-                            : "default"
-                    }
-                    variant="outlined"
-                    sx={{ display: { xs: "none", sm: "flex" } }}
-                  />
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: { xs: "none", md: "block" }, flexShrink: 0 }}
-                  >
-                    {formatDashboardDate(new Date(row.createdAt), {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      timeZone: event.timezone,
-                    })}
-                  </Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </Paper>
-        )}
-      </Box>
-
-      <Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
-          Manage this event
-        </Typography>
-        <Grid container spacing={2}>
-          {shortcuts.map((s) => {
-            const Icon = s.icon;
-            return (
-              <Grid size={{ xs: 12, sm: 6 }} key={s.tab}>
-                <Card variant="outlined" sx={{ height: "100%" }}>
-                  <CardActionArea onClick={() => onOpenTab(s.tab)}>
-                    <CardContent>
-                      <Stack
-                        direction="row"
-                        spacing={1.5}
-                        sx={{ alignItems: "flex-start" }}
-                      >
-                        <Icon color="primary" />
-                        <Box>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                            {s.title}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mt: 0.5 }}
-                          >
-                            {s.description}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color="primary"
-                            sx={{ mt: 1, fontWeight: 500 }}
-                          >
-                            Open
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
-      </Box>
-
-      <Paper
-        variant="outlined"
-        sx={{
-          p: 2,
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          alignItems: { xs: "stretch", sm: "center" },
-          justifyContent: "space-between",
-          gap: 2,
-        }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          Preview the public event page as guests see it.
-        </Typography>
-        <Button
-          component={Link}
-          href={publicHref}
-          variant="outlined"
-          endIcon={<OpenInNewIcon />}
-          sx={{ flexShrink: 0 }}
-        >
-          Event page
-        </Button>
-      </Paper>
-    </Stack>
+          </Card>
+        </aside>
+      </div>
+    </div>
   );
 }

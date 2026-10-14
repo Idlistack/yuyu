@@ -1,8 +1,8 @@
 "use client";
 
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import { Copy } from "lucide-react";
+import { IconButton } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/menu";
 import { useToast } from "@/components/feedback/ToastProvider";
 
 export function CopyTicketButton(props: { ticketUrl: string }) {
@@ -10,10 +10,10 @@ export function CopyTicketButton(props: { ticketUrl: string }) {
   const { showToast } = useToast();
 
   return (
-    <Tooltip title="Copy ticket link">
+    <Tooltip content="Copy ticket link">
       <IconButton
-        size="small"
-        aria-label="Copy ticket link"
+        size="sm"
+        label="Copy ticket link"
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(ticketUrl);
@@ -23,7 +23,7 @@ export function CopyTicketButton(props: { ticketUrl: string }) {
           }
         }}
       >
-        <ContentCopyOutlinedIcon fontSize="small" />
+        <Copy />
       </IconButton>
     </Tooltip>
   );

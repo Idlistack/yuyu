@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import type { EventPermission } from "@prisma/client";
 import type { EventClientDto } from "@/lib/eventDto";
-import Tab from "@mui/material/Tab";
-import Tabs from "@mui/material/Tabs";
-import Button from "@mui/material/Button";
+import { ArrowRight, Download, QrCode, UserPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Callout, Card } from "@/components/ui/display";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EditEventForm } from "@/components/event/EditEventForm";
 import { AttendeeTable, type AttendeeRow } from "@/components/attendees/AttendeeTable";
 import { EventInvitePanel } from "@/components/invites/EventInvitePanel";
@@ -19,12 +20,6 @@ import {
   EventRegistrationFormEditor,
   type RegistrationFieldRow,
 } from "@/components/registration/EventRegistrationFormEditor";
-import Typography from "@mui/material/Typography";
-import Stack from "@mui/material/Stack";
-import Paper from "@mui/material/Paper";
-import Alert from "@mui/material/Alert";
-import QrCodeScannerOutlinedIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
 import { ManualRsvpDialog } from "@/components/attendees/ManualRsvpDialog";
 import { useRouter } from "next/navigation";
 import { CollaboratorInvitePanel } from "@/components/event/CollaboratorInvitePanel";
@@ -32,6 +27,25 @@ import { EventWebsiteManager } from "@/components/event/EventWebsiteManager";
 import { EventBroadcastPanel, type BroadcastHistoryRow } from "@/components/broadcasts/EventBroadcastPanel";
 
 type InviteRow = { id: string; email: string; createdAt: string };
+
+const EVENT_TABS = [
+  { value: "overview", label: "Overview" },
+  { value: "guests", label: "Guests" },
+  { value: "page", label: "Page & programme" },
+  { value: "details", label: "Details" },
+  { value: "registration", label: "Registration form" },
+  { value: "invites", label: "Invites" },
+  { value: "emails", label: "Emails" },
+  { value: "analytics", label: "Analytics" },
+  { value: "check-in", label: "Check-in" },
+  { value: "feedback", label: "Feedback" },
+  { value: "settings", label: "Settings" },
+] as const;
+type EventTab = (typeof EVENT_TABS)[number]["value"];
+
+function NoPermission({ children }: { children: React.ReactNode }) {
+  return <p className="text-body-ui text-ink-muted">{children}</p>;
+}
 
 export function EventManageTabs(props: {
   organisationSlug: string;
@@ -65,32 +79,21 @@ export function EventManageTabs(props: {
   broadcasts: BroadcastHistoryRow[];
 }) {
   const { organisationSlug, event, attendees, attendeesTruncated, invites, analytics, registrationFields, feedbackUrl, feedbackForm, feedbackFields, feedbackResponses, feedbackResponsesTruncated, referenceTime, website, canManageCollaborators, canManageRegistrations, canCheckIn, canEditDetails, canManageSchedule, collaborators, pendingCollaboratorInvites, broadcasts } = props;
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState<EventTab>("overview");
   const [manualRsvpOpen, setManualRsvpOpen] = useState(false);
   const router = useRouter();
 
   return (
-    <>
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
-      >
-        <Tab label="Overview" />
-        <Tab label="Event Page & Program" />
-        <Tab label="Details" />
-        <Tab label="Attendees" />
-        <Tab label="Analytics" />
-        <Tab label="Invites" />
-        <Tab label="Emails" />
-        <Tab label="Registration form" />
-        <Tab label="Feedback" />
-        <Tab label="Check-in" />
-        <Tab label="More & delete" />
-      </Tabs>
-      {tab === 0 ? (
+    <Tabs value={tab} onValueChange={(value) => setTab(value as EventTab)}>
+      <TabsList aria-label="Manage event">
+        {EVENT_TABS.map((item) => (
+          <TabsTrigger key={item.value} value={item.value}>
+            {item.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      <TabsContent value="overview">
         <EventManageOverview
           organisationSlug={organisationSlug}
           event={event}
@@ -100,26 +103,45 @@ export function EventManageTabs(props: {
           referenceTime={referenceTime}
           onOpenTab={setTab}
         />
-      ) : null}
-      {tab === 1 ? <Stack spacing={3}>{canManageSchedule ? <Paper variant="outlined" sx={{ p: 2.5 }}><Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}><div><Typography variant="h6">Programme schedule</Typography><Typography variant="body2" color="text.secondary">Add sessions, adjust planned times, and apply live cascading delays from the dedicated schedule workspace.</Typography></div><Button component={Link} href={`/dashboard/${organisationSlug}/event/${event.id}/schedule`} variant="outlined">Open schedule</Button></Stack></Paper> : <Typography color="text.secondary">You do not have permission to manage the programme.</Typography>}{canEditDetails ? <EventWebsiteManager organisationSlug={organisationSlug} eventId={event.id} eventSlug={event.slug} {...website} /> : <Typography color="text.secondary">You do not have permission to edit the event page.</Typography>}</Stack> : null}
-      {tab === 2 ? (
-        <Stack spacing={3}>
-          {canEditDetails ? <EditEventForm organisationSlug={organisationSlug} event={event} page={website.page} /> : <Typography color="text.secondary">You do not have permission to edit event details.</Typography>}
-        </Stack>
-      ) : null}
-      {tab === 3 ? (
-        <Stack spacing={2}>
-          {!canManageRegistrations ? <Typography color="text.secondary">You do not have permission to view or manage attendee registrations.</Typography> : null}
-          {canManageRegistrations ? <>
-          {attendeesTruncated ? <Alert severity="warning">Only the 250 most recent registrations are loaded in this browser view, and its email export is limited to those records. Download the full attendee CSV for the complete list.</Alert> : null}
-          <Stack direction="row" spacing={1} useFlexGap sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
-            <Button variant="contained" startIcon={<PersonAddOutlinedIcon />} onClick={() => setManualRsvpOpen(true)}>
+      </TabsContent>
+
+      <TabsContent value="page" className="flex flex-col gap-6">
+        {canManageSchedule ? (
+          <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-h4 text-ink">Programme schedule</h2>
+              <p className="mt-1 text-body-ui text-ink-muted">Add sessions, adjust planned times, and apply live cascading delays from the dedicated schedule workspace.</p>
+            </div>
+            <Button asChild variant="secondary" className="shrink-0">
+              <Link href={`/dashboard/${organisationSlug}/event/${event.id}/schedule`}>
+                Open schedule
+                <ArrowRight aria-hidden className="size-4" />
+              </Link>
+            </Button>
+          </Card>
+        ) : <NoPermission>You do not have permission to manage the programme.</NoPermission>}
+        {canEditDetails ? <EventWebsiteManager organisationSlug={organisationSlug} eventId={event.id} eventSlug={event.slug} {...website} /> : <NoPermission>You do not have permission to edit the event page.</NoPermission>}
+      </TabsContent>
+
+      <TabsContent value="details">
+        {canEditDetails ? <EditEventForm organisationSlug={organisationSlug} event={event} page={website.page} /> : <NoPermission>You do not have permission to edit event details.</NoPermission>}
+      </TabsContent>
+
+      <TabsContent value="guests" className="flex flex-col gap-4">
+        {!canManageRegistrations ? <NoPermission>You do not have permission to view or manage attendee registrations.</NoPermission> : null}
+        {canManageRegistrations ? <>
+          {attendeesTruncated ? <Callout tone="warning">Only the 250 most recent registrations are loaded in this browser view, and its email export is limited to those records. Download the full attendee CSV for the complete list.</Callout> : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="primary" startIcon={<UserPlus />} onClick={() => setManualRsvpOpen(true)}>
               Add attendee
             </Button>
-            <Button component="a" href={`/api/exports/events/${event.id}/attendees`} variant="outlined">
-              Download full CSV
+            <Button asChild variant="secondary">
+              <a href={`/api/exports/events/${event.id}/attendees`}>
+                <Download aria-hidden className="size-[18px]" />
+                Download full CSV
+              </a>
             </Button>
-          </Stack>
+          </div>
           {manualRsvpOpen ? (
             <ManualRsvpDialog
               organisationSlug={organisationSlug}
@@ -137,69 +159,62 @@ export function EventManageTabs(props: {
             registrationFields={registrationFields}
             eventTitle={event.title}
           />
-          </> : null}
-        </Stack>
-      ) : null}
-      {tab === 4 ? (
+        </> : null}
+      </TabsContent>
+
+      <TabsContent value="analytics">
         <EventAnalyticsPanel analytics={analytics} />
-      ) : null}
-      {tab === 5 ? (
+      </TabsContent>
+
+      <TabsContent value="invites">
         <EventInvitePanel
           organisationSlug={organisationSlug}
           eventId={event.id}
           eventHasEnded={event.endDateTime <= new Date()}
           invites={invites}
         />
-      ) : null}
-      {tab === 6 ? (
-        canManageRegistrations ? (
+      </TabsContent>
+
+      <TabsContent value="emails">
+        {canManageRegistrations ? (
           <EventBroadcastPanel organisationSlug={organisationSlug} eventId={event.id} history={broadcasts} />
-        ) : <Typography color="text.secondary">You do not have permission to email attendees.</Typography>
-      ) : null}
-      {tab === 7 ? (
+        ) : <NoPermission>You do not have permission to email attendees.</NoPermission>}
+      </TabsContent>
+
+      <TabsContent value="registration">
         <EventRegistrationFormEditor
           organisationSlug={organisationSlug}
           eventId={event.id}
           fields={registrationFields}
         />
-      ) : null}
-      {tab === 8 ? (
-        <Stack spacing={3}>
-          <FeedbackFormEditor organisationSlug={organisationSlug} eventId={event.id} feedbackUrl={feedbackUrl} form={feedbackForm} fields={feedbackFields} />
-          {canEditDetails ? <FeedbackResponsesPanel responses={feedbackResponses} truncated={feedbackResponsesTruncated} exportHref={feedbackForm ? `/api/exports/events/${event.id}/feedback` : undefined} /> : <Typography color="text.secondary">You do not have permission to view feedback responses.</Typography>}
-        </Stack>
-      ) : null}
-      {tab === 9 ? (
-        <Stack spacing={2}>
-          {!canCheckIn ? <Typography color="text.secondary">You do not have permission to operate check-in.</Typography> : null}
-          {canCheckIn ? (
-          <Paper variant="outlined" sx={{ p: 3 }}>
-            <Stack spacing={2} sx={{ alignItems: "flex-start" }}>
-              <QrCodeScannerOutlinedIcon color="primary" sx={{ fontSize: 40 }} />
-              <Typography variant="h6" component="h2">
-                Check-in station
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Scan attendee QR codes from their ticket page, paste ticket URLs,
-                search by name, and export who arrived. Use override for waitlist
-                or pending approvals at the door.
-              </Typography>
-              <Button
-                component={Link}
-                href={`/dashboard/${organisationSlug}/event/${event.id}/check-in`}
-                variant="contained"
-                size="large"
-              >
-                Open check-in page
-              </Button>
-            </Stack>
-          </Paper>
-          ) : null}
-        </Stack>
-      ) : null}
-      {tab === 10 ? (
-        <Stack spacing={2}>{canManageCollaborators ? <CollaboratorInvitePanel organisationSlug={organisationSlug} eventId={event.id} collaborators={collaborators} pendingInvites={pendingCollaboratorInvites} /> : null}<EventManageMore organisationSlug={organisationSlug} event={event} /></Stack>
-      ) : null}
-    </>
+      </TabsContent>
+
+      <TabsContent value="feedback" className="flex flex-col gap-6">
+        <FeedbackFormEditor organisationSlug={organisationSlug} eventId={event.id} feedbackUrl={feedbackUrl} form={feedbackForm} fields={feedbackFields} />
+        {canEditDetails ? <FeedbackResponsesPanel responses={feedbackResponses} truncated={feedbackResponsesTruncated} exportHref={feedbackForm ? `/api/exports/events/${event.id}/feedback` : undefined} /> : <NoPermission>You do not have permission to view feedback responses.</NoPermission>}
+      </TabsContent>
+
+      <TabsContent value="check-in">
+        {!canCheckIn ? <NoPermission>You do not have permission to operate check-in.</NoPermission> : (
+          <Card padding="lg" className="flex flex-col items-start gap-3">
+            <span aria-hidden className="flex size-12 items-center justify-center rounded-lg bg-muted text-ink"><QrCode className="size-6" /></span>
+            <h2 className="text-h3 text-ink">Check-in station</h2>
+            <p className="max-w-[560px] text-body-ui text-ink-secondary">
+              Scan attendee QR codes from their ticket page, paste ticket URLs,
+              search by name, and export who arrived. Use override for waitlist
+              or pending approvals at the door.
+            </p>
+            <Button asChild variant="primary" size="lg">
+              <Link href={`/dashboard/${organisationSlug}/event/${event.id}/check-in`}>Open check-in page</Link>
+            </Button>
+          </Card>
+        )}
+      </TabsContent>
+
+      <TabsContent value="settings" className="flex flex-col gap-5">
+        {canManageCollaborators ? <CollaboratorInvitePanel organisationSlug={organisationSlug} eventId={event.id} collaborators={collaborators} pendingInvites={pendingCollaboratorInvites} /> : null}
+        <EventManageMore organisationSlug={organisationSlug} event={event} />
+      </TabsContent>
+    </Tabs>
   );
 }

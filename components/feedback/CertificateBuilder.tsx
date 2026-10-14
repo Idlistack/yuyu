@@ -1,7 +1,12 @@
 "use client";
 
 import { useRef, useState, type PointerEvent } from "react";
-import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { Upload } from "lucide-react";
+import { Button, buttonClasses } from "@/components/ui/button";
+import { CheckboxField } from "@/components/ui/choice";
+import { Callout } from "@/components/ui/display";
+import { Field, Input, NativeSelect } from "@/components/ui/field";
+import { cn } from "@/lib/cn";
 import { certificateFonts, defaultNameArea, type CertificateTemplate } from "@/lib/certificateTemplate";
 import { previewCertificate, uploadCertificateBackground } from "@/app/actions/certificate";
 
@@ -55,45 +60,62 @@ export function CertificateBuilder(props: Props) {
   }
   const stop = () => { drag.current = null; };
   const unit = dimensions.width / 100;
+  const busyOrDisabled = disabled || busy;
   return (
-    <Stack spacing={2} sx={{ border: 1, borderColor: "divider", borderRadius: 3, p: { xs: 2, md: 3 } }}>
-      <Typography variant="h6">Certificate designer</Typography>
-      <Typography variant="body2" color="text.secondary">Upload your finished certificate artwork with a blank space for the attendee name. Drag the name area or resize it from the corner. Names are automatically reduced to fit.</Typography>
-      <Stack direction="row" spacing={1}>
-        <Button component="label" variant="outlined" disabled={disabled || busy}>
+    <div className="flex flex-col gap-4 rounded-xl border border-line bg-subtle p-4 md:p-6">
+      <div>
+        <h3 className="text-h4 text-ink">Certificate designer</h3>
+        <p className="mt-1 text-body-ui text-ink-secondary">Upload your finished certificate artwork with a blank space for the attendee name. Drag the name area or resize it from the corner. Names are automatically reduced to fit.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <label className={cn(buttonClasses({ variant: "secondary" }), busyOrDisabled ? "pointer-events-none opacity-60" : "cursor-pointer")} aria-disabled={busyOrDisabled || undefined}>
+          <Upload aria-hidden className="size-[18px]" />
           {busy ? "Working…" : value ? "Replace background" : "Upload background"}
-          <input hidden type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled || busy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void upload(file); }} />
-        </Button>
-        {value && <Button disabled={disabled || busy} onClick={() => update(null)}>Use default certificate</Button>}
-      </Stack>
-      <Typography variant="caption" color="text.secondary">JPEG, PNG or WebP · up to 5 MB · landscape or portrait. For sharp printing, upload original artwork at least 3508 pixels on its longest side, preferably PNG. Blank backgrounds are shareable images; do not include attendee data.</Typography>
-      {error && <Alert severity="error">{error}</Alert>}
-      {!value ? <Alert severity="info">The standard Yuyu certificate will be used until you upload a background.</Alert> : <>
-        <Box component="fieldset" disabled={disabled || busy} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
-          <Stack spacing={2}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField select label="Font" value={value.font} onChange={(e) => change({ font: e.target.value as CertificateTemplate["font"] })} fullWidth>
-                {Object.entries(certificateFonts).map(([key, font]) => <MenuItem key={key} value={key}>{font.label}</MenuItem>)}
-              </TextField>
-              <TextField label="Font size" type="number" value={value.fontSize} helperText="Relative to a 1000 px image width" onChange={(e) => change({ fontSize: Math.max(12, Math.min(120, Math.round(Number(e.target.value)))) })} fullWidth />
-              <TextField label="Name color" type="color" value={value.color} onChange={(e) => change({ color: e.target.value })} fullWidth />
-              <TextField select label="Alignment" value={value.align} onChange={(e) => change({ align: e.target.value as CertificateTemplate["align"] })} fullWidth>
-                {["left", "center", "right"].map((a) => <MenuItem key={a} value={a}>{a}</MenuItem>)}
-              </TextField>
-            </Stack>
-            <FormControlLabel control={<Checkbox checked={value.bold} onChange={(_, bold) => change({ bold })} />} label="Bold name" />
-            <TextField label="Preview attendee name" value={name} onChange={(e) => { setName(e.target.value); setPreview(null); }} slotProps={{ htmlInput: { maxLength: 200 } }} helperText="For preview only. Downloads use the attendee’s registered name." />
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              {(["x", "y", "width", "height"] as const).map((key) => <TextField key={key} label={{ x: "Left (%)", y: "Top (%)", width: "Width (%)", height: "Height (%)" }[key]} type="number" value={value[key]} fullWidth onChange={(e) => {
-                const max = key === "x" ? 100 - value.width : key === "y" ? 100 - value.height : key === "width" ? 100 - value.x : 100 - value.y;
-                change({ [key]: Math.max(key === "width" ? 5 : key === "height" ? 3 : 0, Math.min(max, Number(e.target.value))) });
-              }} />)}
-            </Stack>
-          </Stack>
-        </Box>
-        <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden", bgcolor: "#eee" }}>
+          <input hidden type="file" accept="image/jpeg,image/png,image/webp" disabled={busyOrDisabled} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void upload(file); }} />
+        </label>
+        {value && <Button variant="quiet" disabled={busyOrDisabled} onClick={() => update(null)}>Use default certificate</Button>}
+      </div>
+      <p className="text-caption text-ink-muted">JPEG, PNG or WebP · up to 5 MB · landscape or portrait. For sharp printing, upload original artwork at least 3508 pixels on its longest side, preferably PNG. Blank backgrounds are shareable images; do not include attendee data.</p>
+      {error && <Callout tone="danger" role="alert">{error}</Callout>}
+      {!value ? <Callout tone="info">The standard Yuyu certificate will be used until you upload a background.</Callout> : <>
+        <fieldset disabled={busyOrDisabled} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Font">
+              <NativeSelect value={value.font} onChange={(e) => change({ font: e.target.value as CertificateTemplate["font"] })}>
+                {Object.entries(certificateFonts).map(([key, font]) => <option key={key} value={key}>{font.label}</option>)}
+              </NativeSelect>
+            </Field>
+            <Field label="Font size" helperText="Relative to a 1000 px image width">
+              <Input type="number" value={value.fontSize} onChange={(e) => change({ fontSize: Math.max(12, Math.min(120, Math.round(Number(e.target.value)))) })} />
+            </Field>
+            <Field label="Name color">
+              <Input type="color" value={value.color} onChange={(e) => change({ color: e.target.value })} className="h-11 cursor-pointer p-1" />
+            </Field>
+            <Field label="Alignment">
+              <NativeSelect value={value.align} onChange={(e) => change({ align: e.target.value as CertificateTemplate["align"] })}>
+                {["left", "center", "right"].map((a) => <option key={a} value={a}>{a}</option>)}
+              </NativeSelect>
+            </Field>
+          </div>
+          <CheckboxField label="Bold name" checked={value.bold} onCheckedChange={(bold) => change({ bold: bold === true })} />
+          <Field label="Preview attendee name" helperText="For preview only. Downloads use the attendee’s registered name.">
+            <Input value={name} maxLength={200} onChange={(e) => { setName(e.target.value); setPreview(null); }} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {(["x", "y", "width", "height"] as const).map((key) => (
+              <Field key={key} label={{ x: "Left (%)", y: "Top (%)", width: "Width (%)", height: "Height (%)" }[key]}>
+                <Input type="number" value={value[key]} onChange={(e) => {
+                  const max = key === "x" ? 100 - value.width : key === "y" ? 100 - value.height : key === "width" ? 100 - value.x : 100 - value.y;
+                  change({ [key]: Math.max(key === "width" ? 5 : key === "height" ? 3 : 0, Math.min(max, Number(e.target.value))) });
+                }} />
+              </Field>
+            ))}
+          </div>
+        </fieldset>
+        <div className="overflow-hidden rounded-lg border border-line bg-[#eee]">
           {/* Hidden measurement image avoids distorting portrait uploads. */}
-          <Box component="img" src={imageUrl} alt="" sx={{ display: "none" }} onLoad={(e) => setDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} onError={() => setError("Background could not load. Try uploading it again.")} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt="" className="hidden" onLoad={(e) => setDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} onError={() => setError("Background could not load. Try uploading it again.")} />
           <svg ref={canvas} viewBox={`0 0 ${dimensions.width} ${dimensions.height}`} role="img" aria-label="Certificate layout preview. Use the position and size fields to adjust the name area." style={{ display: "block", width: "100%", touchAction: "none" }}>
             <image href={imageUrl} width={dimensions.width} height={dimensions.height} />
             <svg x={value.x * unit} y={value.y * dimensions.height / 100} width={value.width * unit} height={value.height * dimensions.height / 100}>
@@ -102,9 +124,9 @@ export function CertificateBuilder(props: Props) {
             <rect x={value.x * unit} y={value.y * dimensions.height / 100} width={value.width * unit} height={value.height * dimensions.height / 100} fill="#2563eb0a" stroke="#2563eb" strokeWidth={2} vectorEffect="non-scaling-stroke" strokeDasharray="6 4" style={{ cursor: "move" }} onPointerDown={(e) => start(e, "move")} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} />
             <rect x={(value.x + value.width) * unit - unit * 1.5} y={(value.y + value.height) * dimensions.height / 100 - unit * 1.5} width={unit * 3} height={unit * 3} rx={unit / 2} fill="#2563eb" style={{ cursor: "nwse-resize" }} onPointerDown={(e) => start(e, "resize")} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} />
           </svg>
-        </Box>
-        <Typography variant="caption" color="text.secondary">Layout preview uses your browser’s fonts. Generate a preview to check the exact font and fit used in the downloaded JPEG.</Typography>
-        <Button disabled={disabled || busy || !name.trim()} variant="outlined" onClick={async () => {
+        </div>
+        <p className="text-caption text-ink-muted">Layout preview uses your browser’s fonts. Generate a preview to check the exact font and fit used in the downloaded JPEG.</p>
+        <Button variant="secondary" className="self-start" disabled={busyOrDisabled || !name.trim()} onClick={async () => {
           setWorking(true); setError("");
           try {
             const result = await previewCertificate({ organisationSlug: props.organisationSlug, eventId: props.eventId, template: value, name });
@@ -112,9 +134,10 @@ export function CertificateBuilder(props: Props) {
           } catch { setError("Preview failed. Please try again."); }
           finally { setWorking(false); }
         }}>Generate exact preview</Button>
-        {preview && <Box component="img" src={preview} alt="Generated certificate preview with the sample attendee name" sx={{ width: "100%", borderRadius: 2 }} />}
-        <Alert severity="info">Save feedback settings below to apply this design. It is used automatically after an eligible attendee completes feedback.</Alert>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {preview && <img src={preview} alt="Generated certificate preview with the sample attendee name" className="w-full rounded-lg" />}
+        <Callout tone="info">Save feedback settings below to apply this design. It is used automatically after an eligible attendee completes feedback.</Callout>
       </>}
-    </Stack>
+    </div>
   );
 }

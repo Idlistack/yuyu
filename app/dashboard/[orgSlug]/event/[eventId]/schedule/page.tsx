@@ -1,7 +1,5 @@
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import Button from "@mui/material/Button";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { EventProgramScheduleManager } from "@/components/event/EventProgramScheduleManager";
 import { prisma } from "@/lib/db";
@@ -23,5 +21,19 @@ export default async function EventScheduleManagePage({ params }: { params: Prom
   if (!(await canAccessEvent({ userId: access.userId, organisationId: access.organisation.id, eventId: event.id, permission: EventPermission.PUBLISH_AND_SCHEDULE }))) notFound();
   const conflictIds = conflictingTrackSessionIds(event.sessions);
   const sessions = effectiveEventProgram(event.sessions).map((session) => ({ id: session.id, trackId: session.trackId, title: session.title, descriptionHtml: session.descriptionHtml, startDateTime: session.startDateTime.toISOString(), endDateTime: session.endDateTime.toISOString(), effectiveStartDateTime: session.effectiveStartDateTime.toISOString(), effectiveEndDateTime: session.effectiveEndDateTime.toISOString(), type: session.type, visibility: session.visibility, sortOrder: session.sortOrder, delayMinutes: session.delayMinutes, cumulativeDelayMinutes: session.cumulativeDelayMinutes, speakerIds: session.speakers.map((speaker) => speaker.speakerId), speakerNames: session.speakers.map((speaker) => speaker.speaker.name), hasConflict: conflictIds.has(session.id) }));
-  return <Stack spacing={3}><Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}><div><Typography variant="h4" component="h1">{event.title} schedule</Typography><Typography color="text.secondary">Plan parallel tracks and manage live timing changes independently.</Typography></div><Button href={`/dashboard/${access.organisation.slug}/event/${event.id}`} startIcon={<ArrowBackIcon />}>Back to event</Button></Stack><EventProgramScheduleManager organisationSlug={access.organisation.slug} eventId={event.id} eventStart={event.startDateTime.toISOString()} timeZone={event.timezone} tracks={event.scheduleTracks} sessions={sessions} speakers={event.speakers} /></Stack>;
+  return (
+    <div className="flex flex-col gap-6">
+      <Link href={`/dashboard/${access.organisation.slug}/event/${event.id}`} className="inline-flex min-h-9 items-center gap-1.5 self-start text-sm font-semibold text-ink-secondary hover:text-ink">
+        <ArrowLeft aria-hidden className="size-4" />
+        Back to event
+      </Link>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="break-words text-h1 text-ink">{event.title} schedule</h1>
+          <p className="mt-2 max-w-[640px] text-body-ui text-ink-secondary">Plan parallel tracks and manage live timing changes independently.</p>
+        </div>
+      </div>
+      <EventProgramScheduleManager organisationSlug={access.organisation.slug} eventId={event.id} eventStart={event.startDateTime.toISOString()} timeZone={event.timezone} tracks={event.scheduleTracks} sessions={sessions} speakers={event.speakers} />
+    </div>
+  );
 }

@@ -3,35 +3,14 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { BroadcastAttendanceFilter, RsvpStatus } from "@prisma/client";
-import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Checkbox from "@mui/material/Checkbox";
-import Chip from "@mui/material/Chip";
-import CircularProgress from "@mui/material/CircularProgress";
-import Divider from "@mui/material/Divider";
-import FormControl from "@mui/material/FormControl";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import FormGroup from "@mui/material/FormGroup";
-import FormLabel from "@mui/material/FormLabel";
-import Grid from "@mui/material/Grid";
-import InputLabel from "@mui/material/InputLabel";
-import ListSubheader from "@mui/material/ListSubheader";
-import MenuItem from "@mui/material/MenuItem";
-import Paper from "@mui/material/Paper";
-import Radio from "@mui/material/Radio";
-import RadioGroup from "@mui/material/RadioGroup";
-import Select from "@mui/material/Select";
-import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
-import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
-import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
-import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
-import DesktopWindowsOutlinedIcon from "@mui/icons-material/DesktopWindowsOutlined";
-import PhoneIphoneOutlinedIcon from "@mui/icons-material/PhoneIphoneOutlined";
+import { FlaskConical, Monitor, Send, Smartphone } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckboxField, Radio, RadioGroup, SegmentedControl } from "@/components/ui/choice";
+import { Callout, Card } from "@/components/ui/display";
+import { Field, Input } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/menu";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { countBroadcastRecipients, previewEventBroadcast, sendEventBroadcast, sendEventBroadcastTest } from "@/app/actions/broadcasts";
 import {
   BROADCAST_ATTENDANCE_OPTIONS,
@@ -170,166 +149,151 @@ export function EventBroadcastPanel(props: {
   const canSend = !pending && statuses.length > 0 && hasContent && (recipientCount ?? 0) > 0;
 
   return (
-    <Stack spacing={3}>
-      <Alert severity="info">
+    <div className="flex flex-col gap-6">
+      <Callout tone="info">
         Emails go only to people who already registered for this event. Messages are queued and delivered in the background, a few at a time, so large audiences take a few minutes. Send yourself a test first.
-      </Alert>
+      </Callout>
 
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ alignItems: { md: "center" } }}>
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h6" component="h2">Start from a template</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Reminders, agenda updates, speaker news, logistics, thank-yous, and more. Each one fills in the subject, message, and a suggested audience; everything stays editable.
-            </Typography>
-          </Box>
-          <FormControl size="small" sx={{ minWidth: 280 }}>
-            <InputLabel id="broadcast-template-label">Template</InputLabel>
-            <Select
-              labelId="broadcast-template-label"
-              label="Template"
-              value={templateId}
-              displayEmpty
-              onChange={(event) => applyTemplate(String(event.target.value))}
-              disabled={pending}
-              renderValue={(value) => BROADCAST_STARTER_TEMPLATES.find((template) => template.id === value)?.name ?? "Custom (from a previous email)"}
-            >
-              {TEMPLATE_GROUPS.flatMap((group) => [
-                <ListSubheader key={`group-${group}`} disableSticky>{group}</ListSubheader>,
-                ...BROADCAST_STARTER_TEMPLATES.filter((template) => template.group === group).map((template) => (
-                  <MenuItem key={template.id} value={template.id}>
-                    <Stack>
-                      <Typography variant="body2">{template.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">{template.description}</Typography>
-                    </Stack>
-                  </MenuItem>
-                )),
-              ])}
-            </Select>
-          </FormControl>
-        </Stack>
-      </Paper>
-
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
-            <Stack spacing={2.5}>
-              <Typography variant="h6" component="h2">Who receives it</Typography>
-              <FormControl component="fieldset" variant="standard">
-                <FormLabel component="legend">Registration status</FormLabel>
-                <FormGroup>
-                  {BROADCAST_STATUS_OPTIONS.map((option) => (
-                    <FormControlLabel
-                      key={option.value}
-                      control={<Checkbox checked={statuses.includes(option.value)} onChange={() => toggleStatus(option.value)} disabled={pending} />}
-                      label={<span><strong>{option.label}</strong> <Typography component="span" variant="body2" color="text.secondary">— {option.hint}</Typography></span>}
-                    />
+      <Card className="flex flex-col gap-4 md:flex-row md:items-center">
+        <div className="flex-1">
+          <h2 className="text-h4 text-ink">Start from a template</h2>
+          <p className="mt-1 text-body-ui text-ink-muted">
+            Reminders, agenda updates, speaker news, logistics, thank-yous, and more. Each one fills in the subject, message, and a suggested audience; everything stays editable.
+          </p>
+        </div>
+        <div className="flex w-full flex-col gap-1.5 md:w-[300px]">
+          <label id="broadcast-template-label" className="text-label text-ink">Template</label>
+          <Select value={templateId} onValueChange={applyTemplate} disabled={pending}>
+            <SelectTrigger aria-labelledby="broadcast-template-label">
+              <SelectValue placeholder="Custom (from a previous email)" />
+            </SelectTrigger>
+            <SelectContent>
+              {TEMPLATE_GROUPS.map((group) => (
+                <SelectGroup key={group}>
+                  <SelectLabel>{group}</SelectLabel>
+                  {BROADCAST_STARTER_TEMPLATES.filter((template) => template.group === group).map((template) => (
+                    <SelectItem key={template.id} value={template.id} description={template.description}>
+                      {template.name}
+                    </SelectItem>
                   ))}
-                </FormGroup>
-              </FormControl>
-              <FormControl component="fieldset" variant="standard">
-                <FormLabel component="legend">Attendance</FormLabel>
-                <RadioGroup value={attendance} onChange={(_, value) => setAttendance(value as BroadcastAttendanceFilter)}>
-                  {BROADCAST_ATTENDANCE_OPTIONS.map((option) => (
-                    <FormControlLabel key={option.value} value={option.value} control={<Radio disabled={pending} />} label={option.label} />
-                  ))}
-                </RadioGroup>
-              </FormControl>
-              <Divider />
-              <Box aria-live="polite">
-                {countError ? <Alert severity="error">{countError}</Alert> : (
-                  <Typography variant="body1">
-                    {recipientCount === null ? "Counting recipients…" : (
-                      <>
-                        <strong>{recipientCount}</strong> {recipientCount === 1 ? "person" : "people"} will receive this ({audienceText}).
-                      </>
-                    )}
-                  </Typography>
-                )}
-                <Typography variant="caption" color="text.secondary">
-                  One email per address, even if someone registered twice.
-                </Typography>
-              </Box>
-            </Stack>
-          </Paper>
-        </Grid>
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </Card>
 
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <Paper variant="outlined" sx={{ p: 2.5 }}>
-            <Stack spacing={2}>
-              <Typography variant="h6" component="h2">Message</Typography>
-              <TextField
-                label="Subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                inputRef={subjectRef}
-                required
-                fullWidth
-                size="small"
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <Card className="flex flex-col gap-5">
+          <h2 className="text-h4 text-ink">Who receives it</h2>
+          <fieldset className="flex flex-col gap-2.5">
+            <legend className="mb-2 text-label text-ink">Registration status</legend>
+            {BROADCAST_STATUS_OPTIONS.map((option) => (
+              <CheckboxField
+                key={option.value}
+                checked={statuses.includes(option.value)}
+                onCheckedChange={() => toggleStatus(option.value)}
                 disabled={pending}
-                slotProps={{ htmlInput: { maxLength: BROADCAST_SUBJECT_MAX } }}
-                helperText={`${subject.length}/${BROADCAST_SUBJECT_MAX}`}
+                label={<><strong className="font-semibold">{option.label}</strong> <span className="text-ink-muted">— {option.hint}</span></>}
               />
-              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", alignItems: "center" }}>
-                <Typography variant="caption" color="text.secondary">Subject placeholders:</Typography>
-                {SUBJECT_PLACEHOLDERS.map((placeholder) => (
-                  <Tooltip key={placeholder.token} title={placeholder.description}>
-                    <Chip label={placeholder.label} size="small" variant="outlined" onClick={() => insertSubjectPlaceholder(placeholder.token)} disabled={pending} />
-                  </Tooltip>
-                ))}
-              </Stack>
-              <BroadcastEmailEditor value={body} onChange={setBody} disabled={pending} />
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
+            ))}
+          </fieldset>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-2 text-label text-ink">Attendance</legend>
+            <RadioGroup value={attendance} onValueChange={(value) => setAttendance(value as BroadcastAttendanceFilter)} aria-label="Attendance">
+              {BROADCAST_ATTENDANCE_OPTIONS.map((option) => (
+                <Radio key={option.value} value={option.value} label={option.label} disabled={pending} />
+              ))}
+            </RadioGroup>
+          </fieldset>
+          <div aria-live="polite" className="border-t border-line pt-4">
+            {countError ? <Callout tone="danger">{countError}</Callout> : (
+              <p className="text-body-ui text-ink">
+                {recipientCount === null ? "Counting recipients…" : (
+                  <>
+                    <strong className="font-display text-xl font-extrabold">{recipientCount}</strong> {recipientCount === 1 ? "person" : "people"} will receive this ({audienceText}).
+                  </>
+                )}
+              </p>
+            )}
+            <p className="mt-1 text-caption text-ink-muted">One email per address, even if someone registered twice.</p>
+          </div>
+        </Card>
 
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack spacing={1.5}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}>
-            <Box>
-              <Typography variant="h6" component="h2">Preview</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Rendered by the server with example values, exactly as it will arrive. Each attendee sees their own name and, when confirmed, their own ticket link.
-              </Typography>
-            </Box>
-            <ToggleButtonGroup size="small" exclusive value={previewWidth} onChange={(_, value) => value && setPreviewWidth(value)} aria-label="Preview width">
-              <ToggleButton value="desktop" aria-label="Desktop width"><DesktopWindowsOutlinedIcon fontSize="small" sx={{ mr: 0.5 }} /> Desktop</ToggleButton>
-              <ToggleButton value="mobile" aria-label="Mobile width"><PhoneIphoneOutlinedIcon fontSize="small" sx={{ mr: 0.5 }} /> Mobile</ToggleButton>
-            </ToggleButtonGroup>
-          </Stack>
-          {!hasContent ? (
-            <Alert severity="info">Add a subject and a message to see the preview.</Alert>
-          ) : preview.error && previewReady ? (
-            <Alert severity="error">{preview.error}</Alert>
-          ) : (
-            <Box sx={{ position: "relative", bgcolor: "action.hover", borderRadius: 2, p: { xs: 1, sm: 2 }, display: "flex", justifyContent: "center" }}>
-              {!previewReady ? (
-                <Box sx={{ position: "absolute", top: 12, right: 12, display: "flex", alignItems: "center", gap: 1 }} aria-live="polite">
-                  <CircularProgress size={16} /> <Typography variant="caption">Updating…</Typography>
-                </Box>
-              ) : null}
-              <Box sx={{ width: previewWidth === "mobile" ? 390 : "100%", maxWidth: 720, transition: "width 0.2s" }}>
-                <Typography variant="subtitle2" sx={{ px: 1, pb: 1, color: "text.secondary" }}>
-                  Subject: <Typography component="span" variant="subtitle2" sx={{ color: "text.primary", fontWeight: 700 }}>{preview.subject || "…"}</Typography>
-                </Typography>
-                <Box
-                  component="iframe"
-                  title="Email preview"
-                  sandbox=""
-                  srcDoc={preview.html}
-                  sx={{ width: "100%", height: 620, border: 1, borderColor: "divider", borderRadius: 2, bgcolor: "#f8f9fa", opacity: previewReady ? 1 : 0.6, transition: "opacity 0.2s" }}
-                />
-              </Box>
-            </Box>
-          )}
-        </Stack>
-      </Paper>
+        <Card className="flex flex-col gap-4">
+          <h2 className="text-h4 text-ink">Message</h2>
+          <Field label="Subject" required helperText={`${subject.length}/${BROADCAST_SUBJECT_MAX}`}>
+            <Input ref={subjectRef} value={subject} onChange={(e) => setSubject(e.target.value)} disabled={pending} maxLength={BROADCAST_SUBJECT_MAX} />
+          </Field>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-caption text-ink-muted">Subject placeholders:</span>
+            {SUBJECT_PLACEHOLDERS.map((placeholder) => (
+              <Tooltip key={placeholder.token} content={placeholder.description}>
+                <button
+                  type="button"
+                  onClick={() => insertSubjectPlaceholder(placeholder.token)}
+                  disabled={pending}
+                  className="inline-flex min-h-8 items-center rounded-full border border-line-strong bg-canvas px-3 text-[13px] font-semibold text-ink transition-colors hover:bg-subtle disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {placeholder.label}
+                </button>
+              </Tooltip>
+            ))}
+          </div>
+          <BroadcastEmailEditor value={body} onChange={setBody} disabled={pending} />
+        </Card>
+      </div>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ justifyContent: "flex-end" }}>
+      <Card className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-h4 text-ink">Preview</h2>
+            <p className="mt-1 max-w-[640px] text-caption text-ink-muted">
+              Rendered by the server with example values, exactly as it will arrive. Each attendee sees their own name and, when confirmed, their own ticket link.
+            </p>
+          </div>
+          <SegmentedControl
+            ariaLabel="Preview width"
+            size="sm"
+            value={previewWidth}
+            onValueChange={setPreviewWidth}
+            options={[
+              { value: "desktop", label: "Desktop", icon: <Monitor aria-hidden />, ariaLabel: "Desktop width" },
+              { value: "mobile", label: "Mobile", icon: <Smartphone aria-hidden />, ariaLabel: "Mobile width" },
+            ]}
+          />
+        </div>
+        {!hasContent ? (
+          <Callout tone="info">Add a subject and a message to see the preview.</Callout>
+        ) : preview.error && previewReady ? (
+          <Callout tone="danger">{preview.error}</Callout>
+        ) : (
+          <div className="relative flex justify-center rounded-lg bg-muted p-2 sm:p-4">
+            {!previewReady ? (
+              <div aria-live="polite" className="absolute right-3 top-3 flex items-center gap-2 text-caption text-ink-secondary">
+                <Spinner className="size-4" /> Updating…
+              </div>
+            ) : null}
+            <div className="w-full max-w-[720px] transition-[width] duration-200" style={{ width: previewWidth === "mobile" ? 390 : "100%" }}>
+              <p className="px-1 pb-2 text-label text-ink-muted">
+                Subject: <span className="font-bold text-ink">{preview.subject || "…"}</span>
+              </p>
+              <iframe
+                title="Email preview"
+                sandbox=""
+                srcDoc={preview.html}
+                className="h-[620px] w-full rounded-lg border border-line bg-[#f8f9fa] transition-opacity duration-200"
+                style={{ opacity: previewReady ? 1 : 0.6 }}
+              />
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
         <Button
-          variant="outlined"
-          startIcon={<ScienceOutlinedIcon />}
+          variant="secondary"
+          startIcon={<FlaskConical />}
           disabled={pending || !hasContent}
           onClick={() => {
             startTransition(async () => {
@@ -341,10 +305,10 @@ export function EventBroadcastPanel(props: {
         >
           Send a test to me
         </Button>
-        <Button variant="contained" startIcon={<SendOutlinedIcon />} disabled={!canSend} onClick={() => setConfirmOpen(true)}>
+        <Button variant="primary" startIcon={<Send />} disabled={!canSend} onClick={() => setConfirmOpen(true)}>
           {recipientCount && recipientCount > 0 ? `Send to ${recipientCount} ${recipientCount === 1 ? "person" : "people"}` : "Send"}
         </Button>
-      </Stack>
+      </div>
 
       <ConfirmationDialog
         open={confirmOpen}
@@ -365,32 +329,34 @@ export function EventBroadcastPanel(props: {
         }}
       />
 
-      <Stack spacing={1.5}>
-        <Typography variant="h6" component="h2">Previously sent</Typography>
+      <section aria-labelledby="broadcast-history" className="flex flex-col gap-3">
+        <h2 id="broadcast-history" className="text-h3 text-ink">Previously sent</h2>
         {history.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 3 }}>
-            <Typography color="text.secondary">No emails have been sent for this event yet.</Typography>
-          </Paper>
-        ) : history.map((row) => (
-          <Paper key={row.id} variant="outlined" sx={{ p: 2 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ justifyContent: "space-between", alignItems: { sm: "flex-start" } }}>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{row.subject}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {new Date(row.createdAt).toLocaleString()} · {row.recipientCount} {row.recipientCount === 1 ? "recipient" : "recipients"} · {describeBroadcastAudience(row.statuses, row.attendance)}
-                  {row.createdByName ? ` · by ${row.createdByName}` : ""}
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 1, whiteSpace: "pre-wrap", color: "text.secondary", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                  {broadcastHtmlToText(row.body)}
-                </Typography>
-              </Box>
-              <Button size="small" variant="outlined" onClick={() => loadFromHistory(row)} disabled={pending} sx={{ flexShrink: 0 }}>
-                Reuse
-              </Button>
-            </Stack>
-          </Paper>
-        ))}
-      </Stack>
-    </Stack>
+          <Card>
+            <p className="text-body-ui text-ink-muted">No emails have been sent for this event yet.</p>
+          </Card>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {history.map((row) => (
+              <li key={row.id}>
+                <Card padding="sm" className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[16px] font-semibold text-ink">{row.subject}</p>
+                    <p className="text-sm text-ink-muted">
+                      {new Date(row.createdAt).toLocaleString()} · {row.recipientCount} {row.recipientCount === 1 ? "recipient" : "recipients"} · {describeBroadcastAudience(row.statuses, row.attendance)}
+                      {row.createdByName ? ` · by ${row.createdByName}` : ""}
+                    </p>
+                    <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-ink-secondary">{broadcastHtmlToText(row.body)}</p>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => loadFromHistory(row)} disabled={pending} className="shrink-0">
+                    Reuse
+                  </Button>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }

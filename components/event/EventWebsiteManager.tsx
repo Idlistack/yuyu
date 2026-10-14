@@ -1,20 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition, type FormEvent } from "react";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import {
-  Alert,
-  Button,
-  Checkbox,
-  Collapse,
-  Divider,
-  FormControlLabel,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { ArrowUpRight, ChevronDown, ChevronUp, Plus, Upload } from "lucide-react";
+import { Button, IconButton } from "@/components/ui/button";
+import { CheckboxField } from "@/components/ui/choice";
+import { Callout, Card, Chip, type ChipTone } from "@/components/ui/display";
+import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
+import { ACCENT_PRESETS, DEFAULT_EVENT_ACCENT, normalizeAccentHex } from "@/lib/theme/accent";
+import { cn } from "@/lib/cn";
 import { useRouter } from "next/navigation";
 import {
   deleteWebsiteContent,
@@ -128,6 +121,21 @@ function contentInput(
   };
 }
 
+const visibilityTones: Record<string, ChipTone> = { PUBLISHED: "success", DRAFT: "neutral", HIDDEN: "outline" };
+const visibilityLabels: Record<string, string> = { PUBLISHED: "Published", DRAFT: "Draft", HIDDEN: "Hidden" };
+
+function VisibilitySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <Field label="Visibility">
+      <NativeSelect name="visibility" value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="PUBLISHED">Published</option>
+        <option value="DRAFT">Draft</option>
+        <option value="HIDDEN">Hidden</option>
+      </NativeSelect>
+    </Field>
+  );
+}
+
 function ContentCollection({
   title,
   kind,
@@ -207,302 +215,192 @@ function ContentCollection({
   const clearPhotoDraft = () => setPhotoFile(null);
   const photoPicker =
     kind === "speaker" || kind === "sponsor" ? (
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ alignItems: "center", flexWrap: "wrap" }}
-      >
-        <Button
-          component="label"
-          variant="outlined"
-          size="small"
-          disabled={pending || uploadingPhoto}
-        >
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label className={cn("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-line-strong bg-canvas px-3.5 text-sm font-semibold text-ink transition-colors hover:bg-subtle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--yy-focus)]", (pending || uploadingPhoto) && "pointer-events-none opacity-50")}>
+          <Upload aria-hidden className="size-4" />
           Choose {kind === "speaker" ? "speaker photo" : "sponsor logo"}
           <input
-            hidden
+            className="sr-only"
             type="file"
             accept="image/jpeg,image/png,image/webp"
+            disabled={pending || uploadingPhoto}
             onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
           />
-        </Button>
-        <Typography variant="caption" color="text.secondary">
+        </label>
+        <span className="text-caption text-ink-muted">
           {photoFile ? photoFile.name : "JPEG, PNG, or WebP · up to 5 MB"}
-        </Typography>
-      </Stack>
+        </span>
+      </div>
     ) : null;
   const destinationUrlField = (row?: ContentRow) =>
     kind === "speaker" || kind === "sponsor" ? (
-      <TextField
-        name="websiteUrl"
-        label="Destination URL"
-        type="url"
-        defaultValue={String(row?.values.websiteUrl ?? "")}
-        placeholder="https://example.com"
-        helperText={`Where guests go when they select the ${kind === "speaker" ? "speaker photo" : "sponsor logo"}.`}
-        size="small"
-      />
+      <Field label="Destination URL" helperText={`Where guests go when they select the ${kind === "speaker" ? "speaker photo" : "sponsor logo"}.`}>
+        <Input name="websiteUrl" type="url" defaultValue={String(row?.values.websiteUrl ?? "")} placeholder="https://example.com" />
+      </Field>
     ) : null;
   const metadataFields = (row?: ContentRow) => (
     <>
       {kind === "highlight" ? (
-        <TextField
-          name="icon"
-          label="Icon"
-          defaultValue={String(row?.values.icon ?? "")}
-          helperText="Optional short icon or emoji shown with this highlight."
-          size="small"
-        />
+        <Field label="Icon" helperText="Optional short icon or emoji shown with this highlight.">
+          <Input name="icon" defaultValue={String(row?.values.icon ?? "")} />
+        </Field>
       ) : null}
       {kind === "speaker" ? (
-        <>
-          <TextField name="headline" label="Headline" defaultValue={String(row?.values.headline ?? "")} size="small" />
-          <TextField name="organisation" label="Organisation" defaultValue={String(row?.values.organisation ?? "")} size="small" />
-          <TextField name="linkedinUrl" label="LinkedIn URL" type="url" defaultValue={String(row?.values.linkedinUrl ?? "")} size="small" />
-          <TextField name="xUrl" label="X URL" type="url" defaultValue={String(row?.values.xUrl ?? "")} size="small" />
-        </>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Headline"><Input name="headline" defaultValue={String(row?.values.headline ?? "")} /></Field>
+          <Field label="Organisation"><Input name="organisation" defaultValue={String(row?.values.organisation ?? "")} /></Field>
+          <Field label="LinkedIn URL"><Input name="linkedinUrl" type="url" defaultValue={String(row?.values.linkedinUrl ?? "")} /></Field>
+          <Field label="X URL"><Input name="xUrl" type="url" defaultValue={String(row?.values.xUrl ?? "")} /></Field>
+        </div>
       ) : null}
       {kind === "sponsor" ? (
-        <TextField name="tier" label="Sponsor tier" select defaultValue={String(row?.values.tier ?? "PARTNER")} size="small">
-          <MenuItem value="PLATINUM">Platinum</MenuItem>
-          <MenuItem value="GOLD">Gold</MenuItem>
-          <MenuItem value="SILVER">Silver</MenuItem>
-          <MenuItem value="PARTNER">Partner</MenuItem>
-          <MenuItem value="COMMUNITY_PARTNER">Community partner</MenuItem>
-        </TextField>
+        <Field label="Sponsor tier">
+          <NativeSelect name="tier" defaultValue={String(row?.values.tier ?? "PARTNER")}>
+            <option value="PLATINUM">Platinum</option>
+            <option value="GOLD">Gold</option>
+            <option value="SILVER">Silver</option>
+            <option value="PARTNER">Partner</option>
+            <option value="COMMUNITY_PARTNER">Community partner</option>
+          </NativeSelect>
+        </Field>
       ) : null}
     </>
   );
+  const itemForm = (row?: ContentRow) => (
+    <>
+      <Field label={kind === "faq" ? "Question" : "Name"} required>
+        <Input name="title" defaultValue={row?.title} />
+      </Field>
+      {photoPicker}
+      {destinationUrlField(row)}
+      {metadataFields(row)}
+      {kind === "resource" ? (
+        <Field label="Resource link" required helperText="Paste the public URL guests should open.">
+          <Input name="externalUrl" defaultValue={row ? String(row.values.externalUrl ?? "") : undefined} />
+        </Field>
+      ) : null}
+      {supportsRichText ? (
+        <RichTextEditor
+          name="description"
+          label={kind === "faq" ? "Answer" : "Description"}
+          defaultValue={row?.description}
+          minHeight={88}
+        />
+      ) : (
+        <Field label="Description">
+          <Textarea name="description" rows={2} defaultValue={row?.description} />
+        </Field>
+      )}
+      <VisibilitySelect value={formVisibility} onChange={setFormVisibility} />
+    </>
+  );
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 2.5 } }}>
-      <Stack spacing={1.5}>
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ justifyContent: "space-between", alignItems: "center" }}
+    <Card as="section" aria-label={title}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-h4 text-ink">{title}</h3>
+          <p className="text-sm text-ink-muted">{rows.length} added</p>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          startIcon={adding ? undefined : <Plus />}
+          aria-expanded={adding}
+          onClick={() => {
+            if (adding) {
+              clearPhotoDraft();
+              setAdding(false);
+            } else {
+              openNewItemForm();
+            }
+          }}
         >
-          <Stack spacing={0.25}>
-            <Typography variant="h6">{title}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {rows.length} added
-            </Typography>
-          </Stack>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => {
-              if (adding) {
-                clearPhotoDraft();
-                setAdding(false);
-              } else {
-                openNewItemForm();
-              }
-            }}
-          >
-            {adding ? "Close" : `Add ${itemName}`}
+          {adding ? "Close" : `Add ${itemName}`}
+        </Button>
+      </div>
+      <form
+        key={newItemFormKey}
+        data-event-page-form="true"
+        hidden={!adding}
+        onSubmit={(event) => void submit(event)}
+        className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-subtle p-4"
+      >
+        {itemForm()}
+        <div className="flex gap-2">
+          <Button type="submit" variant="primary" disabled={pending || uploadingPhoto}>
+            Add {itemName}
           </Button>
-        </Stack>
-        <Collapse in={adding}>
-          <Stack
-            key={newItemFormKey}
-            component="form"
-            data-event-page-form="true"
-            spacing={1.5}
-            onSubmit={(event) => void submit(event)}
-            sx={{ pt: 1 }}
+          <Button
+            variant="quiet"
+            onClick={() => {
+              setPhotoFile(null);
+              setAdding(false);
+            }}
+            disabled={uploadingPhoto}
           >
-            <TextField
-              name="title"
-              label={kind === "faq" ? "Question" : "Name"}
-              required
-              size="small"
-            />
-            {photoPicker}
-            {destinationUrlField()}
-            {metadataFields()}
-            {kind === "resource" ? (
-              <TextField
-                name="externalUrl"
-                label="Resource link"
-                helperText="Paste the public URL guests should open."
-                required
-                size="small"
-              />
-            ) : null}
-            {supportsRichText ? (
-              <RichTextEditor
-                name="description"
-                label={kind === "faq" ? "Answer" : "Description"}
-                minHeight={88}
-              />
-            ) : (
-              <TextField
-                name="description"
-                label="Description"
-                multiline
-                minRows={2}
-                size="small"
-              />
-            )}
-            <TextField
-              name="visibility"
-              label="Visibility"
-              select
-              value={formVisibility}
-              onChange={(event) => setFormVisibility(event.target.value)}
-              size="small"
-            >
-              <MenuItem value="PUBLISHED">Published</MenuItem>
-              <MenuItem value="DRAFT">Draft</MenuItem>
-              <MenuItem value="HIDDEN">Hidden</MenuItem>
-            </TextField>
-            <Stack direction="row" spacing={1}>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={pending || uploadingPhoto}
-              >
-                Add {itemName}
-              </Button>
-              <Button
-                onClick={() => {
-                  setPhotoFile(null);
-                  setAdding(false);
-                }}
-                disabled={uploadingPhoto}
-              >
-                Cancel
-              </Button>
-            </Stack>
-          </Stack>
-        </Collapse>
-        {rows.length ? (
-          <Stack divider={<Divider flexItem />}>
-            {rows.map((row) => (
-              <Stack key={row.id} spacing={1} sx={{ py: 1 }}>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ justifyContent: "space-between", alignItems: "center" }}
-                >
-                  <Stack spacing={0.25}>
-                    <Typography>{row.title}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {row.visibility.toLowerCase()}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={0.5}>
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        const nextEditing = editing === row.id ? null : row.id;
-                        setEditing(nextEditing);
-                        setAdding(false);
-                        clearPhotoDraft();
-                        if (nextEditing) setFormVisibility(row.visibility);
-                      }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      color="error"
-                      size="small"
-                      onClick={() => onDelete(row)}
-                      disabled={pending}
-                    >
-                      Remove
-                    </Button>
-                  </Stack>
-                </Stack>
-                <Collapse in={editing === row.id}>
-                  <Stack
-                    component="form"
-                    data-event-page-form="true"
-                    spacing={1.5}
-                    onSubmit={(event) => void submit(event, row)}
-                    sx={{ pt: 1 }}
+            Cancel
+          </Button>
+        </div>
+      </form>
+      {rows.length ? (
+        <ul className="mt-3 divide-y divide-line border-t border-line">
+          {rows.map((row) => (
+            <li key={row.id} className="py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-[15px] font-semibold text-ink">{row.title}</span>
+                  <Chip size="sm" tone={visibilityTones[row.visibility] ?? "neutral"}>{visibilityLabels[row.visibility] ?? row.visibility.toLowerCase()}</Chip>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    size="sm"
+                    variant="quiet"
+                    aria-expanded={editing === row.id}
+                    onClick={() => {
+                      const nextEditing = editing === row.id ? null : row.id;
+                      setEditing(nextEditing);
+                      setAdding(false);
+                      clearPhotoDraft();
+                      if (nextEditing) setFormVisibility(row.visibility);
+                    }}
                   >
-                    <TextField
-                      name="title"
-                      label={kind === "faq" ? "Question" : "Name"}
-                      defaultValue={row.title}
-                      required
-                      size="small"
-                    />
-                    {photoPicker}
-                    {destinationUrlField(row)}
-                    {metadataFields(row)}
-                    {kind === "resource" ? (
-                      <TextField
-                        name="externalUrl"
-                        label="Resource link"
-                        defaultValue={String(row.values.externalUrl ?? "")}
-                        helperText="Paste the public URL guests should open."
-                        required
-                        size="small"
-                      />
-                    ) : null}
-                    {supportsRichText ? (
-                      <RichTextEditor
-                        name="description"
-                        label={kind === "faq" ? "Answer" : "Description"}
-                        defaultValue={row.description}
-                        minHeight={88}
-                      />
-                    ) : (
-                      <TextField
-                        name="description"
-                        label="Description"
-                        defaultValue={row.description}
-                        multiline
-                        minRows={2}
-                        size="small"
-                      />
-                    )}
-                    <TextField
-                      name="visibility"
-                      label="Visibility"
-                      select
-                      value={formVisibility}
-                      onChange={(event) =>
-                        setFormVisibility(event.target.value)
-                      }
-                      size="small"
-                    >
-                      <MenuItem value="PUBLISHED">Published</MenuItem>
-                      <MenuItem value="DRAFT">Draft</MenuItem>
-                      <MenuItem value="HIDDEN">Hidden</MenuItem>
-                    </TextField>
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={pending || uploadingPhoto}
-                      >
-                        Save changes
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          clearPhotoDraft();
-                          setEditing(null);
-                        }}
-                        disabled={pending || uploadingPhoto}
-                      >
-                        Cancel
-                      </Button>
-                    </Stack>
-                  </Stack>
-                </Collapse>
-              </Stack>
-            ))}
-          </Stack>
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            Nothing has been added yet.
-          </Typography>
-        )}
-      </Stack>
-    </Paper>
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="dangerQuiet" onClick={() => onDelete(row)} disabled={pending}>
+                    Remove
+                  </Button>
+                </div>
+              </div>
+              <form
+                data-event-page-form="true"
+                hidden={editing !== row.id}
+                onSubmit={(event) => void submit(event, row)}
+                className="mt-3 flex flex-col gap-4 rounded-lg border border-line bg-subtle p-4"
+              >
+                {itemForm(row)}
+                <div className="flex gap-2">
+                  <Button type="submit" variant="primary" disabled={pending || uploadingPhoto}>
+                    Save changes
+                  </Button>
+                  <Button
+                    variant="quiet"
+                    onClick={() => {
+                      clearPhotoDraft();
+                      setEditing(null);
+                    }}
+                    disabled={pending || uploadingPhoto}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-body-ui text-ink-muted">Nothing has been added yet.</p>
+      )}
+    </Card>
   );
 }
 
@@ -590,122 +488,102 @@ export function EventWebsiteManager(props: Props) {
   };
   const remove = (kind: ContentKind) => (row: ContentRow) =>
     setDeleteTarget({ kind, row });
+  const [accentColor, setAccentColor] = useState(props.page?.accentColor ?? "");
+  const accentPreview = normalizeAccentHex(accentColor);
   return (
-    <Stack spacing={2}>
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      {saved ? <Alert severity="success">Changes saved.</Alert> : null}
-      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-        <Stack
-          component="form"
-          data-event-page-form="true"
-          spacing={2}
-          onSubmit={savePage}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            sx={{
-              justifyContent: "space-between",
-              alignItems: { sm: "center" },
-            }}
-          >
+    <div className="flex flex-col gap-5">
+      {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
+      {saved ? <Callout tone="success" role="status">Changes saved.</Callout> : null}
+      <Card>
+        <form data-event-page-form="true" onSubmit={savePage} className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <Typography variant="h6">Event page</Typography>
-              <Typography variant="body2" color="text.secondary">
+              <h2 className="text-h3 text-ink">Event page</h2>
+              <p className="mt-1 max-w-[560px] text-body-ui text-ink-muted">
                 Choose what visitors see, arrange the sections, and preview the
                 result. Edit the event introduction in Details.
-              </Typography>
+              </p>
             </div>
-            <Stack direction="row" spacing={1}>
-              <Button
-                component="a"
-                href={`/${props.organisationSlug}/${props.eventSlug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                endIcon={<OpenInNewIcon />}
-              >
-                Preview
+            <div className="flex shrink-0 gap-2">
+              <Button asChild variant="secondary">
+                <a href={`/${props.organisationSlug}/${props.eventSlug}`} target="_blank" rel="noopener noreferrer">
+                  Preview
+                  <ArrowUpRight aria-hidden className="size-4" />
+                </a>
               </Button>
-              <Button type="submit" variant="contained" disabled={pending}>
-                {pending ? "Saving…" : "Save all changes"}
+              <Button type="submit" variant="primary" loading={pending} loadingLabel="Saving…">
+                Save all changes
               </Button>
-            </Stack>
-          </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-            <TextField
-              name="accentColor"
-              label="Accent colour"
-              defaultValue={props.page?.accentColor ?? ""}
-              placeholder="#2563EB"
-              size="small"
-              fullWidth
-            />
-          </Stack>
-          <Divider />
-          <Stack spacing={0.5}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              Page sections
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
+            </div>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-end gap-2.5">
+              <Field label="Accent colour" className="flex-1">
+                <Input name="accentColor" value={accentColor} onChange={(event) => setAccentColor(event.target.value)} placeholder={DEFAULT_EVENT_ACCENT} className="font-mono" />
+              </Field>
+              <span aria-hidden className="size-[50px] shrink-0 rounded-md border border-line" style={{ backgroundColor: accentPreview }} />
+            </div>
+            <div role="group" aria-label="Accent presets" className="flex flex-wrap gap-2">
+              {ACCENT_PRESETS.map((preset) => {
+                const selected = accentPreview === preset.hex;
+                return (
+                  <button
+                    key={preset.hex}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setAccentColor(preset.hex);
+                      setDirty(true);
+                      setSaved(false);
+                    }}
+                    className={cn("inline-flex min-h-9 items-center gap-2 rounded-full border bg-canvas px-3 text-sm font-semibold text-ink transition-colors hover:bg-subtle", selected ? "border-[1.5px] border-primary" : "border-line-strong")}
+                  >
+                    <span aria-hidden className="size-4 rounded-full" style={{ backgroundColor: preset.hex }} />
+                    {preset.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="border-t border-line pt-5">
+            <h3 className="text-h4 text-ink">Page sections</h3>
+            <p className="mt-1 text-body-ui text-ink-muted">
               Turn sections on or off, then arrange them in the order guests
               should see.
-            </Typography>
-          </Stack>
-          <Stack spacing={0.25}>
-            {sections.map((section, index) => (
-              <Stack
-                key={section.type}
-                direction="row"
-                spacing={1}
-                sx={{ alignItems: "center", justifyContent: "space-between" }}
-              >
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={section.isVisible}
-                      onChange={(_, isVisible) => {
-                        setDirty(true);
-                        setSaved(false);
-                        setSections((current) =>
-                          current.map((item) =>
-                            item.type === section.type
-                              ? { ...item, isVisible }
-                              : item,
-                          ),
-                        );
-                      }}
-                    />
-                  }
-                  label={
-                    sectionLabels[section.type as keyof typeof sectionLabels] ??
-                    section.type
-                  }
-                  sx={{ m: 0 }}
-                />
-                <Stack direction="row" spacing={0.5}>
-                  <Button
-                    size="small"
-                    disabled={index === 0}
-                    onClick={() => moveSection(index, -1)}
-                    aria-label={`Move ${section.type} up`}
-                  >
-                    Up
-                  </Button>
-                  <Button
-                    size="small"
-                    disabled={index === sections.length - 1}
-                    onClick={() => moveSection(index, 1)}
-                    aria-label={`Move ${section.type} down`}
-                  >
-                    Down
-                  </Button>
-                </Stack>
-              </Stack>
-            ))}
-          </Stack>
-        </Stack>
-      </Paper>
+            </p>
+            <ol className="mt-3 divide-y divide-line rounded-lg border border-line">
+              {sections.map((section, index) => (
+                <li key={section.type} className="flex items-center justify-between gap-2 px-3.5 py-2">
+                  <CheckboxField
+                    label={sectionLabels[section.type as keyof typeof sectionLabels] ?? section.type}
+                    checked={section.isVisible}
+                    onCheckedChange={(checked) => {
+                      const isVisible = checked === true;
+                      setDirty(true);
+                      setSaved(false);
+                      setSections((current) =>
+                        current.map((item) =>
+                          item.type === section.type
+                            ? { ...item, isVisible }
+                            : item,
+                        ),
+                      );
+                    }}
+                  />
+                  <div className="flex gap-0.5">
+                    <IconButton label={`Move ${section.type} up`} size="sm" disabled={index === 0} onClick={() => moveSection(index, -1)}>
+                      <ChevronUp />
+                    </IconButton>
+                    <IconButton label={`Move ${section.type} down`} size="sm" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)}>
+                      <ChevronDown />
+                    </IconButton>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </form>
+      </Card>
       <ContentCollection
         title="Highlights"
         kind="highlight"
@@ -779,6 +657,6 @@ export function EventWebsiteManager(props: Props) {
           });
         }}
       />
-    </Stack>
+    </div>
   );
 }

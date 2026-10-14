@@ -3,34 +3,12 @@
 import { useMemo, useState, useTransition } from "react";
 import type { RegistrationFieldType } from "@prisma/client";
 import { RegistrationFieldType as RegistrationFieldTypeEnum } from "@prisma/client";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Box from "@mui/material/Box";
-import IconButton from "@mui/material/IconButton";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
-import TextField from "@mui/material/TextField";
-import MenuItem from "@mui/material/MenuItem";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Checkbox from "@mui/material/Checkbox";
-import Divider from "@mui/material/Divider";
-import Chip from "@mui/material/Chip";
-import Grid from "@mui/material/Grid";
-import Radio from "@mui/material/Radio";
-import RadioGroup from "@mui/material/RadioGroup";
-import FormLabel from "@mui/material/FormLabel";
-import FormControl from "@mui/material/FormControl";
-
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import ArrowUpwardOutlinedIcon from "@mui/icons-material/ArrowUpwardOutlined";
-import ArrowDownwardOutlinedIcon from "@mui/icons-material/ArrowDownwardOutlined";
-import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import PreviewIcon from "@mui/icons-material/Preview";
+import { ArrowDown, ArrowUp, Eye, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { Button, IconButton } from "@/components/ui/button";
+import { CheckboxField, Radio, RadioGroup } from "@/components/ui/choice";
+import { Chip, EmptyState } from "@/components/ui/display";
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
+import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
 
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/feedback/ToastProvider";
@@ -216,313 +194,188 @@ export function EventRegistrationFormEditor(props: {
     });
   }
 
+  function saveField() {
+    startTransition(async () => {
+      const options = optionsCsv
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const res = await upsertEventRegistrationField({
+        organisationSlug,
+        eventId,
+        fieldId: editing?.id,
+        key,
+        label,
+        type,
+        required,
+        options,
+      });
+      if (!res.ok) {
+        showToast(res.error, "error");
+        return;
+      }
+      const savedField: RegistrationFieldRow = {
+        id: res.data!.fieldId,
+        key,
+        label,
+        type,
+        required,
+        options,
+        sortOrder: editing?.sortOrder ?? fields.length + 1,
+      };
+      setLocalFields((current) =>
+        editing
+          ? current.map((field) => field.id === editing.id ? savedField : field)
+          : [...current, savedField],
+      );
+      showToast("Saved field config", "success");
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
   return (
-    <Stack spacing={4}>
+    <div className="flex flex-col gap-8">
       {/* ── HEADER ── */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        sx={{
-          alignItems: { xs: "stretch", sm: "flex-end" },
-          justifyContent: "space-between",
-          pb: 1.5,
-          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-        }}
-      >
-        <Stack spacing={0.5}>
-          <Typography variant="h5" component="h1" sx={{ fontWeight: 750, letterSpacing: "-0.5px" }}>
-            Registration Form Editor
-          </Typography>
-          <Typography variant="body2" sx={{ color: "#8E8E93" }}>
-            Add custom input fields to collect guest information. Name and Email are always collected.
-          </Typography>
-        </Stack>
-        <Button
-          variant="contained"
-          onClick={openCreate}
-          disabled={pending}
-          sx={{
-            alignSelf: { xs: "flex-start", sm: "center" },
-            backgroundColor: "#0A84FF",
-            color: "#FFFFFF",
-            fontWeight: 600,
-            textTransform: "none",
-            borderRadius: "8px",
-            px: 3,
-          }}
-        >
+      <div className="flex flex-col gap-4 border-b border-line pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-h2 text-ink">Registration Form Editor</h1>
+          <p className="mt-1 text-body-ui text-ink-muted">Add custom input fields to collect guest information. Name and Email are always collected.</p>
+        </div>
+        <Button variant="primary" startIcon={<Plus />} onClick={openCreate} disabled={pending} className="self-start sm:self-auto">
           Add Custom Field
         </Button>
-      </Stack>
+      </div>
 
       {/* ── TWO COLUMN BUILDER / PREVIEW LAYOUT ── */}
-      <Grid container spacing={4}>
+      <div className="grid gap-8 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         {/* Left Column: Visual Builder Cards */}
-        <Grid size={{ xs: 12, md: 7 }}>
-          <Stack spacing={2.5}>
-            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", letterSpacing: "-0.2px" }}>
-              Form Structure
-            </Typography>
+        <section aria-labelledby="form-structure-title" className="flex flex-col gap-4">
+          <h2 id="form-structure-title" className="text-h4 text-ink">Form Structure</h2>
 
-            <Stack spacing={2}>
-              {/* Default Fields Panel */}
-              <Paper variant="outlined" sx={{ p: 2.5, backgroundColor: "rgba(255,255,255,0.01)", borderColor: "rgba(255,255,255,0.06)" }}>
-                <Stack spacing={1.5}>
-                  <Typography variant="caption" sx={{ color: "#8E8E93", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                    Standard Fields (Always Collected)
-                  </Typography>
-                  <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                    <DragIndicatorIcon sx={{ color: "rgba(255,255,255,0.15)" }} />
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>Name</Typography>
-                      <Typography variant="caption" color="text.secondary">Collected from all registered attendees.</Typography>
-                    </Box>
-                    <Chip label="Required" size="small" variant="outlined" sx={{ color: "#0A84FF", borderColor: "rgba(10, 132, 255, 0.2)", bgcolor: "rgba(10, 132, 255, 0.04)" }} />
-                  </Stack>
-                  <Divider sx={{ borderColor: "rgba(255,255,255,0.04)" }} />
-                  <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                    <DragIndicatorIcon sx={{ color: "rgba(255,255,255,0.15)" }} />
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>Email</Typography>
-                      <Typography variant="caption" color="text.secondary">Used for sending ticket confirmation and QR codes.</Typography>
-                    </Box>
-                    <Chip label="Required" size="small" variant="outlined" sx={{ color: "#0A84FF", borderColor: "rgba(10, 132, 255, 0.2)", bgcolor: "rgba(10, 132, 255, 0.04)" }} />
-                  </Stack>
-                </Stack>
-              </Paper>
+          {/* Default Fields Panel */}
+          <div className="rounded-lg border border-line bg-subtle p-4">
+            <p className="mb-2 text-overline text-ink-muted">Standard Fields (Always Collected)</p>
+            <ul className="divide-y divide-line">
+              {[
+                { name: "Name", description: "Collected from all registered attendees." },
+                { name: "Email", description: "Used for sending ticket confirmation and QR codes." },
+              ].map((item) => (
+                <li key={item.name} className="flex items-center gap-3 py-2.5">
+                  <GripVertical aria-hidden className="size-4 text-ink-disabled" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-label text-ink">{item.name}</p>
+                    <p className="text-caption text-ink-muted">{item.description}</p>
+                  </div>
+                  <Chip size="sm" tone="outline">Required</Chip>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-              {/* Custom Fields List */}
-              {fields.length === 0 ? (
-                <Paper variant="outlined" sx={{ p: 4, textAlign: "center", backgroundColor: "rgba(255,255,255,0.01)", borderColor: "rgba(255,255,255,0.06)" }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No custom fields configured. Click &quot;Add Custom Field&quot; to capture dietary needs, phone numbers, or sizes.
-                  </Typography>
-                </Paper>
-              ) : (
-                <Stack spacing={1.5}>
-                  {fields.map((f, idx) => (
-                    <Paper
-                      key={f.id}
-                      variant="outlined"
-                      sx={{
-                        p: 2.5,
-                        backgroundColor: "#1C1C1E",
-                        borderColor: "rgba(255,255,255,0.08)",
-                        transition: "border-color 0.15s ease",
-                        "&:hover": {
-                          borderColor: "rgba(10, 132, 255, 0.3)",
-                        },
-                      }}
-                    >
-                      <Stack
-                        direction={{ xs: "column", sm: "row" }}
-                        spacing={2}
-                        sx={{ alignItems: { xs: "stretch", sm: "center" } }}
-                      >
-                        <DragIndicatorIcon sx={{ color: "rgba(255,255,255,0.3)", alignSelf: { xs: "flex-start", sm: "auto" } }} />
-                        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
-                              {f.label}
-                            </Typography>
-                            {f.required && (
-                              <Chip label="Required" size="small" variant="outlined" sx={{ height: 20, fontSize: "0.65rem", color: "#FF9F0A", borderColor: "rgba(255, 159, 10, 0.2)" }} />
-                            )}
-                          </Stack>
-                          <Typography variant="caption" sx={{ color: "#8E8E93", fontFamily: "monospace", display: "block", mt: 0.25 }}>
-                            key: {f.key} · type: {f.type.toLowerCase()}
-                          </Typography>
-                          {needsOptions(f.type) && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, overflowWrap: "anywhere" }}>
-                              Options: {f.options.join(", ")}
-                            </Typography>
-                          )}
-                        </Box>
-
-                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", alignSelf: { xs: "flex-end", sm: "auto" } }}>
-                          <IconButton
-                            aria-label="Move up"
-                            disabled={pending || idx === 0}
-                            onClick={() => move(f.id, -1)}
-                            size="small"
-                          >
-                            <ArrowUpwardOutlinedIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            aria-label="Move down"
-                            disabled={pending || idx === fields.length - 1}
-                            onClick={() => move(f.id, 1)}
-                            size="small"
-                          >
-                            <ArrowDownwardOutlinedIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            aria-label="Edit"
-                            disabled={pending}
-                            onClick={() => openEdit(f)}
-                            size="small"
-                          >
-                            <EditOutlinedIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            aria-label="Delete"
-                            disabled={pending}
-                            onClick={() => setDeleteConfirmField(f)}
-                            size="small"
-                          >
-                            <DeleteOutlineOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </Stack>
-                      </Stack>
-                    </Paper>
-                  ))}
-                </Stack>
-              )}
-            </Stack>
-          </Stack>
-        </Grid>
+          {/* Custom Fields List */}
+          {fields.length === 0 ? (
+            <EmptyState>No custom fields configured. Click &quot;Add Custom Field&quot; to capture dietary needs, phone numbers, or sizes.</EmptyState>
+          ) : (
+            <ul className="flex flex-col gap-2.5">
+              {fields.map((f, idx) => (
+                <li key={f.id} className="flex flex-col gap-3 rounded-lg border border-line bg-canvas p-4 transition-colors hover:border-line-strong sm:flex-row sm:items-center">
+                  <GripVertical aria-hidden className="hidden size-4 text-ink-muted sm:block" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="text-label text-ink [overflow-wrap:anywhere]">{f.label}</p>
+                      {f.required ? <Chip size="sm" tone="warning">Required</Chip> : null}
+                    </div>
+                    <p className="mt-0.5 font-mono text-xs text-ink-muted">key: {f.key} · type: {f.type.toLowerCase()}</p>
+                    {needsOptions(f.type) ? <p className="mt-1 text-caption text-ink-muted [overflow-wrap:anywhere]">Options: {f.options.join(", ")}</p> : null}
+                  </div>
+                  <div className="flex items-center gap-0.5 self-end sm:self-auto">
+                    <IconButton label="Move up" size="sm" disabled={pending || idx === 0} onClick={() => move(f.id, -1)}><ArrowUp /></IconButton>
+                    <IconButton label="Move down" size="sm" disabled={pending || idx === fields.length - 1} onClick={() => move(f.id, 1)}><ArrowDown /></IconButton>
+                    <IconButton label="Edit" size="sm" disabled={pending} onClick={() => openEdit(f)}><Pencil /></IconButton>
+                    <IconButton label="Delete" size="sm" variant="danger" disabled={pending} onClick={() => setDeleteConfirmField(f)}><Trash2 /></IconButton>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         {/* Right Column: Live Interactive Preview */}
-        <Grid size={{ xs: 12, md: 5 }}>
-          <Stack spacing={2.5} sx={{ position: "sticky", top: 24 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <PreviewIcon sx={{ color: "#0A84FF" }} />
-              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", letterSpacing: "-0.2px" }}>
-                Live Form Preview
-              </Typography>
-            </Stack>
+        <section aria-labelledby="form-preview-title" className="flex flex-col gap-4 md:sticky md:top-6 md:self-start">
+          <h2 id="form-preview-title" className="flex items-center gap-2 text-h4 text-ink">
+            <Eye aria-hidden className="size-5 text-ink-muted" />
+            Live Form Preview
+          </h2>
+          <div className="rounded-xl border border-line bg-canvas p-6 shadow-raised">
+            <p className="text-h4 text-ink">Register for Event</p>
+            <p className="mb-5 mt-1 text-caption text-ink-muted">Fill out the form below to secure your spot.</p>
+            <div className="flex flex-col gap-4">
+              {/* Standard Name / Email fields */}
+              <Field label="Full Name *"><Input placeholder="Enter full name" /></Field>
+              <Field label="Email Address *"><Input type="email" placeholder="you@domain.com" /></Field>
 
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 3.5,
-                borderRadius: "20px",
-                backgroundColor: "#1C1C1E",
-                borderColor: "rgba(255,255,255,0.08)",
-                boxShadow: "0 10px 40px rgba(0, 0, 0, 0.4)",
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                Register for Event
-              </Typography>
-              <Typography variant="caption" sx={{ color: "#8E8E93", display: "block", mb: 3 }}>
-                Fill out the form below to secure your spot.
-              </Typography>
+              {/* Render Custom Configured Fields */}
+              {previewFields.map((f) => {
+                const fullLabel = `${f.label}${f.required ? " *" : ""}`;
+                if (f.type === "TEXT") return <Field key={f.id} label={fullLabel}><Input placeholder="Enter answer..." /></Field>;
+                if (f.type === "EMAIL") return <Field key={f.id} label={fullLabel}><Input type="email" placeholder="you@example.com" /></Field>;
+                if (f.type === "PHONE") return <Field key={f.id} label={fullLabel} helperText="Include country code"><Input type="tel" inputMode="tel" placeholder="Phone number" /></Field>;
+                if (f.type === "TEXTAREA") return <Field key={f.id} label={fullLabel}><Textarea rows={3} placeholder="Enter answer..." /></Field>;
+                if (f.type === "NUMBER") return <Field key={f.id} label={fullLabel}><Input type="number" placeholder="0" /></Field>;
+                if (f.type === "DATE") return <Field key={f.id} label={fullLabel}><Input type="date" /></Field>;
+                if (f.type === "CHECKBOX") return <CheckboxField key={f.id} label={fullLabel} />;
+                if (f.type === "SELECT") {
+                  return (
+                    <Field key={f.id} label={fullLabel}>
+                      <NativeSelect defaultValue="">
+                        <option value="" disabled>Choose…</option>
+                        {f.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </NativeSelect>
+                    </Field>
+                  );
+                }
+                if (f.type === "RADIO") {
+                  return (
+                    <fieldset key={f.id}>
+                      <legend className="mb-2 text-label text-ink">{fullLabel}</legend>
+                      <RadioGroup className="flex-row flex-wrap gap-x-4">
+                        {f.options.map((opt) => <Radio key={opt} value={opt} label={opt} />)}
+                      </RadioGroup>
+                    </fieldset>
+                  );
+                }
+                if (f.type === "MULTI_SELECT") {
+                  return (
+                    <fieldset key={f.id} className="flex flex-col gap-2">
+                      <legend className="mb-2 text-label text-ink">{fullLabel}</legend>
+                      {f.options.map((opt) => <CheckboxField key={opt} label={opt} />)}
+                    </fieldset>
+                  );
+                }
+                return null;
+              })}
 
-              <Stack spacing={3}>
-                {/* Standard Name / Email fields */}
-                <TextField label="Full Name" size="small" fullWidth required placeholder="Enter full name" />
-                <TextField label="Email Address" size="small" type="email" fullWidth required placeholder="you@domain.com" />
-
-                {/* Render Custom Configured Fields */}
-                {previewFields.map((f) => {
-                  const requiredLabel = f.required ? " *" : "";
-                  const fullLabel = `${f.label}${requiredLabel}`;
-
-                  if (f.type === "TEXT") {
-                    return <TextField key={f.id} label={fullLabel} size="small" fullWidth placeholder="Enter answer..." />;
-                  }
-                  if (f.type === "EMAIL") {
-                    return <TextField key={f.id} label={fullLabel} size="small" type="email" fullWidth placeholder="you@example.com" />;
-                  }
-                  if (f.type === "PHONE") {
-                    return <TextField key={f.id} label={fullLabel} size="small" type="tel" inputMode="tel" fullWidth placeholder="Phone number" helperText="Include country code" />;
-                  }
-                  if (f.type === "TEXTAREA") {
-                    return <TextField key={f.id} label={fullLabel} size="small" multiline rows={3} fullWidth placeholder="Enter answer..." />;
-                  }
-                  if (f.type === "NUMBER") {
-                    return <TextField key={f.id} label={fullLabel} size="small" type="number" fullWidth placeholder="0" />;
-                  }
-                  if (f.type === "DATE") {
-                    return <TextField key={f.id} label={fullLabel} size="small" type="date" slotProps={{ inputLabel: { shrink: true } }} fullWidth />;
-                  }
-                  if (f.type === "CHECKBOX") {
-                    return <FormControlLabel key={f.id} control={<Checkbox />} label={fullLabel} />;
-                  }
-                  if (f.type === "SELECT") {
-                    return (
-                      <TextField key={f.id} select label={fullLabel} size="small" fullWidth value="">
-                        {f.options.map((opt) => (
-                          <MenuItem key={opt} value={opt}>
-                            {opt}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    );
-                  }
-                  if (f.type === "RADIO") {
-                    return (
-                      <FormControl key={f.id} component="fieldset">
-                        <FormLabel component="legend" sx={{ fontSize: "0.85rem", fontWeight: 600, color: "#8E8E93" }}>
-                          {fullLabel}
-                        </FormLabel>
-                        <RadioGroup row sx={{ mt: 0.5 }}>
-                          {f.options.map((opt) => (
-                            <FormControlLabel key={opt} value={opt} control={<Radio size="small" />} label={opt} />
-                          ))}
-                        </RadioGroup>
-                      </FormControl>
-                    );
-                  }
-                  if (f.type === "MULTI_SELECT") {
-                    return (
-                      <FormControl key={f.id} component="fieldset">
-                        <FormLabel component="legend" sx={{ fontSize: "0.85rem", fontWeight: 600, color: "#8E8E93" }}>
-                          {fullLabel}
-                        </FormLabel>
-                        <Stack spacing={0.25} sx={{ mt: 0.75 }}>
-                          {f.options.map((opt) => (
-                            <FormControlLabel key={opt} control={<Checkbox size="small" />} label={opt} />
-                          ))}
-                        </Stack>
-                      </FormControl>
-                    );
-                  }
-                  return null;
-                })}
-
-                <Button
-                  variant="contained"
-                  fullWidth
-                  sx={{
-                    mt: 1,
-                    backgroundColor: "#0A84FF",
-                    color: "#FFFFFF",
-                    fontWeight: 700,
-                    textTransform: "none",
-                    borderRadius: "8px",
-                    py: 1,
-                  }}
-                >
-                  Submit RSVP
-                </Button>
-              </Stack>
-            </Paper>
-          </Stack>
-        </Grid>
-      </Grid>
+              <Button variant="primary" fullWidth className="mt-1">Submit RSVP</Button>
+            </div>
+          </div>
+        </section>
+      </div>
 
       {/* ── CREATE / EDIT DIALOG (presets at top) ── */}
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 700 }}>{editing ? "Edit custom field" : "Add custom field"}</DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent size="md">
+          <DialogHeader title={editing ? "Edit custom field" : "Add custom field"} />
+          <DialogBody className="flex flex-col gap-4">
             {!editing && (
-              <Box sx={{ mb: 1 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 600, display: "block", mb: 1.5, textTransform: "uppercase", letterSpacing: "0.5px" }}
-                >
-                  Quick preset templates
-                </Typography>
-                <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", gap: 1 }}>
+              <div className="border-b border-line pb-4">
+                <p className="mb-2.5 text-overline text-ink-muted">Quick preset templates</p>
+                <div className="flex flex-wrap gap-1.5">
                   {FIELD_PRESETS.map((preset) => (
                     <Button
                       key={preset.label}
-                      variant="outlined"
-                      size="small"
+                      variant="secondary"
+                      size="sm"
                       onClick={() => {
                         setLabel(preset.label);
                         setKey(uniqueKey(makeKeyFromLabel(preset.label), existingKeys));
@@ -530,139 +383,52 @@ export function EventRegistrationFormEditor(props: {
                         setRequired(preset.required);
                         setOptionsCsv(preset.optionsCsv);
                       }}
-                      sx={{
-                        textTransform: "none",
-                        fontSize: "0.75rem",
-                        borderRadius: "6px",
-                        py: 0.5,
-                        px: 1.25,
-                      }}
                     >
                       {preset.label}
                     </Button>
                   ))}
-                </Stack>
-                <Divider sx={{ mt: 2.5, mb: 1.5 }} />
-              </Box>
+                </div>
+              </div>
             )}
 
-            <TextField
-              label="Field Label"
-              value={label}
-              onChange={(e) => {
-                const next = e.target.value;
-                setLabel(next);
-                if (!editing) {
-                  setKey(uniqueKey(makeKeyFromLabel(next), existingKeys));
-                }
-              }}
-              fullWidth
-              placeholder="e.g. Phone Number, Food Preference"
-            />
-            <TextField
-              label="Field Key (System Identifier)"
-              helperText={
-                editing
-                  ? "Unique key for CSV exports (locked)."
-                  : "Auto-generated database key. Used in custom field metrics."
-              }
-              value={key}
-              disabled
-              fullWidth
-            />
-            <TextField
-              label="Field Type"
-              select
-              value={type}
-              onChange={(e) => setType(e.target.value as RegistrationFieldType)}
-              fullWidth
-            >
-              {Object.values(RegistrationFieldTypeEnum).map((t) => (
-                <MenuItem key={t} value={t}>
-                  {t}
-                </MenuItem>
-              ))}
-            </TextField>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={required}
-                  onChange={(_, checked) => setRequired(checked)}
-                  color="primary"
-                />
-              }
-              label="Make this field required"
-            />
-            {needsOptions(type) ? (
-              <TextField
-                label="Options List"
-                helperText="Type options separated by commas (e.g. Small, Medium, Large)"
-                value={optionsCsv}
-                onChange={(e) => setOptionsCsv(e.target.value)}
-                fullWidth
-                placeholder="Option 1, Option 2, Option 3"
+            <Field label="Field Label">
+              <Input
+                value={label}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setLabel(next);
+                  if (!editing) {
+                    setKey(uniqueKey(makeKeyFromLabel(next), existingKeys));
+                  }
+                }}
+                placeholder="e.g. Phone Number, Food Preference"
               />
+            </Field>
+            <Field
+              label="Field Key (System Identifier)"
+              helperText={editing ? "Unique key for CSV exports (locked)." : "Auto-generated database key. Used in custom field metrics."}
+            >
+              <Input value={key} disabled className="font-mono" />
+            </Field>
+            <Field label="Field Type">
+              <NativeSelect value={type} onChange={(e) => setType(e.target.value as RegistrationFieldType)}>
+                {Object.values(RegistrationFieldTypeEnum).map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </NativeSelect>
+            </Field>
+            <CheckboxField label="Make this field required" checked={required} onCheckedChange={(checked) => setRequired(checked === true)} />
+            {needsOptions(type) ? (
+              <Field label="Options List" helperText="Type options separated by commas (e.g. Small, Medium, Large)">
+                <Input value={optionsCsv} onChange={(e) => setOptionsCsv(e.target.value)} placeholder="Option 1, Option 2, Option 3" />
+              </Field>
             ) : null}
-          </Stack>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button>
+            <Button variant="primary" disabled={pending} onClick={saveField}>Save</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setOpen(false)} disabled={pending} sx={{ textTransform: "none" }}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disabled={pending}
-            onClick={() => {
-              startTransition(async () => {
-                const options = optionsCsv
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean);
-                const res = await upsertEventRegistrationField({
-                  organisationSlug,
-                  eventId,
-                  fieldId: editing?.id,
-                  key,
-                  label,
-                  type,
-                  required,
-                  options,
-                });
-                if (!res.ok) {
-                  showToast(res.error, "error");
-                  return;
-                }
-                const savedField: RegistrationFieldRow = {
-                  id: res.data!.fieldId,
-                  key,
-                  label,
-                  type,
-                  required,
-                  options,
-                  sortOrder: editing?.sortOrder ?? fields.length + 1,
-                };
-                setLocalFields((current) =>
-                  editing
-                    ? current.map((field) => field.id === editing.id ? savedField : field)
-                    : [...current, savedField],
-                );
-                showToast("Saved field config", "success");
-                setOpen(false);
-                router.refresh();
-              });
-            }}
-            sx={{
-              textTransform: "none",
-              backgroundColor: "#0A84FF",
-              color: "#FFFFFF",
-              fontWeight: 600,
-              borderRadius: "8px",
-              px: 3,
-            }}
-          >
-            Save
-          </Button>
-        </DialogActions>
       </Dialog>
 
       {/* ── CONFIRM DELETE DIALOG ── */}
@@ -728,6 +494,6 @@ export function EventRegistrationFormEditor(props: {
           });
         }}
       />
-    </Stack>
+    </div>
   );
 }

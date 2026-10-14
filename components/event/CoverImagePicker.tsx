@@ -1,23 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import IconButton from "@mui/material/IconButton";
-import Paper from "@mui/material/Paper";
-import Slider from "@mui/material/Slider";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
-import RotateRightOutlinedIcon from "@mui/icons-material/RotateRightOutlined";
-import CropOutlinedIcon from "@mui/icons-material/CropOutlined";
-import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
-import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
-import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
+import * as SliderPrimitive from "@radix-ui/react-slider";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Check, Crop, ImageIcon, RotateCcw, RotateCw, X } from "lucide-react";
+import { Button, IconButton } from "@/components/ui/button";
+import { Callout } from "@/components/ui/display";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const MAX_COVER_IMAGE_BYTES = 5 * 1024 * 1024;
 const OUTPUT_SIZE = 1200;
@@ -134,128 +123,110 @@ export function CoverImagePicker(props: {
     );
   }
 
+  const resetEdits = () => {
+    setZoom(1);
+    setRotation(0);
+    setOffset({ x: 0, y: 0 });
+  };
+
   return (
-    <Stack spacing={1.25} sx={{ maxWidth: 260 }}>
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      <Box
-        sx={{
-          position: "relative",
-          overflow: "hidden",
-          width: 220,
-          maxWidth: "100%",
-          aspectRatio: "1 / 1",
-          borderRadius: "14px",
-          border: "1px dashed rgba(255,255,255,0.18)",
-          backgroundColor: "rgba(255,255,255,0.025)",
-          display: "grid",
-          placeItems: "center",
-        }}
-      >
+    <div className="flex max-w-[260px] flex-col gap-3">
+      {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
+      <div className="relative grid aspect-square w-[220px] max-w-full place-items-center overflow-hidden rounded-xl border-[1.5px] border-dashed border-line-strong bg-subtle">
         {previewUrl ? (
-          <Box component="img" src={previewUrl} alt="Cover image preview" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          // Local object URLs and managed uploads are previewed directly.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={previewUrl} alt="Cover image preview" className="size-full object-cover" />
         ) : (
-          <Stack spacing={0.75} sx={{ alignItems: "center", px: 2, textAlign: "center" }}>
-            <ImageOutlinedIcon sx={{ color: "text.secondary", fontSize: 30 }} />
-            <Typography variant="body2" color="text.secondary">Your event cover will appear here.</Typography>
-          </Stack>
+          <div className="flex flex-col items-center gap-1.5 px-4 text-center">
+            <ImageIcon aria-hidden className="size-7 text-ink-muted" />
+            <p className="text-sm text-ink-muted">Your event cover will appear here.</p>
+          </div>
         )}
-      </Box>
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-        <Button variant="outlined" size="small" disabled={disabled} onClick={() => inputRef.current?.click()} sx={{ textTransform: "none" }}>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" size="sm" disabled={disabled} onClick={() => inputRef.current?.click()}>
           {previewUrl ? "Replace image" : "Choose image"}
         </Button>
         {previewUrl ? (
-          <Button size="small" color="inherit" disabled={disabled} onClick={() => { setPreviewUrl(""); onChange(null, ""); }} sx={{ textTransform: "none" }}>
+          <Button variant="quiet" size="sm" disabled={disabled} onClick={() => { setPreviewUrl(""); onChange(null, ""); }}>
             Remove
           </Button>
         ) : null}
-      </Stack>
-      <Typography variant="caption" color="text.secondary">
-        JPEG, PNG, or WebP · up to 5 MB · cropped to a square cover.
-      </Typography>
+      </div>
+      <p className="text-caption text-ink-muted">JPEG, PNG, or WebP · up to 5 MB · cropped to a square cover.</p>
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => selectImage(event.target.files?.[0])} />
 
-      <Dialog
-        open={editorOpen}
-        onClose={() => setEditorOpen(false)}
-        fullWidth
-        maxWidth="xs"
-        slotProps={{ paper: { sx: { m: 1.5, overflow: "hidden", borderRadius: 2 } } }}
-      >
-        <DialogTitle sx={{ p: 0, backgroundColor: "#5574F2", color: "#fff" }}>
-          <Stack direction="row" sx={{ minHeight: 54, alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
-            <IconButton aria-label="Cancel photo edit" onClick={() => setEditorOpen(false)} sx={{ color: "inherit" }}>
-              <CloseOutlinedIcon />
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent size="sm" hideClose>
+          <div className="flex min-h-14 items-center justify-between border-b border-line px-2">
+            <IconButton label="Cancel photo edit" onClick={() => setEditorOpen(false)}>
+              <X />
             </IconButton>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Edit photo</Typography>
-            <IconButton aria-label="Use cropped image" onClick={applyEdit} disabled={!imageLoaded} sx={{ color: "inherit" }}>
-              <CheckOutlinedIcon />
+            <DialogPrimitive.Title className="text-h4 text-ink">Edit photo</DialogPrimitive.Title>
+            <DialogPrimitive.Description className="sr-only">Drag to position, zoom, or rotate the cover image.</DialogPrimitive.Description>
+            <IconButton label="Use cropped image" variant="primary" onClick={applyEdit} disabled={!imageLoaded}>
+              <Check />
             </IconButton>
-          </Stack>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0, backgroundColor: "#0B0B0D" }}>
-          <Stack spacing={0}>
-            <Box sx={{ p: 1.5, pb: 1, backgroundColor: "#111" }}>
-              <Box sx={{ position: "relative", overflow: "hidden", backgroundColor: "#111", aspectRatio: "1 / 1", maxWidth: 360, mx: "auto" }}>
+          </div>
+          <div className="bg-[#111113] p-3">
+            <div className="relative mx-auto aspect-square max-w-[360px] overflow-hidden bg-[#111113]">
               <canvas
                 ref={canvasRef}
                 onPointerDown={startDrag}
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
-                style={{ display: "block", width: "100%", height: "100%", cursor: "grab", touchAction: "none" }}
+                aria-label="Cover image crop area. Drag to reposition."
+                className="block size-full cursor-grab touch-none active:cursor-grabbing"
               />
-              <Box
-                sx={{
-                  pointerEvents: "none",
-                  position: "absolute",
-                  inset: 0,
-                  border: "2px solid rgba(255,255,255,0.8)",
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 border-2 border-white/80"
+                style={{
                   boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.35)",
                   backgroundImage: "linear-gradient(to right, transparent 33.2%, rgba(255,255,255,0.3) 33.2%, rgba(255,255,255,0.3) 33.6%, transparent 33.6%, transparent 66.4%, rgba(255,255,255,0.3) 66.4%, rgba(255,255,255,0.3) 66.8%, transparent 66.8%), linear-gradient(to bottom, transparent 33.2%, rgba(255,255,255,0.3) 33.2%, rgba(255,255,255,0.3) 33.6%, transparent 33.6%, transparent 66.4%, rgba(255,255,255,0.3) 66.4%, rgba(255,255,255,0.3) 66.8%, transparent 66.8%)",
                 }}
               />
-              </Box>
-            </Box>
-            {/* A native image element is required as the canvas source for client-side cropping. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img ref={imageRef} src={sourceUrl} alt="" hidden onLoad={() => setImageLoaded(true)} />
-            <Paper square elevation={0} sx={{ p: 2, color: "#1D1D1F", backgroundColor: "#fff" }}>
-              <Typography variant="subtitle2" sx={{ textAlign: "center", fontWeight: 700, mb: 0.75 }}>
-                {Math.round(zoom * 100)}%
-              </Typography>
-              <Slider
-                value={zoom}
+            </div>
+          </div>
+          {/* A native image element is required as the canvas source for client-side cropping. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img ref={imageRef} src={sourceUrl} alt="" hidden onLoad={() => setImageLoaded(true)} />
+          <div className="flex flex-col gap-4 px-6 pb-6 pt-4">
+            <div className="flex flex-col gap-2">
+              <p className="text-center text-label text-ink">{Math.round(zoom * 100)}%</p>
+              <SliderPrimitive.Root
+                value={[zoom]}
                 min={1}
                 max={3}
                 step={0.05}
-                onChange={(_, value) => setZoom(value as number)}
-                sx={{ color: "#5574F2", mb: 1.5 }}
-              />
-              <Stack direction="row" sx={{ justifyContent: "space-around", alignItems: "center" }}>
-                <Stack spacing={0.25} sx={{ alignItems: "center" }}>
-                  <IconButton aria-label="Reset crop" onClick={() => { setZoom(1); setRotation(0); setOffset({ x: 0, y: 0 }); }} sx={{ color: "#5574F2" }}>
-                    <CropOutlinedIcon />
+                onValueChange={([value]) => setZoom(value ?? 1)}
+                className="relative flex h-6 w-full touch-none select-none items-center"
+              >
+                <SliderPrimitive.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-track">
+                  <SliderPrimitive.Range className="absolute h-full rounded-full bg-primary" />
+                </SliderPrimitive.Track>
+                <SliderPrimitive.Thumb aria-label="Zoom" className="block size-5 rounded-full border-2 border-primary bg-canvas shadow-raised" />
+              </SliderPrimitive.Root>
+            </div>
+            <div className="flex items-center justify-around">
+              {[
+                { label: "Crop", aria: "Reset crop", icon: <Crop />, onClick: resetEdits },
+                { label: "Rotate", aria: "Rotate image", icon: <RotateCw />, onClick: () => setRotation((current) => current + 90) },
+                { label: "Reset", aria: "Reset image edits", icon: <RotateCcw />, onClick: resetEdits },
+              ].map((tool) => (
+                <div key={tool.label} className="flex flex-col items-center gap-0.5">
+                  <IconButton label={tool.aria} onClick={tool.onClick}>
+                    {tool.icon}
                   </IconButton>
-                  <Typography variant="caption">Crop</Typography>
-                </Stack>
-                <Stack spacing={0.25} sx={{ alignItems: "center" }}>
-                  <IconButton aria-label="Rotate image" onClick={() => setRotation((current) => current + 90)} sx={{ color: "#1D1D1F" }}>
-                    <RotateRightOutlinedIcon />
-                  </IconButton>
-                  <Typography variant="caption">Rotate</Typography>
-                </Stack>
-                <Stack spacing={0.25} sx={{ alignItems: "center" }}>
-                  <IconButton aria-label="Reset image edits" onClick={() => { setZoom(1); setRotation(0); setOffset({ x: 0, y: 0 }); }} sx={{ color: "#1D1D1F" }}>
-                    <RestartAltOutlinedIcon />
-                  </IconButton>
-                  <Typography variant="caption">Reset</Typography>
-                </Stack>
-              </Stack>
-            </Paper>
-          </Stack>
+                  <span aria-hidden className="text-caption text-ink-muted">{tool.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
-    </Stack>
+    </div>
   );
 }

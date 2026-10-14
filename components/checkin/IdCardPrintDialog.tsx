@@ -1,31 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import ButtonGroup from "@mui/material/ButtonGroup";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import Divider from "@mui/material/Divider";
-import useMediaQuery from "@mui/material/useMediaQuery";
-import Chip from "@mui/material/Chip";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import CloseIcon from "@mui/icons-material/Close";
-import UndoIcon from "@mui/icons-material/Undo";
-import RedoIcon from "@mui/icons-material/Redo";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import MenuItem from "@mui/material/MenuItem";
-import Stack from "@mui/material/Stack";
-import Switch from "@mui/material/Switch";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
+import { useCallback, useMemo, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { Printer, Redo2, Undo2, X } from "lucide-react";
+import { Button, IconButton } from "@/components/ui/button";
+import { SegmentedControl, Switch } from "@/components/ui/choice";
+import { Callout, Chip } from "@/components/ui/display";
+import { Description as DialogDescription, Title as DialogTitle } from "@radix-ui/react-dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Field, Input, NativeSelect } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/cn";
 import QRCode from "react-qr-code";
 import {
   A6_LANDSCAPE,
@@ -82,6 +67,25 @@ const LAYOUT_ELEMENT_LABELS: Record<IdCardLayoutElement, string> = {
   footer: "Footer",
   logo: "Organisation logo",
 };
+
+function subscribeToCompactPreview(onChange: () => void) {
+  const query = window.matchMedia("(max-width:599px)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function useCompactPreview() {
+  return useSyncExternalStore(subscribeToCompactPreview, () => window.matchMedia("(max-width:599px)").matches, () => false);
+}
+
+function SwitchField({ id, label, checked, disabled, onCheckedChange }: { id: string; label: string; checked: boolean; disabled?: boolean; onCheckedChange: (checked: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+      <label htmlFor={id} className={cn("text-body-ui text-ink", disabled && "text-ink-muted")}>{label}</label>
+    </div>
+  );
+}
 
 function snapToGrid(value: number, gridSizeMm: number) {
   return Math.round(value / gridSizeMm) * gridSizeMm;
@@ -264,7 +268,7 @@ export function IdCardPrintDialog(props: {
   const { open, onClose, eventId, eventTitle, organisationName, organisationLogoUrl, attendee, registrationFields } = props;
   const [layoutDrag, setLayoutDrag] = useState<LayoutDrag | null>(null);
   const [selectedLayoutElement, setSelectedLayoutElement] = useState<IdCardLayoutElement>("name");
-  const compactPreview = useMediaQuery("(max-width:599px)");
+  const compactPreview = useCompactPreview();
   const [activeTab, setActiveTab] = useState(0);
   const [cleanPreview, setCleanPreview] = useState(false);
   const [undoHistory, setUndoHistory] = useState<IdCardPrintSettings[]>([]);
@@ -328,22 +332,23 @@ export function IdCardPrintDialog(props: {
   const logoUrl = settings.showLogo ? safeLogoUrl(organisationLogoUrl) : null;
   const selectedElementIsText = selectedLayoutElement !== "qr" && selectedLayoutElement !== "logo";
   const previewTextSize = (element: IdCardLayoutElement) => `${settings.elementTextSizes[element] * 0.3528 * previewPixelsPerMillimetre}px`;
-  const previewPositionSx = (element: IdCardLayoutElement) => {
+  const previewPositionStyle = (element: IdCardLayoutElement): CSSProperties => {
     const position = settings.elementPositions[element];
     return {
-      position: "absolute" as const,
+      position: "absolute",
       left: `${position.xMm * previewPixelsPerMillimetre}px`,
       top: `${position.yMm * previewPixelsPerMillimetre}px`,
       cursor: cleanPreview ? "default" : "grab",
       touchAction: cleanPreview ? "auto" : "none",
       userSelect: "none",
       zIndex: draggingElement === element ? 3 : selectedLayoutElement === element ? 2 : 1,
-      outline: cleanPreview ? "none" : draggingElement === element || selectedLayoutElement === element ? "2px solid #1976d2" : "1px dashed transparent",
-      outlineOffset: 2,
-      "&:hover": { outlineColor: cleanPreview ? "transparent" : "#1976d2" },
-      "&:focus-visible": { outline: "2px solid #1976d2", outlineOffset: 2 },
     };
   };
+  const previewOutlineClass = (element: IdCardLayoutElement) => cleanPreview
+    ? "outline-none"
+    : draggingElement === element || selectedLayoutElement === element
+      ? "outline outline-2 outline-offset-2 outline-[#1976d2]"
+      : "outline-dashed outline-1 outline-offset-2 outline-transparent hover:outline-[#1976d2]";
   const previewItemWidth = (element: IdCardLayoutElement) => `${settings.elementSizes[element] * previewPixelsPerMillimetre}px`;
 
   const update = (patch: Partial<IdCardPrintSettings>, recordHistory = true) => {
@@ -475,266 +480,284 @@ export function IdCardPrintDialog(props: {
     update({ printFieldLabels });
   };
 
-  const previewTemplateSx = settings.template === "bold"
-    ? {
-        border: "3px solid #000",
-        "&::before": {
-          content: '""', position: "absolute", inset: 0, right: "auto", width: 15, bgcolor: "#000",
-        },
-      }
+  const previewTemplateStyle: CSSProperties = settings.template === "bold"
+    ? { border: "3px solid #000" }
     : settings.template === "minimal"
-      ? { border: 0, boxShadow: 1 }
+      ? { border: 0, boxShadow: "0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12)" }
       : {};
+  const tabTriggerClass = "flex-1 justify-center";
+  const selectedPosition = settings.elementPositions[selectedLayoutElement];
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth aria-labelledby="id-card-designer-title"
-      slotProps={{ paper: { sx: { height: { md: "min(900px, 94dvh)" }, maxHeight: "94dvh", m: { xs: 1, sm: 3 }, width: { xs: "calc(100% - 16px)", sm: "calc(100% - 48px)" }, borderRadius: 3 } } }}>
-      <DialogTitle id="id-card-designer-title" sx={{ px: 3, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
-        <Box>
-          <Typography component="span" variant="h6" sx={{ fontWeight: 800 }}>ID card designer</Typography>
-          <Typography variant="body2" color="text.secondary">{eventTitle} · {attendee ? "Personalise and print this attendee’s card" : "Create a reusable card for your check-in desk"}</Typography>
-        </Box>
-        <IconButton aria-label="Close designer" onClick={onClose}><CloseIcon /></IconButton>
-      </DialogTitle>
-      <DialogContent dividers sx={{ p: 0, display: { md: "flex" }, minHeight: 0 }}>
-        <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, width: "100%", minHeight: 0 }}>
-          <Box sx={{ width: { md: 380 }, flexShrink: 0, borderRight: { md: "1px solid" }, borderColor: "divider", display: "flex", flexDirection: "column", minHeight: 0 }}>
-            <Tabs value={activeTab} onChange={(_, value: number) => setActiveTab(value)} variant="fullWidth" aria-label="Designer settings" sx={{ borderBottom: "1px solid", borderColor: "divider", flexShrink: 0 }}>
-              {["Design", "Content", "Layout"].map((label, index) => <Tab key={label} id={`id-card-tab-${index}`} aria-controls={`id-card-panel-${index}`} label={label} />)}
-            </Tabs>
-            <Box sx={{ overflowY: "auto", p: 2.5, maxHeight: { xs: 360, md: "none" } }}>
-            <Stack spacing={2.5} role="tabpanel" id="id-card-panel-0" aria-labelledby="id-card-tab-0" hidden={activeTab !== 0} sx={{ display: activeTab === 0 ? "flex" : "none" }}>
-              <Box><Typography variant="subtitle1" sx={{ fontWeight: 750 }}>Start with a style</Typography><Typography variant="body2" color="text.secondary">Choose a template, then make it yours. Switching styles resets the layout.</Typography></Box>
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>Template</Typography>
-              <Stack direction="column" spacing={1} aria-label="ID card template">
-                {TEMPLATE_OPTIONS.map((template) => (
-                  <Button
-                    key={template.key}
-                    variant="outlined"
-                    aria-pressed={settings.template === template.key}
-                    onClick={() => update({
-                      template: template.key,
-                      elementPositions: defaultIdCardElementPositions(template.key, settings.widthMm, settings.heightMm),
-                      elementSizes: defaultIdCardElementSizes(template.key, settings.widthMm),
-                      elementBold: defaultIdCardElementBold(),
-                      elementTextSizes: defaultIdCardElementTextSizes(template.key),
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent size="xl" hideClose aria-labelledby="id-card-designer-title" className="max-h-[94dvh] w-[calc(100vw-16px)] sm:w-[calc(100vw-48px)] md:h-[min(900px,94dvh)]">
+        <div className="flex items-center justify-between gap-4 border-b border-line px-6 py-4">
+          <div className="min-w-0">
+            <DialogTitle id="id-card-designer-title" className="text-h4 text-ink">ID card designer</DialogTitle>
+            <DialogDescription className="text-body-ui text-ink-muted">{eventTitle} · {attendee ? "Personalise and print this attendee’s card" : "Create a reusable card for your check-in desk"}</DialogDescription>
+          </div>
+          <IconButton label="Close designer" onClick={onClose}><X /></IconButton>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+          <Tabs value={String(activeTab)} onValueChange={(value) => setActiveTab(Number(value))} className="flex min-h-0 shrink-0 flex-col border-line md:w-[380px] md:border-r">
+            <TabsList aria-label="Designer settings" className="shrink-0 px-2">
+              {["Design", "Content", "Layout"].map((label, index) => <TabsTrigger key={label} value={String(index)} className={tabTriggerClass}>{label}</TabsTrigger>)}
+            </TabsList>
+            <div className="max-h-[360px] overflow-y-auto p-5 md:max-h-none md:flex-1">
+              <TabsContent value="0" className="flex flex-col gap-5 pt-0">
+                <div>
+                  <h3 className="text-label text-ink">Start with a style</h3>
+                  <p className="text-body-ui text-ink-muted">Choose a template, then make it yours. Switching styles resets the layout.</p>
+                </div>
+                <div>
+                  <p className="mb-2 text-label text-ink">Template</p>
+                  <div className="flex flex-col gap-2" aria-label="ID card template" role="group">
+                    {TEMPLATE_OPTIONS.map((template) => {
+                      const selected = settings.template === template.key;
+                      return (
+                        <button
+                          key={template.key}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => update({
+                            template: template.key,
+                            elementPositions: defaultIdCardElementPositions(template.key, settings.widthMm, settings.heightMm),
+                            elementSizes: defaultIdCardElementSizes(template.key, settings.widthMm),
+                            elementBold: defaultIdCardElementBold(),
+                            elementTextSizes: defaultIdCardElementTextSizes(template.key),
+                          })}
+                          className={cn("flex min-h-[76px] items-start gap-4 rounded-lg border bg-canvas p-3 text-left transition-colors hover:bg-subtle", selected ? "border-[1.5px] border-primary bg-subtle" : "border-line")}
+                        >
+                          <span aria-hidden className="block h-[54px] w-[42px] shrink-0 bg-white p-[5.6px] text-[#172032] shadow-sm" style={{ border: template.key === "minimal" ? "1px solid #ddd" : "2px solid", borderLeftWidth: template.key === "bold" ? 7 : 1 }}>
+                            <span className="mb-2 block h-[3px] w-[80%] bg-current" />
+                            <span className="mb-1 block h-[5px] w-[65%] bg-current" />
+                            <span className="block h-[2px] w-[90%] bg-[#aaa]" />
+                            <span className="ml-auto mt-[6.4px] block size-[10px] border-2 border-dotted" />
+                          </span>
+                          <span>
+                            <span className="block text-body-ui font-bold text-ink">{template.label}</span>
+                            <span className="block text-caption text-ink-muted">{template.description}</span>
+                          </span>
+                        </button>
+                      );
                     })}
-                    sx={{ borderColor: settings.template === template.key ? "primary.main" : "divider", bgcolor: settings.template === template.key ? "action.selected" : "transparent", flex: 1, minHeight: 76, alignItems: "flex-start", justifyContent: "flex-start", textAlign: "left", textTransform: "none" }}
-                  >
-                    <Box aria-hidden sx={{ width: 42, height: 54, mr: 2, flexShrink: 0, bgcolor: "#fff", color: "#172032", border: template.key === "minimal" ? "1px solid #ddd" : "2px solid", borderLeftWidth: template.key === "bold" ? 7 : 1, p: 0.7, boxShadow: 1 }}>
-                      <Box sx={{ width: "80%", height: 3, bgcolor: "currentColor", mb: 1 }} />
-                      <Box sx={{ width: "65%", height: 5, bgcolor: "currentColor", mb: 0.5 }} />
-                      <Box sx={{ width: "90%", height: 2, bgcolor: "#aaa" }} />
-                      <Box sx={{ width: 10, height: 10, border: "2px dotted", mt: 0.8, ml: "auto" }} />
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 800 }}>{template.label}</Typography>
-                      <Typography variant="caption" sx={{ display: "block", opacity: 0.8 }}>{template.description}</Typography>
-                    </Box>
-                  </Button>
-                ))}
-              </Stack>
-            </Box>
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>Paper size</Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>Presets refit the layout. Use custom dimensions for your own stock.</Typography>
-              <ButtonGroup size="small" aria-label="ID card paper size">
-                <Button variant={isA6Portrait ? "contained" : "outlined"} onClick={() => updatePaper(A6_PORTRAIT)}>A6 portrait</Button>
-                <Button variant={isA6Landscape ? "contained" : "outlined"} onClick={() => updatePaper(A6_LANDSCAPE)}>A6 landscape</Button>
-              </ButtonGroup>
-            </Box>
-            <Stack direction="row" spacing={1.5}>
-              <TextField label="Width (mm)" type="number" value={settings.widthMm} onChange={(event) => update({ widthMm: Number(event.target.value) })} slotProps={{ htmlInput: { min: 40, max: 300, step: 0.1 } }} fullWidth />
-              <TextField label="Height (mm)" type="number" value={settings.heightMm} onChange={(event) => update({ heightMm: Number(event.target.value) })} slotProps={{ htmlInput: { min: 40, max: 300, step: 0.1 } }} fullWidth />
-            </Stack>
-            <Typography variant="body2" color="text.secondary">All styles use high-contrast black and white for laser and thermal printing.</Typography>
-            </Stack>
-            <Stack spacing={2} role="tabpanel" id="id-card-panel-2" aria-labelledby="id-card-tab-2" hidden={activeTab !== 2} sx={{ display: activeTab === 2 ? "flex" : "none" }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-              <Box>
-                <Typography variant="subtitle2">Layout</Typography>
-                <Typography variant="body2" color="text.secondary">Select an item on the card to edit it. Drag to move, or use arrow keys for small adjustments.</Typography>
-              </Box>
-              <Button size="small" color="inherit" onClick={() => update({ elementPositions: defaultIdCardElementPositions(settings.template, settings.widthMm, settings.heightMm) })}>Reset layout</Button>
-            </Stack>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}>
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>Snap grid</Typography>
-                <ButtonGroup size="small" aria-label="ID card snap grid size">
-                  {ID_CARD_GRID_SIZES_MM.map((size) => <Button key={size} variant={settings.gridSizeMm === size ? "contained" : "outlined"} onClick={() => update({ gridSizeMm: size })}>{size} mm</Button>)}
-                </ButtonGroup>
-              </Box>
-              <FormControlLabel control={<Switch checked={settings.showGrid} onChange={(_, checked) => update({ showGrid: checked })} />} label="Show grid" />
-            </Stack>
-            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1.5 }}>
-              <Typography variant="subtitle2" gutterBottom>Selected component</Typography>
-              <Stack spacing={1}>
-                <TextField select label="Component" value={selectedLayoutElement} onChange={(event) => setSelectedLayoutElement(event.target.value as IdCardLayoutElement)} fullWidth>
-                  {Object.entries(LAYOUT_ELEMENT_LABELS).map(([element, label]) => <MenuItem key={element} value={element}>{label}</MenuItem>)}
-                </TextField>
-                {selectedElementIsText ? (
-                  <TextField label="Text size (pt)" type="number" value={settings.elementTextSizes[selectedLayoutElement]} onChange={(event) => updateElementTextSize(selectedLayoutElement, Number(event.target.value))} slotProps={{ htmlInput: { min: 6, max: 48, step: 0.5 } }} fullWidth />
-                ) : (
-                  <TextField label="Square size (mm)" type="number" value={settings.elementSizes[selectedLayoutElement]} onChange={(event) => updateElementSize(selectedLayoutElement, Number(event.target.value))} slotProps={{ htmlInput: { min: 10, max: settings.widthMm - 4, step: 1 } }} fullWidth />
-                )}
-                {selectedElementIsText ? <TextField label="Text box width (mm)" type="number" value={settings.elementSizes[selectedLayoutElement]} onChange={(event) => updateElementSize(selectedLayoutElement, Number(event.target.value))} slotProps={{ htmlInput: { min: 20, max: settings.widthMm - 4, step: 1 } }} fullWidth /> : null}
-                {selectedElementIsText ? <FormControlLabel control={<Switch checked={settings.elementBold[selectedLayoutElement]} onChange={(_, checked) => update({ elementBold: { ...settings.elementBold, [selectedLayoutElement]: checked } })} />} label="Bold text" /> : null}
-                <Stack direction="row" spacing={1}>
-                  <TextField label="X position (mm)" type="number" value={settings.elementPositions[selectedLayoutElement].xMm} onChange={(event) => updateElementPosition(selectedLayoutElement, Number(event.target.value), settings.elementPositions[selectedLayoutElement].yMm)} slotProps={{ htmlInput: { min: 0, max: settings.widthMm, step: settings.gridSizeMm } }} fullWidth />
-                  <TextField label="Y position (mm)" type="number" value={settings.elementPositions[selectedLayoutElement].yMm} onChange={(event) => updateElementPosition(selectedLayoutElement, settings.elementPositions[selectedLayoutElement].xMm, Number(event.target.value))} slotProps={{ htmlInput: { min: 0, max: settings.heightMm, step: settings.gridSizeMm } }} fullWidth />
-                </Stack>
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} aria-label="Align selected component">
-                  <Button size="small" onClick={() => alignSelectedElement("left")}>Left</Button>
-                  <Button size="small" onClick={() => alignSelectedElement("center")}>Centre</Button>
-                  <Button size="small" onClick={() => alignSelectedElement("right")}>Right</Button>
-                  <Button size="small" onClick={() => alignSelectedElement("top")}>Top</Button>
-                  <Button size="small" onClick={() => alignSelectedElement("middle")}>Middle</Button>
-                  <Button size="small" onClick={() => alignSelectedElement("bottom")}>Bottom</Button>
-                  <Button size="small" color="inherit" onClick={resetSelectedElementPosition}>Reset component</Button>
-                </Box>
-              </Stack>
-            </Box>
-            {settings.elementSizes.qr < 20 ? <Alert severity="warning">Keep the QR code at least 20 mm square for reliable scanning after printing.</Alert> : null}
-            </Stack>
-            <Stack spacing={2.5} role="tabpanel" id="id-card-panel-1" aria-labelledby="id-card-tab-1" hidden={activeTab !== 1} sx={{ display: activeTab === 1 ? "flex" : "none" }}>
-              <Box><Typography variant="subtitle1" sx={{ fontWeight: 750 }}>Make it your event</Typography><Typography variant="body2" color="text.secondary">Names and QR codes update automatically for each attendee.</Typography></Box>
-            <TextField label="Card heading" value={settings.heading} onChange={(event) => update({ heading: event.target.value })} slotProps={{ htmlInput: { maxLength: 120 } }} fullWidth />
-            <TextField label="Badge label" value={settings.badgeLabel} onChange={(event) => update({ badgeLabel: event.target.value })} slotProps={{ htmlInput: { maxLength: 40 } }} fullWidth />
-            <TextField label="Footer text" value={settings.footerText} onChange={(event) => update({ footerText: event.target.value })} slotProps={{ htmlInput: { maxLength: 80 } }} fullWidth />
-            <Divider />
-            <FormControlLabel control={<Switch disabled={!organisationLogoUrl} checked={settings.showLogo && !!organisationLogoUrl} onChange={(_, checked) => update({ showLogo: checked })} />} label={organisationLogoUrl ? "Include organisation logo" : "No organisation logo available"} />
-            <FormControlLabel control={<Switch checked={settings.showEmail} onChange={(_, checked) => update({ showEmail: checked })} />} label="Include attendee email" />
-            <Divider />
-            <Box>
-              <Typography variant="subtitle2">Card fields</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Add the attendee details you want directly from this event&apos;s registration form—for example Organisation, Company, or Role.
-              </Typography>
-              {fieldOptions.length === 0 ? (
-                <Alert severity="warning">This event has no registration-form fields to add to the card yet.</Alert>
-              ) : (
-                <Stack spacing={1}>
-                  <TextField
-                    select
-                    label="Add registration field"
-                    value=""
-                    onChange={(event) => togglePrintField(event.target.value, true)}
-                    fullWidth
-                    disabled={availableFieldOptions.length === 0}
-                    helperText={availableFieldOptions.length === 0 ? "All registration fields are already on this card." : "Choose a field to add it to the card."}
-                  >
-                    <MenuItem value="" disabled>Select a registration field</MenuItem>
-                    {availableFieldOptions.map((field) => (
-                      <MenuItem key={field.key} value={field.key}>{field.label} · {field.detail}</MenuItem>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-label text-ink">Paper size</p>
+                  <p className="mb-2 text-caption text-ink-muted">Presets refit the layout. Use custom dimensions for your own stock.</p>
+                  <div className="inline-flex rounded-full bg-muted p-1" role="group" aria-label="ID card paper size">
+                    {[{ label: "A6 portrait", active: isA6Portrait, paper: A6_PORTRAIT }, { label: "A6 landscape", active: isA6Landscape, paper: A6_LANDSCAPE }].map((option) => (
+                      <button key={option.label} type="button" aria-pressed={option.active} onClick={() => updatePaper(option.paper)} className={cn("min-h-8 rounded-full px-3 text-[13px] font-semibold transition-colors", option.active ? "bg-canvas text-ink shadow-segment" : "text-ink-muted hover:text-ink")}>
+                        {option.label}
+                      </button>
                     ))}
-                  </TextField>
-                  {selectedFieldOptions.map((field) => (
-                    <Stack key={field.key} spacing={0.5} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1 }}>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{field.label}</Typography>
-                          <Typography variant="caption" color="text.secondary">{field.detail}</Typography>
-                        </Box>
-                        <Button size="small" color="inherit" onClick={() => togglePrintField(field.key, false)}>Remove</Button>
-                      </Stack>
-                      <TextField
-                        label="Printed label"
-                        value={settings.printFieldLabels[field.key] ?? field.label}
-                        onChange={(event) => updatePrintFieldLabel(field.key, event.target.value)}
-                        slotProps={{ htmlInput: { maxLength: 60 } }}
-                        size="small"
-                        fullWidth
-                        helperText="Clear this to print the answer without a label."
-                      />
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-            </Box>
-            </Stack>
-            </Box>
-          </Box>
-          <Stack sx={{ flex: { md: 1 }, flexShrink: 0, minWidth: 0, bgcolor: "action.hover", overflowY: { md: "auto" } }}>
-            <Stack direction="row" sx={{ px: 2.5, py: 1.5, alignItems: "center", justifyContent: "space-between", gap: 1, flexWrap: "wrap", borderBottom: "1px solid", borderColor: "divider" }}>
-              <Box><Typography variant="subtitle2">{cleanPreview ? "Print preview" : "Design canvas"}</Typography><Typography variant="caption" color="text.secondary">{paperDescription} · {attendee ? "Attendee card" : "Sample attendee"}</Typography></Box>
-              <Stack direction="row" sx={{ alignItems: "center" }} spacing={0.5}>
-                <Tooltip title="Undo"><span><IconButton aria-label="Undo design change" disabled={!undoHistory.length} onClick={() => {
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Width (mm)"><Input type="number" min={40} max={300} step={0.1} value={settings.widthMm} onChange={(event) => update({ widthMm: Number(event.target.value) })} /></Field>
+                  <Field label="Height (mm)"><Input type="number" min={40} max={300} step={0.1} value={settings.heightMm} onChange={(event) => update({ heightMm: Number(event.target.value) })} /></Field>
+                </div>
+                <p className="text-body-ui text-ink-muted">All styles use high-contrast black and white for laser and thermal printing.</p>
+              </TabsContent>
+
+              <TabsContent value="2" className="flex flex-col gap-4 pt-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-label text-ink">Layout</h3>
+                    <p className="text-body-ui text-ink-muted">Select an item on the card to edit it. Drag to move, or use arrow keys for small adjustments.</p>
+                  </div>
+                  <Button size="sm" variant="quiet" onClick={() => update({ elementPositions: defaultIdCardElementPositions(settings.template, settings.widthMm, settings.heightMm) })}>Reset layout</Button>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="mb-1.5 text-label text-ink">Snap grid</p>
+                    <SegmentedControl
+                      size="sm"
+                      ariaLabel="ID card snap grid size"
+                      value={String(settings.gridSizeMm)}
+                      onValueChange={(value) => update({ gridSizeMm: Number(value) as IdCardPrintSettings["gridSizeMm"] })}
+                      options={ID_CARD_GRID_SIZES_MM.map((size) => ({ value: String(size), label: `${size} mm` }))}
+                    />
+                  </div>
+                  <SwitchField id="id-card-show-grid" label="Show grid" checked={settings.showGrid} onCheckedChange={(checked) => update({ showGrid: checked })} />
+                </div>
+                <div className="flex flex-col gap-3 rounded-lg border border-line p-3">
+                  <p className="text-label text-ink">Selected component</p>
+                  <Field label="Component">
+                    <NativeSelect value={selectedLayoutElement} onChange={(event) => setSelectedLayoutElement(event.target.value as IdCardLayoutElement)}>
+                      {Object.entries(LAYOUT_ELEMENT_LABELS).map(([element, label]) => <option key={element} value={element}>{label}</option>)}
+                    </NativeSelect>
+                  </Field>
+                  {selectedElementIsText ? (
+                    <Field label="Text size (pt)"><Input type="number" min={6} max={48} step={0.5} value={settings.elementTextSizes[selectedLayoutElement]} onChange={(event) => updateElementTextSize(selectedLayoutElement, Number(event.target.value))} /></Field>
+                  ) : (
+                    <Field label="Square size (mm)"><Input type="number" min={10} max={settings.widthMm - 4} step={1} value={settings.elementSizes[selectedLayoutElement]} onChange={(event) => updateElementSize(selectedLayoutElement, Number(event.target.value))} /></Field>
+                  )}
+                  {selectedElementIsText ? <Field label="Text box width (mm)"><Input type="number" min={20} max={settings.widthMm - 4} step={1} value={settings.elementSizes[selectedLayoutElement]} onChange={(event) => updateElementSize(selectedLayoutElement, Number(event.target.value))} /></Field> : null}
+                  {selectedElementIsText ? <SwitchField id="id-card-bold" label="Bold text" checked={settings.elementBold[selectedLayoutElement]} onCheckedChange={(checked) => update({ elementBold: { ...settings.elementBold, [selectedLayoutElement]: checked } })} /> : null}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="X position (mm)"><Input type="number" min={0} max={settings.widthMm} step={settings.gridSizeMm} value={selectedPosition.xMm} onChange={(event) => updateElementPosition(selectedLayoutElement, Number(event.target.value), selectedPosition.yMm)} /></Field>
+                    <Field label="Y position (mm)"><Input type="number" min={0} max={settings.heightMm} step={settings.gridSizeMm} value={selectedPosition.yMm} onChange={(event) => updateElementPosition(selectedLayoutElement, selectedPosition.xMm, Number(event.target.value))} /></Field>
+                  </div>
+                  <div className="flex flex-wrap gap-1" role="group" aria-label="Align selected component">
+                    {([["left", "Left"], ["center", "Centre"], ["right", "Right"], ["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]] as const).map(([alignment, label]) => (
+                      <Button key={alignment} size="sm" variant="secondary" onClick={() => alignSelectedElement(alignment)}>{label}</Button>
+                    ))}
+                    <Button size="sm" variant="quiet" onClick={resetSelectedElementPosition}>Reset component</Button>
+                  </div>
+                </div>
+                {settings.elementSizes.qr < 20 ? <Callout tone="warning">Keep the QR code at least 20 mm square for reliable scanning after printing.</Callout> : null}
+              </TabsContent>
+
+              <TabsContent value="1" className="flex flex-col gap-4 pt-0">
+                <div>
+                  <h3 className="text-label text-ink">Make it your event</h3>
+                  <p className="text-body-ui text-ink-muted">Names and QR codes update automatically for each attendee.</p>
+                </div>
+                <Field label="Card heading"><Input maxLength={120} value={settings.heading} onChange={(event) => update({ heading: event.target.value })} /></Field>
+                <Field label="Badge label"><Input maxLength={40} value={settings.badgeLabel} onChange={(event) => update({ badgeLabel: event.target.value })} /></Field>
+                <Field label="Footer text"><Input maxLength={80} value={settings.footerText} onChange={(event) => update({ footerText: event.target.value })} /></Field>
+                <div className="flex flex-col gap-3 border-y border-line py-4">
+                  <SwitchField id="id-card-logo" label={organisationLogoUrl ? "Include organisation logo" : "No organisation logo available"} disabled={!organisationLogoUrl} checked={settings.showLogo && !!organisationLogoUrl} onCheckedChange={(checked) => update({ showLogo: checked })} />
+                  <SwitchField id="id-card-email" label="Include attendee email" checked={settings.showEmail} onCheckedChange={(checked) => update({ showEmail: checked })} />
+                </div>
+                <div>
+                  <p className="text-label text-ink">Card fields</p>
+                  <p className="mb-2 text-body-ui text-ink-muted">
+                    Add the attendee details you want directly from this event&apos;s registration form—for example Organisation, Company, or Role.
+                  </p>
+                  {fieldOptions.length === 0 ? (
+                    <Callout tone="warning">This event has no registration-form fields to add to the card yet.</Callout>
+                  ) : (
+                    <div className="flex flex-col gap-2.5">
+                      <Field label="Add registration field" helperText={availableFieldOptions.length === 0 ? "All registration fields are already on this card." : "Choose a field to add it to the card."}>
+                        <NativeSelect value="" onChange={(event) => togglePrintField(event.target.value, true)} disabled={availableFieldOptions.length === 0}>
+                          <option value="" disabled>Select a registration field</option>
+                          {availableFieldOptions.map((field) => (
+                            <option key={field.key} value={field.key}>{field.label} · {field.detail}</option>
+                          ))}
+                        </NativeSelect>
+                      </Field>
+                      {selectedFieldOptions.map((field) => (
+                        <div key={field.key} className="flex flex-col gap-2 rounded-lg border border-line p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <p className="text-body-ui font-bold text-ink">{field.label}</p>
+                              <p className="text-caption text-ink-muted">{field.detail}</p>
+                            </div>
+                            <Button size="sm" variant="quiet" onClick={() => togglePrintField(field.key, false)}>Remove</Button>
+                          </div>
+                          <Field label="Printed label" helperText="Clear this to print the answer without a label.">
+                            <Input maxLength={60} value={settings.printFieldLabels[field.key] ?? field.label} onChange={(event) => updatePrintFieldLabel(field.key, event.target.value)} />
+                          </Field>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </div>
+          </Tabs>
+
+          <div className="flex min-w-0 shrink-0 flex-col bg-subtle md:flex-1 md:overflow-y-auto">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
+              <div>
+                <p className="text-label text-ink">{cleanPreview ? "Print preview" : "Design canvas"}</p>
+                <p className="text-caption text-ink-muted">{paperDescription} · {attendee ? "Attendee card" : "Sample attendee"}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Tooltip content="Undo"><span><IconButton size="sm" label="Undo design change" disabled={!undoHistory.length} onClick={() => {
                   const previous = undoHistory[undoHistory.length - 1];
                   if (!previous) return;
                   setRedoHistory((history) => [...history, settings]);
                   setUndoHistory((history) => history.slice(0, -1));
                   update(previous, false);
-                }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
-                <Tooltip title="Redo"><span><IconButton aria-label="Redo design change" disabled={!redoHistory.length} onClick={() => {
+                }}><Undo2 /></IconButton></span></Tooltip>
+                <Tooltip content="Redo"><span><IconButton size="sm" label="Redo design change" disabled={!redoHistory.length} onClick={() => {
                   const next = redoHistory[redoHistory.length - 1];
                   if (!next) return;
                   setUndoHistory((history) => [...history, settings]);
                   setRedoHistory((history) => history.slice(0, -1));
                   update(next, false);
-                }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
-                <Button size="small" variant={cleanPreview ? "contained" : "outlined"} aria-pressed={cleanPreview} onClick={() => setCleanPreview(!cleanPreview)}>{cleanPreview ? "Back to editing" : "Preview"}</Button>
-              </Stack>
-            </Stack>
-            <Box sx={{ flex: 1, minHeight: 360, overflow: "auto", display: "grid", placeItems: "center", p: { xs: 2, sm: 4 }, backgroundImage: "radial-gradient(circle, rgba(128,128,128,0.2) 1px, transparent 1px)", backgroundSize: "16px 16px" }}>
-            <Box sx={{ width: previewWidthPx, flexShrink: 0 }}>
-            <Box
-              data-id-card-preview
-              sx={{
-                width: `${previewWidthPx}px`, aspectRatio: ratio, position: "relative", border: "2px solid", borderColor: "#000", bgcolor: "#fff", color: "#000", boxShadow: 3, overflow: "hidden",
-                backgroundImage: settings.showGrid && !cleanPreview ? "linear-gradient(to right, rgb(0 0 0 / 8%) 1px, transparent 1px), linear-gradient(to bottom, rgb(0 0 0 / 8%) 1px, transparent 1px)" : "none",
-                backgroundSize: `${settings.gridSizeMm * previewPixelsPerMillimetre}px ${settings.gridSizeMm * previewPixelsPerMillimetre}px`,
-                "&::after": { display: cleanPreview ? "none" : "block", content: '""', position: "absolute", inset: `${SAFE_MARGIN_MM * previewPixelsPerMillimetre}px`, border: "1px dashed rgb(0 0 0 / 25%)", pointerEvents: "none", zIndex: 0 },
-                ...previewTemplateSx,
-              }}
-            >
-              <Box aria-hidden sx={{ display: cleanPreview ? "none" : "block", position: "absolute", left: `${settings.elementPositions[selectedLayoutElement].xMm * previewPixelsPerMillimetre}px`, top: `${Math.max(0, settings.elementPositions[selectedLayoutElement].yMm * previewPixelsPerMillimetre - 19)}px`, zIndex: 4, pointerEvents: "none", bgcolor: "#1976d2", color: "#fff", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: "0.6rem", fontWeight: 700, whiteSpace: "nowrap" }}>{LAYOUT_ELEMENT_LABELS[selectedLayoutElement]} · {settings.elementPositions[selectedLayoutElement].xMm} × {settings.elementPositions[selectedLayoutElement].yMm} mm</Box>
-              <Box {...layoutItemProps("header")} sx={{ ...previewPositionSx("header"), width: previewItemWidth("header"), pb: 0.75, borderBottom: settings.template === "classic" ? "1px solid #000" : 0, borderTop: settings.template === "classic" ? 0 : "1px solid #000", pt: settings.template === "classic" ? 0 : 0.75 }}>
-                <Typography sx={{ fontSize: "0.62rem", letterSpacing: "0.14em", fontWeight: settings.elementBold.header ? 800 : 400 }}>{settings.badgeLabel}</Typography>
-                <Typography sx={{ mt: settings.template === "minimal" ? 0.25 : 0.75, fontSize: previewTextSize("header"), fontWeight: settings.elementBold.header ? 700 : 400, lineHeight: 1.08, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>{settings.heading}</Typography>
-              </Box>
-              {logoUrl ? <Box component="img" {...layoutItemProps("logo")} src={logoUrl} alt="" sx={{ ...previewPositionSx("logo"), width: `${settings.elementSizes.logo * previewPixelsPerMillimetre}px`, height: `${settings.elementSizes.logo * previewPixelsPerMillimetre}px`, objectFit: "contain", borderRadius: 1, bgcolor: "#fff", p: 0.25 }} /> : null}
-              <Typography {...layoutItemProps("name")} sx={{ ...previewPositionSx("name"), width: previewItemWidth("name"), fontSize: previewTextSize("name"), fontWeight: settings.elementBold.name ? 800 : 400, lineHeight: 1.12, letterSpacing: "-0.015em", textTransform: settings.template === "bold" ? "uppercase" : "none", overflowWrap: "anywhere" }}>{sampleAttendee.displayName}</Typography>
-              {settings.showEmail && sampleAttendee.email ? <Typography {...layoutItemProps("email")} variant="body2" sx={{ ...previewPositionSx("email"), width: previewItemWidth("email"), fontSize: previewTextSize("email"), fontWeight: settings.elementBold.email ? 700 : 400, opacity: 0.75, overflowWrap: "anywhere" }}>{sampleAttendee.email}</Typography> : null}
-              <Box {...layoutItemProps("qr")} sx={{ ...previewPositionSx("qr"), bgcolor: "#fff", p: 0.5 }}>
-                <QRCode value={sampleAttendee.checkInQrToken} size={Math.round(settings.elementSizes.qr * previewPixelsPerMillimetre)} bgColor="#FFFFFF" fgColor="#000000" level="M" />
-              </Box>
-              {previewFields.length > 0 ? (
-                <Stack {...layoutItemProps("details")} spacing={0.4} sx={{ ...previewPositionSx("details"), width: previewItemWidth("details"), borderTop: settings.template === "minimal" ? 0 : "1px solid", borderColor: "#000", pt: settings.template === "minimal" ? 0 : 1 }}>
-                  {previewFields.map((detail) => {
-                    const label = settings.printFieldLabels[detail.key] ?? detail.label;
-                    return <Stack direction="row" key={detail.key} sx={{ justifyContent: label ? "space-between" : "flex-start", gap: 1 }}>{label ? <Typography variant="caption" sx={{ fontSize: previewTextSize("details"), fontWeight: settings.elementBold.details ? 700 : 400, opacity: 0.72 }}>{label}</Typography> : null}<Typography variant="caption" sx={{ fontSize: previewTextSize("details"), fontWeight: settings.elementBold.details ? 700 : 400, textAlign: "right" }}>{detail.value}</Typography></Stack>;
-                  })}
-                </Stack>
-              ) : null}
-              <Typography {...layoutItemProps("footer")} variant="caption" sx={{ ...previewPositionSx("footer"), width: previewItemWidth("footer"), fontSize: previewTextSize("footer"), fontWeight: settings.elementBold.footer ? 700 : 400, opacity: 0.68, overflowWrap: "anywhere" }}>{settings.footerText}</Typography>
-            </Box>
-            </Box>
-            </Box>
-            <Stack spacing={1} sx={{ px: 3, py: 2, borderTop: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}><Chip size="small" variant="outlined" label={cleanPreview ? "Guides hidden" : `${settings.gridSizeMm} mm snap`} /><Typography variant="caption" color="text.secondary">{cleanPreview ? "Grid and selection guides never print." : "Select to edit · Drag to move · Arrow keys to nudge"}</Typography></Stack>
-              <Typography variant="caption" color="text.secondary">Print at 100% / actual size. Match your printer’s paper to {paperDescription} and turn off headers and footers.</Typography>
-            </Stack>
-          </Stack>
-        </Box>
+                }}><Redo2 /></IconButton></span></Tooltip>
+                <Button size="sm" variant={cleanPreview ? "primary" : "secondary"} aria-pressed={cleanPreview} onClick={() => setCleanPreview(!cleanPreview)}>{cleanPreview ? "Back to editing" : "Preview"}</Button>
+              </div>
+            </div>
+            <div className="grid min-h-[360px] flex-1 place-items-center overflow-auto p-4 sm:p-8" style={{ backgroundImage: "radial-gradient(circle, rgba(128,128,128,0.2) 1px, transparent 1px)", backgroundSize: "16px 16px" }}>
+              <div className="shrink-0" style={{ width: previewWidthPx }}>
+                <div
+                  data-id-card-preview
+                  style={{
+                    width: `${previewWidthPx}px`, aspectRatio: ratio, position: "relative", border: "2px solid #000", background: "#fff", color: "#000",
+                    boxShadow: "0 3px 3px -2px rgba(0,0,0,.2), 0 3px 4px 0 rgba(0,0,0,.14), 0 1px 8px 0 rgba(0,0,0,.12)", overflow: "hidden",
+                    backgroundImage: settings.showGrid && !cleanPreview ? "linear-gradient(to right, rgb(0 0 0 / 8%) 1px, transparent 1px), linear-gradient(to bottom, rgb(0 0 0 / 8%) 1px, transparent 1px)" : "none",
+                    backgroundSize: `${settings.gridSizeMm * previewPixelsPerMillimetre}px ${settings.gridSizeMm * previewPixelsPerMillimetre}px`,
+                    ...previewTemplateStyle,
+                  }}
+                >
+                  {settings.template === "bold" ? <span aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 15, background: "#000" }} /> : null}
+                  {!cleanPreview ? <span aria-hidden style={{ position: "absolute", inset: `${SAFE_MARGIN_MM * previewPixelsPerMillimetre}px`, border: "1px dashed rgb(0 0 0 / 25%)", pointerEvents: "none", zIndex: 0 }} /> : null}
+                  <span aria-hidden style={{ display: cleanPreview ? "none" : "block", position: "absolute", left: `${selectedPosition.xMm * previewPixelsPerMillimetre}px`, top: `${Math.max(0, selectedPosition.yMm * previewPixelsPerMillimetre - 19)}px`, zIndex: 4, pointerEvents: "none", background: "#1976d2", color: "#fff", borderRadius: 6, padding: "0.8px 4px", fontSize: "0.6rem", fontWeight: 700, whiteSpace: "nowrap", fontFamily: "Inter, Arial, Helvetica, sans-serif" }}>{LAYOUT_ELEMENT_LABELS[selectedLayoutElement]} · {selectedPosition.xMm} × {selectedPosition.yMm} mm</span>
+                  <div {...layoutItemProps("header")} className={previewOutlineClass("header")} style={{ ...previewPositionStyle("header"), width: previewItemWidth("header"), paddingBottom: 6, borderBottom: settings.template === "classic" ? "1px solid #000" : 0, borderTop: settings.template === "classic" ? 0 : "1px solid #000", paddingTop: settings.template === "classic" ? 0 : 6 }}>
+                    <p style={{ margin: 0, fontSize: "0.62rem", letterSpacing: "0.14em", fontWeight: settings.elementBold.header ? 800 : 400 }}>{settings.badgeLabel}</p>
+                    <p style={{ margin: 0, marginTop: settings.template === "minimal" ? 2 : 6, fontSize: previewTextSize("header"), fontWeight: settings.elementBold.header ? 700 : 400, lineHeight: 1.08, letterSpacing: "-0.025em", overflowWrap: "anywhere" }}>{settings.heading}</p>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {logoUrl ? <img {...layoutItemProps("logo")} src={logoUrl} alt="" className={previewOutlineClass("logo")} style={{ ...previewPositionStyle("logo"), width: `${settings.elementSizes.logo * previewPixelsPerMillimetre}px`, height: `${settings.elementSizes.logo * previewPixelsPerMillimetre}px`, objectFit: "contain", borderRadius: 12, background: "#fff", padding: 2 }} /> : null}
+                  <p {...layoutItemProps("name")} className={previewOutlineClass("name")} style={{ ...previewPositionStyle("name"), margin: 0, width: previewItemWidth("name"), fontSize: previewTextSize("name"), fontWeight: settings.elementBold.name ? 800 : 400, lineHeight: 1.12, letterSpacing: "-0.015em", textTransform: settings.template === "bold" ? "uppercase" : "none", overflowWrap: "anywhere" }}>{sampleAttendee.displayName}</p>
+                  {settings.showEmail && sampleAttendee.email ? <p {...layoutItemProps("email")} className={previewOutlineClass("email")} style={{ ...previewPositionStyle("email"), margin: 0, width: previewItemWidth("email"), fontSize: previewTextSize("email"), fontWeight: settings.elementBold.email ? 700 : 400, opacity: 0.75, overflowWrap: "anywhere" }}>{sampleAttendee.email}</p> : null}
+                  <div {...layoutItemProps("qr")} className={previewOutlineClass("qr")} style={{ ...previewPositionStyle("qr"), background: "#fff", padding: 4 }}>
+                    <QRCode value={sampleAttendee.checkInQrToken} size={Math.round(settings.elementSizes.qr * previewPixelsPerMillimetre)} bgColor="#FFFFFF" fgColor="#000000" level="M" />
+                  </div>
+                  {previewFields.length > 0 ? (
+                    <div {...layoutItemProps("details")} className={previewOutlineClass("details")} style={{ ...previewPositionStyle("details"), display: "flex", flexDirection: "column", gap: 3.2, width: previewItemWidth("details"), borderTop: settings.template === "minimal" ? 0 : "1px solid #000", paddingTop: settings.template === "minimal" ? 0 : 8 }}>
+                      {previewFields.map((detail) => {
+                        const label = settings.printFieldLabels[detail.key] ?? detail.label;
+                        return (
+                          <div key={detail.key} style={{ display: "flex", justifyContent: label ? "space-between" : "flex-start", gap: 8 }}>
+                            {label ? <span style={{ fontSize: previewTextSize("details"), fontWeight: settings.elementBold.details ? 700 : 400, opacity: 0.72 }}>{label}</span> : null}
+                            <span style={{ fontSize: previewTextSize("details"), fontWeight: settings.elementBold.details ? 700 : 400, textAlign: "right" }}>{detail.value}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  <p {...layoutItemProps("footer")} className={previewOutlineClass("footer")} style={{ ...previewPositionStyle("footer"), margin: 0, width: previewItemWidth("footer"), fontSize: previewTextSize("footer"), fontWeight: settings.elementBold.footer ? 700 : 400, opacity: 0.68, overflowWrap: "anywhere" }}>{settings.footerText}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5 border-t border-line bg-canvas px-6 py-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip size="sm" tone="outline">{cleanPreview ? "Guides hidden" : `${settings.gridSizeMm} mm snap`}</Chip>
+                <p className="text-caption text-ink-muted">{cleanPreview ? "Grid and selection guides never print." : "Select to edit · Drag to move · Arrow keys to nudge"}</p>
+              </div>
+              <p className="text-caption text-ink-muted">Print at 100% / actual size. Match your printer’s paper to {paperDescription} and turn off headers and footers.</p>
+            </div>
+          </div>
+        </div>
+        {printError ? (
+          <div className="px-4 pt-2">
+            <Callout tone="danger" role="alert" action={<Button size="sm" variant="quiet" onClick={() => setPrintError(null)}>Dismiss</Button>}>{printError}</Callout>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2 border-t border-line px-6 py-4">
+          <p className="basis-full text-caption text-ink-muted sm:mr-auto sm:basis-auto">Changes are kept in this browser for this event.{!attendee ? " Print a card after checking in an attendee." : ""}</p>
+          <Button variant="secondary" onClick={onClose}>Done</Button>
+          <Button variant="primary" startIcon={<Printer />} disabled={!attendee || printing} onClick={async () => {
+            if (!attendee) return;
+            setPrinting(true);
+            setPrintError(null);
+            try {
+              const printed = await printCard({ settings, attendee, organisationLogoUrl });
+              if (!printed) setPrintError("Could not open the print window. Allow pop-ups for this station and try again.");
+            } catch {
+              setPrintError("Could not prepare the card. Please try again.");
+            } finally {
+              setPrinting(false);
+            }
+          }}>{printing ? "Preparing…" : "Print ID card"}</Button>
+        </div>
       </DialogContent>
-      {printError ? <Alert severity="error" onClose={() => setPrintError(null)} sx={{ mx: 2, mt: 1 }}>{printError}</Alert> : null}
-      <DialogActions sx={{ px: 3, py: 2, gap: 1, flexWrap: "wrap" }}>
-        <Typography variant="caption" color="text.secondary" sx={{ mr: "auto", flexBasis: { xs: "100%", sm: "auto" } }}>Changes are kept in this browser for this event.{!attendee ? " Print a card after checking in an attendee." : ""}</Typography>
-        <Button onClick={onClose} color="inherit">Done</Button>
-        <Button variant="contained" startIcon={<PrintOutlinedIcon />} disabled={!attendee || printing} onClick={async () => {
-          if (!attendee) return;
-          setPrinting(true);
-          setPrintError(null);
-          try {
-            const printed = await printCard({ settings, attendee, organisationLogoUrl });
-            if (!printed) setPrintError("Could not open the print window. Allow pop-ups for this station and try again.");
-          } catch {
-            setPrintError("Could not prepare the card. Please try again.");
-          } finally {
-            setPrinting(false);
-          }
-        }}>{printing ? "Preparing…" : "Print ID card"}</Button>
-      </DialogActions>
     </Dialog>
   );
 }

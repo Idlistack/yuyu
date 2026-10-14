@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { EventPermission } from "@prisma/client";
 import Link from "next/link";
-import Typography from "@mui/material/Typography";
-import Stack from "@mui/material/Stack";
-import Button from "@mui/material/Button";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import { ArrowLeft, ArrowUpRight, QrCode } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Chip, DateBlock } from "@/components/ui/display";
+import { formatDateBlock, formatRelativeDay, formatTime } from "@/lib/format/datetime";
+import { normalizeAccentHex } from "@/lib/theme/accent";
 import { prisma } from "@/lib/db";
 import { getRequestOrigin } from "@/lib/publicUrl";
 import { isOrgAdmin, requireOrgDashboardAccess } from "@/lib/permissions";
@@ -208,51 +209,49 @@ export default async function EventManagePage({ params }: Props) {
     return { id: response.id, submittedAt: response.submittedAt.toISOString(), answers: Object.values(grouped).map((answer) => ({ label: answer.label, value: answer.values.join(", ") })) };
   });
 
+  const dateBlock = formatDateBlock(event.startDateTime, event.timezone);
+  const privacy = { PUBLIC: "Public", HIDDEN_LINK: "Hidden link", APPROVAL_REQUIRED: "Approval required", INVITE_ONLY: "Invite only" }[event.privacyType] ?? event.privacyType;
+  const statusChip = event.status === "PUBLISHED" ? { label: "Published", tone: "success" as const } : event.status === "DRAFT" ? { label: "Draft", tone: "neutral" as const } : { label: event.status === "CANCELLED" ? "Cancelled" : event.status, tone: "danger" as const };
+
   return (
-    <Stack spacing={3}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        sx={{
-          alignItems: { xs: "stretch", sm: "flex-start" },
-          justifyContent: "space-between",
-        }}
-      >
-        <Typography variant="h5" component="h1" sx={{ fontWeight: 600 }}>
-          {event.title}
-        </Typography>
-        <Stack
-          direction="row"
-          spacing={1}
-          useFlexGap
-          sx={{ flexWrap: "wrap", alignItems: "center" }}
-        >
-          {canCheckIn ? <Link
-            href={`/dashboard/${organisation.slug}/event/${event.id}/check-in`}
-            style={{ textDecoration: "none" }}
-          >
-            <Button variant="contained" size="small" sx={{ flexShrink: 0 }}>
-              Check-in
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
+        <Link href={`/dashboard/${organisation.slug}`} className="inline-flex min-h-9 items-center gap-1.5 self-start text-sm font-semibold text-ink-secondary hover:text-ink">
+          <ArrowLeft aria-hidden className="size-4" />
+          All events
+        </Link>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <DateBlock month={dateBlock.month} day={dateBlock.day} tone={event.status === "DRAFT" ? "draft" : "accent"} color={event.status === "DRAFT" ? undefined : normalizeAccentHex(event.page?.accentColor)} />
+            <div className="min-w-0">
+              <h1 className="break-words text-h1 text-ink">{event.title}</h1>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-body-ui text-ink-muted">
+                <Chip size="sm" tone={statusChip.tone}>{statusChip.label}</Chip>
+                <span>{privacy} · {formatRelativeDay(event.startDateTime, event.timezone)}, {formatTime(event.startDateTime, event.timezone)}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {access.membership && isOrgAdmin(access.membership.role) && event.endDateTime < new Date() ? (
+              <EventReportDownloadButton href={`/api/reports/event/${event.id}`} />
+            ) : null}
+            <Button asChild variant="secondary">
+              <Link href={`/${organisation.slug}/${event.slug}`}>
+                View page
+                <ArrowUpRight aria-hidden className="size-4" />
+              </Link>
             </Button>
-          </Link> : null}
-          {access.membership && isOrgAdmin(access.membership.role) && event.endDateTime < new Date() ? (
-            <EventReportDownloadButton href={`/api/reports/event/${event.id}`} />
-          ) : null}
-          <Link
-            href={`/${organisation.slug}/${event.slug}`}
-            style={{ textDecoration: "none" }}
-          >
-            <Button
-              variant="outlined"
-              size="small"
-              endIcon={<OpenInNewIcon />}
-              sx={{ flexShrink: 0, alignSelf: { sm: "center" } }}
-            >
-              Event page
-            </Button>
-          </Link>
-        </Stack>
-      </Stack>
+            {canCheckIn ? (
+              <Button asChild variant="primary">
+                <Link href={`/dashboard/${organisation.slug}/event/${event.id}/check-in`}>
+                  <QrCode aria-hidden className="size-[18px]" />
+                  Open check-in
+                </Link>
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
 
       <EventManageTabs
         organisationSlug={organisation.slug}
@@ -297,6 +296,6 @@ website={{ page: event.page, highlights: event.highlights.map((x) => ({ id: x.id
           checkedIn,
         }}
       />
-    </Stack>
+    </div>
   );
 }
