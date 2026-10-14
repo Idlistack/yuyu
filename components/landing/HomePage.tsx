@@ -117,15 +117,15 @@ export function HomePage({ getStartedHref }: { getStartedHref: string }) {
                   <span className="rounded-full bg-accent-soft px-[11px] py-1 text-[13px] font-bold leading-[1.4] text-accent-text">Free</span>
                   <span className="rounded-full bg-muted px-[11px] py-1 text-[13px] font-bold leading-[1.4] text-ink-secondary">In person</span>
                 </div>
-                <p className="font-display text-[28px] font-extrabold leading-tight tracking-[-0.02em] text-accent-text sm:text-[32px]">Demo Summit 2026</p>
+                <p className="font-display text-[28px] font-extrabold leading-tight tracking-[-0.02em] text-accent-text sm:text-[32px]">Maker Conference 2026</p>
                 <div className="flex items-center gap-3.5">
                   <span className="flex h-[60px] w-14 shrink-0 flex-col items-center overflow-hidden rounded-md border border-line bg-canvas">
-                    <span className="w-full bg-accent py-[3px] text-center text-[11px] font-bold uppercase leading-[1.3] tracking-[0.08em] text-on-accent">Oct</span>
-                    <span className="font-display text-[22px] font-extrabold leading-[1.35] text-ink">14</span>
+                    <span className="w-full bg-accent py-[3px] text-center text-[11px] font-bold uppercase leading-[1.3] tracking-[0.08em] text-on-accent">Jun</span>
+                    <span className="font-display text-[22px] font-extrabold leading-[1.35] text-ink">6</span>
                   </span>
                   <span className="flex min-w-0 flex-col">
-                    <span className="text-label text-ink">Wednesday, 14 October · 9:30 AM</span>
-                    <span className="text-body-ui text-ink-muted">Bangalore International Centre</span>
+                    <span className="text-label text-ink">Saturday, 6 June · 9:30 AM</span>
+                    <span className="text-body-ui text-ink-muted">Kochi, Kerala</span>
                   </span>
                 </div>
                 <div className="flex flex-col gap-2">
