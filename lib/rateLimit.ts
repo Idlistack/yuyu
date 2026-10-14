@@ -19,7 +19,9 @@ export type Bucket =
   | "search"
   | "apiRead"
   | "apiWrite"
-  | "dataExport";
+  | "dataExport"
+  | "ticketStatus"
+  | "ticketEvents";
 
 const limits: Record<Bucket, { max: number; windowMs: number }> = {
   global: { max: 300, windowMs: 60_000 },
@@ -40,6 +42,10 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   apiRead: { max: 600, windowMs: 60_000 },
   apiWrite: { max: 60, windowMs: 60_000 },
   dataExport: { max: 5, windowMs: 60 * 60_000 },
+  // Public ticket check-in state. Attendees at one venue often share a NAT
+  // address, so these stay generous while still bounding polling/reconnects.
+  ticketStatus: { max: 120, windowMs: 60_000 },
+  ticketEvents: { max: 60, windowMs: 60_000 },
 };
 
 // Local fallback store

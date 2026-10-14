@@ -9,7 +9,7 @@
 - PostgreSQL and Prisma ORM
 - Auth.js with Prisma persistence
 - Tailwind CSS, Radix UI primitives and lucide icons (`components/ui/*`)
-- Redis for distributed rate limiting
+- Redis for distributed rate limiting and realtime ticket check-in pub/sub
 - S3-compatible private object storage
 - Nodemailer-backed transactional email
 - Vitest and Playwright
@@ -72,6 +72,10 @@ Refer to `prisma/schema.prisma` for the authoritative fields, constraints, index
 ## Background and scheduled work
 
 Request handlers enqueue transactional messages in `OutboxMessage`; they do not wait for SMTP delivery. Every self-hosted Node.js instance starts a singleton one-minute worker that claims and sends a batch, retries failures, purges expired operational records, and updates a one-row `OperationalHeartbeat`. Queue row claims keep concurrent replicas safe. The protected `POST /api/internal/outbox` endpoint remains available as an external scheduler or recovery trigger.
+
+## Realtime ticket check-in
+
+When an RSVP transitions to checked in, `commitCheckInProjection` (`lib/checkInMutations.ts`, the single write path for online scans, manual check-in, offline-sync replay, and venue stations) publishes a `checkedInAt` message after its transaction commits through `lib/ticketCheckInEvents.ts`. Channels are keyed by RSVP id, never by the ticket token. With `REDIS_URL` set, messages fan out to every replica over Redis pub/sub (one lazily created subscriber connection per process, reference-counted per channel); without Redis an in-process EventEmitter is used, which only reaches viewers on the same instance. Publishing is fire-and-forget and never fails a check-in. The ticket page listens via `GET /api/ticket/:token/events` (SSE) and can fall back to `GET /api/ticket/:token/status`; both return only the check-in state. Delivery is best effort: a dropped message is recovered on the client's next reconnect or status read. Reverse proxies must not buffer `text/event-stream` responses (the route sends `X-Accel-Buffering: no`) and should allow idle reads of at least 30 seconds.
 
 ## Instance service configuration
 

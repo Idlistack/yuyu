@@ -8,6 +8,7 @@ import { TicketQrPanel } from "@/components/ticket/TicketQrPanel";
 import { CancelRsvpButton } from "@/components/ticket/CancelRsvpButton";
 import { TicketDownloadButton } from "@/components/ticket/TicketDownloadButton";
 import { TicketStatusStorageSync } from "@/components/ticket/TicketStatusStorageSync";
+import { HideAfterLiveCheckIn, LiveCheckedInChip, LiveTicketCard, LiveTicketProvider } from "@/components/ticket/LiveTicket";
 import { safeTimeZone } from "@/lib/timeZone";
 import { googleCalendarEventUrl, type CalendarEvent } from "@/lib/calendarInvite";
 import { accentStyle, INK_ACCENT } from "@/lib/theme/accent";
@@ -164,8 +165,42 @@ export default async function TicketPage({ params }: Props) {
   const name = displayName(rsvp);
   const eventPageHref = eventSlug ? `/${orgSlug}/${eventSlug}` : `/${orgSlug}`;
 
-  return (
+  const ticketMain = (
     <>
+      <header className="bg-accent px-6 py-5 text-on-accent">
+        <p className="text-sm font-semibold opacity-90">{orgName}</p>
+        <h1 className="mt-1 break-words font-display text-[26px] font-extrabold leading-tight tracking-[-0.02em] text-on-accent">{title}</h1>
+      </header>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-6 py-5">
+        <div>
+          <dt className="text-overline text-ink-muted">Date</dt>
+          <dd className="text-[15px] font-bold text-ink">{formatDayShort(start, timeZone)}</dd>
+        </div>
+        <div>
+          <dt className="text-overline text-ink-muted">Time</dt>
+          <dd className="text-[15px] font-bold text-ink">{formatTime(start, timeZone)} {formatTimeZoneName(start, timeZone)}</dd>
+        </div>
+        {location ? (
+          <div className="col-span-2">
+            <dt className="text-overline text-ink-muted">Venue</dt>
+            <dd className="break-words text-[15px] font-bold text-ink">{location}</dd>
+          </div>
+        ) : null}
+        <div className="col-span-2">
+          <dt className="text-overline text-ink-muted">Guest</dt>
+          <dd className="break-words text-[15px] font-bold text-ink">{name}</dd>
+        </div>
+      </dl>
+    </>
+  );
+
+  return (
+    <LiveTicketProvider
+      token={rsvp.checkInToken}
+      initialCheckedIn={isCheckedIn}
+      initialCheckedInAt={rsvp.checkedInAt?.toISOString() ?? null}
+      enabled={confirmed && !isCheckedIn}
+    >
       <TicketStatusStorageSync checkInToken={rsvp.checkInToken} status={rsvp.status} />
       <div style={accentStyle(accent)} className="yy-accent-scope mx-auto flex w-full max-w-[400px] flex-col gap-4 py-2 sm:py-6">
         <div className="flex items-center justify-between gap-3">
@@ -174,7 +209,7 @@ export default async function TicketPage({ params }: Props) {
             Event page
           </Link>
           <div className="flex flex-wrap justify-end gap-1.5">
-            {isCheckedIn ? <Chip tone="success" icon={<Check />}>Checked in</Chip> : null}
+            {isCheckedIn ? <Chip tone="success" icon={<Check />}>Checked in</Chip> : <LiveCheckedInChip />}
             <Chip tone={status.tone} icon={confirmed ? <Check /> : undefined}>{status.label}</Chip>
           </div>
         </div>
@@ -187,47 +222,19 @@ export default async function TicketPage({ params }: Props) {
           <DotFace mood="waiting" size={64} />
         ) : null}
 
-        <article className="overflow-hidden rounded-xl border border-line bg-canvas shadow-raised">
-          <header className="bg-accent px-6 py-5 text-on-accent">
-            <p className="text-sm font-semibold opacity-90">{orgName}</p>
-            <h1 className="mt-1 break-words font-display text-[26px] font-extrabold leading-tight tracking-[-0.02em] text-on-accent">{title}</h1>
-          </header>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-6 py-5">
-            <div>
-              <dt className="text-overline text-ink-muted">Date</dt>
-              <dd className="text-[15px] font-bold text-ink">{formatDayShort(start, timeZone)}</dd>
-            </div>
-            <div>
-              <dt className="text-overline text-ink-muted">Time</dt>
-              <dd className="text-[15px] font-bold text-ink">{formatTime(start, timeZone)} {formatTimeZoneName(start, timeZone)}</dd>
-            </div>
-            {location ? (
-              <div className="col-span-2">
-                <dt className="text-overline text-ink-muted">Venue</dt>
-                <dd className="break-words text-[15px] font-bold text-ink">{location}</dd>
-              </div>
-            ) : null}
-            <div className="col-span-2">
-              <dt className="text-overline text-ink-muted">Guest</dt>
-              <dd className="break-words text-[15px] font-bold text-ink">{name}</dd>
-            </div>
-          </dl>
-          {confirmed ? (
-            <>
-              <div aria-hidden className="relative mx-6 border-t-2 border-dashed border-line">
-                <span className="absolute -left-8 -top-2.5 size-5 rounded-full border border-line bg-subtle" />
-                <span className="absolute -right-8 -top-2.5 size-5 rounded-full border border-line bg-subtle" />
-              </div>
-              <TicketQrPanel token={rsvp.checkInToken} />
-            </>
-          ) : (
+        {confirmed ? (
+          // Once checked in, the QR is never rendered again: the card shows its torn, checked-in state.
+          <LiveTicketCard main={ticketMain} stub={isCheckedIn ? null : <TicketQrPanel token={rsvp.checkInToken} />} timeZone={timeZone} />
+        ) : (
+          <article className="overflow-hidden rounded-xl border border-line bg-canvas shadow-raised">
+            {ticketMain}
             <div className="px-6 pb-6">
               <Callout tone={rsvp.status === "REJECTED" ? "danger" : "info"}>
                 A scannable ticket will be available after this registration is confirmed.
               </Callout>
             </div>
-          )}
-        </article>
+          </article>
+        )}
 
         {confirmed ? (
           <div className="grid grid-cols-2 gap-3">
@@ -242,9 +249,11 @@ export default async function TicketPage({ params }: Props) {
         ) : null}
 
         {!isCheckedIn && rsvp.status !== "REJECTED" ? (
-          <CancelRsvpButton checkInToken={rsvp.checkInToken} eventPageHref={eventPageHref} />
+          <HideAfterLiveCheckIn>
+            <CancelRsvpButton checkInToken={rsvp.checkInToken} eventPageHref={eventPageHref} />
+          </HideAfterLiveCheckIn>
         ) : null}
       </div>
-    </>
+    </LiveTicketProvider>
   );
 }

@@ -444,3 +444,19 @@
   }
 }
 .yy-ticket-shadow { filter: drop-shadow(0 10px 22px rgb(0 0 0 / 0.1)); }
+
+/* ---- Live ticket tear-away (components/ticket/LiveTicket.tsx) ----
+   The ticket page stacks its QR stub below the main part, so these rip along
+   a horizontal perforation at every width (the 404 rules above are vertical
+   and desktop-only). Same SVG-mask teeth; pair with .yy-ticket-shadow. */
+.yy-ripped-bottom {
+  mask:
+    linear-gradient(#000 0 0) top / 100% calc(100% - 7px) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M0 0L5 7L10 0Z'/%3E%3C/svg%3E") bottom / 10px 7px repeat-x;
+}
+.yy-ripped-top {
+  mask:
+    linear-gradient(#000 0 0) bottom / 100% calc(100% - 7px) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M0 7L5 0L10 7Z'/%3E%3C/svg%3E") top / 10px 7px repeat-x;
+}
+/* ---- End live ticket tear-away ---- */

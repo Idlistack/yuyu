@@ -58,6 +58,8 @@ Every super-admin page additionally requires a current TOTP verification. Users 
 | `POST /api/check-in/station` | PIN-scoped station session, rate-limited | Open and operate a venue check-in station |
 | `GET /api/search?q=...` | Public, rate-limited | Return matching public events |
 | `GET /api/ticket/:token/download` | Opaque token | Download the attendee ticket |
+| `GET /api/ticket/:token/status` | Opaque token, rate-limited per IP | Return only `{ checkedIn, checkedInAt }` for the ticket (`no-store`, `no-referrer`; empty 404 for unknown tokens) |
+| `GET /api/ticket/:token/events` | Opaque token, rate-limited per IP | Server-Sent Events: initial `state`, then one `checked-in` event when the attendee is admitted; `: ping` every 25 s, closes after at most 10 minutes |
 | `GET /api/feedback/certificate/:token` | Opaque token | Download an eligible JPEG certificate |
 | `GET /api/exports/events/:eventId/attendees` | Authenticated organisation admin or event collaborator with `MANAGE_REGISTRATIONS` | Audited full attendee CSV download |
 | `GET /api/exports/account` | Authenticated user (own data only), rate limited per user | Audited (`ACCOUNT_DATA_EXPORTED`) personal JSON export; excludes secrets, hashes, and all bearer tokens |
