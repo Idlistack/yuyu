@@ -14,14 +14,15 @@ import { ColorModeToggle } from "./ColorModeToggle";
 const primaryLinks = [
   { href: "/discover", label: "Discover", guestOnly: false },
   { href: "/features", label: "Features", guestOnly: true },
+  { href: "/#self-host", label: "Self-host", guestOnly: false },
   { href: "/about", label: "About", guestOnly: false },
 ];
 
-export function YuyuWordmark({ href = "/", size = 30 }: { href?: string; size?: number }) {
+export function YuyuWordmark({ href = "/", size = 36 }: { href?: string; size?: number }) {
   return (
     <Link href={href} aria-label="Yuyu home" className="inline-flex items-center gap-2.5 rounded-md">
       <YuyuMark size={size} />
-      <span aria-hidden className="font-display text-[22px] font-extrabold tracking-[-0.02em] text-ink">Yuyu</span>
+      <span aria-hidden className="font-display text-[26px] font-extrabold leading-none tracking-[-0.03em] text-ink">yuyu</span>
     </Link>
   );
 }
@@ -37,16 +38,16 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/90 backdrop-blur-md">
-      <nav aria-label="Main navigation" className="mx-auto flex h-16 max-w-[1160px] items-center gap-2 px-4 sm:gap-6 sm:px-6">
+      <nav aria-label="Main navigation" className="mx-auto flex h-[76px] max-w-[1160px] items-center gap-2 px-4 sm:gap-8 sm:px-6 xl:px-0">
         <YuyuWordmark />
-        <ul className="hidden items-center gap-1 md:flex">
+        <ul className="hidden items-center gap-1 lg:flex">
           {links.map((link) => (
             <li key={link.href}>
               <Link
                 href={link.href}
                 aria-current={isActive(link.href) ? "page" : undefined}
                 className={cn(
-                  "inline-flex min-h-10 items-center rounded-full px-3.5 text-[15px] font-medium text-ink-secondary transition-colors hover:text-ink",
+                  "inline-flex min-h-9 items-center rounded-full px-3.5 text-label text-ink-secondary transition-colors hover:text-ink",
                   isActive(link.href) && "bg-muted font-semibold text-ink",
                 )}
               >
@@ -57,23 +58,23 @@ export function SiteHeader() {
         </ul>
         <div className="ml-auto flex items-center gap-2">
           <ColorModeToggle />
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-2.5 md:flex">
             {signedIn ? (
               <>
                 <Button asChild variant="quiet" size="sm">
                   <Link href="/account" aria-current={isActive("/account") ? "page" : undefined}>Account</Link>
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => void signOut({ callbackUrl: "/" })}>Sign out</Button>
-                <Button asChild variant="primary" size="sm">
+                <Button asChild variant="primary" size="md">
                   <Link href="/dashboard">Dashboard</Link>
                 </Button>
               </>
             ) : (
               <>
-                <Button asChild variant="secondary" size="sm">
+                <Button asChild variant="secondary" size="md">
                   <Link href="/login">Sign in</Link>
                 </Button>
-                <Button asChild variant="primary" size="sm">
+                <Button asChild variant="primary" size="md">
                   <Link href="/login">Start organising</Link>
                 </Button>
               </>
@@ -81,13 +82,13 @@ export function SiteHeader() {
           </div>
           <DialogPrimitive.Root open={menuOpen} onOpenChange={setMenuOpen}>
             <DialogPrimitive.Trigger asChild>
-              <IconButton label="Open navigation menu" className="md:hidden">
+              <IconButton label="Open navigation menu" className="lg:hidden">
                 <MenuIcon />
               </IconButton>
             </DialogPrimitive.Trigger>
             <DialogPrimitive.Portal>
-              <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[rgba(17,17,19,0.48)] md:hidden" />
-              <DialogPrimitive.Content className="fixed inset-x-0 top-0 z-50 rounded-b-2xl border-b border-line bg-canvas p-4 shadow-float focus:outline-none md:hidden">
+              <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[rgba(17,17,19,0.48)] lg:hidden" />
+              <DialogPrimitive.Content className="fixed inset-x-0 top-0 z-50 rounded-b-2xl border-b border-line bg-canvas p-4 shadow-float focus:outline-none lg:hidden">
                 <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
                 <DialogPrimitive.Description className="sr-only">Site navigation links</DialogPrimitive.Description>
                 <div className="mb-3 flex items-center justify-between">

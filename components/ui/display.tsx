@@ -1,7 +1,8 @@
-import { useId, type HTMLAttributes, type ReactNode } from "react";
+import { type HTMLAttributes, type ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Info, Repeat, XCircle } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { ThemedImage } from "./themed-image";
 
 /* ---------- Chips (docs/DESIGN.md §4.5) ---------- */
 
@@ -170,21 +171,12 @@ export function OrgLogo({ name, src, size = "md", className }: { name: string; s
 }
 
 /** Yuyu brand tile: mint → lavender gradient with an ink "Y". The only place the brand gradient appears. */
+/** The Yuyu dot sign: a Y on a 5×5 dot grid (marigold dots, one ink "host" dot), themed for dark mode. */
 export function YuyuMark({ size = 32, className }: { size?: number; className?: string }) {
-  // A per-instance id: a shared id would resolve to the first copy in the
-  // document, which may sit inside a hidden container and render nothing.
-  const gradientId = `yuyu-mark-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
   return (
-    <svg width={size} height={size} viewBox="0 0 512 512" role="img" aria-label="Yuyu" className={cn("shrink-0", className)}>
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7EE8C4" />
-          <stop offset="100%" stopColor="#B9AEFF" />
-        </linearGradient>
-      </defs>
-      <rect width="512" height="512" rx="112" fill={`url(#${gradientId})`} />
-      <path fill="#18181B" d="M132 132h84l40 73 40-73h84l-82 148v100h-84V280z" />
-    </svg>
+    <span role="img" aria-label="Yuyu" className={cn("inline-flex shrink-0", className)} style={{ width: size, height: size }}>
+      <ThemedImage src="/landing/logo-mark.svg" darkSrc="/landing/logo-mark-dark.svg" width={size} height={size} />
+    </span>
   );
 }
 

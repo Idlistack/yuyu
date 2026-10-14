@@ -45,14 +45,14 @@ describe("frontend production boundaries", () => {
     const chrome = source("components/chrome/ChromeSwitch.tsx");
     const appShell = source("components/chrome/AppShell.tsx");
     const organiserChrome = source("components/chrome/OrganiserChrome.tsx");
-    const buildingNote = source("components/landing/BuildingNote.tsx");
+    const notFoundPet = source("components/feedback/NotFoundPet.tsx");
     const styles = source("app/globals.css");
     const manifest = source("app/manifest.ts");
     expect(chrome).toContain('href="#main-content"');
     expect(chrome).toContain('id="main-content"');
     expect(appShell).toContain('id="main-content"');
     expect(organiserChrome).toContain('id="main-content"');
-    expect(buildingNote).toContain("useReducedMotion");
+    expect(notFoundPet).toContain("prefers-reduced-motion: reduce");
     expect(styles).toContain("prefers-reduced-motion: reduce");
     expect(manifest).toContain('display: "standalone"');
     expect(manifest).toContain('start_url: "/dashboard"');

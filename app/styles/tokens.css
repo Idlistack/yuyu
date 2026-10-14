@@ -69,7 +69,9 @@
   --yy-focus: var(--yy-primary);
 }
 
-:root[data-color-mode="dark"] {
+/* `.yy-dark-band` keeps a section dark on light pages (landing "At the door", closing CTA). */
+:root[data-color-mode="dark"],
+.yy-dark-band {
   color-scheme: dark;
 
   --yy-bg-canvas: #111113;

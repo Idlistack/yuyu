@@ -369,3 +369,15 @@
 @keyframes yy-pet-zzz { 0% { opacity: 0; transform: translate(0, 0) scale(0.7); } 25% { opacity: 0.8; } 100% { opacity: 0; transform: translate(14px, -26px) scale(1.2); } }
 @keyframes yy-pet-heart { 0% { opacity: 0; transform: translateY(0) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px) scale(1.15); } }
 @keyframes yy-pet-paw { 0% { opacity: 0.35; } 100% { opacity: 0; } }
+
+/* Light/dark asset pairs (components/landing/ThemedImage.tsx): dot icons and the
+   logo have ink dots that must follow the theme. */
+.yy-img-dark { display: none; }
+:root[data-color-mode="dark"] .yy-img-light,
+.yy-dark-band .yy-img-light { display: none; }
+:root[data-color-mode="dark"] .yy-img-dark,
+.yy-dark-band .yy-img-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-mode]) .yy-img-light { display: none; }
+  :root:not([data-color-mode]) .yy-img-dark { display: block; }
+}
