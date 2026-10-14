@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useAnimate, useReducedMotion, type Variants } from "framer-motion";
 import { X } from "lucide-react";
@@ -54,7 +54,7 @@ const FLAP_CLIP = "polygon(0 0, 100% 0, 50% 100%)";
 const FLAP_BACK_CLIP = "polygon(0 100%, 100% 100%, 50% 0)";
 
 const LAYOUT_ID = "building-note-envelope";
-type Phase = "closed" | "opening" | "reading";
+type Phase = "closed" | "opening" | "reading" | "closing";
 
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
@@ -69,6 +69,28 @@ export function BuildingNote({ className }: { className?: string }) {
   const reduceMotion = useReducedMotion();
   const closeButton = useRef<HTMLButtonElement>(null);
   const reading = open && (Boolean(reduceMotion) || phase === "reading");
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [target, setTarget] = useState<DOMRect | null>(null);
+  // The envelope "lands" back on the page after the letter is folded away.
+  const [returned, setReturned] = useState(0);
+
+  const finishClosing = () => {
+    setOpen(false);
+    setPhase("closed");
+    setReturned((count) => count + 1);
+  };
+
+  const requestClose = () => {
+    if (phase === "closing") return;
+    // Mid-opening, or with reduced motion, just close. While reading, fold the letter away first.
+    if (reduceMotion || phase !== "reading") {
+      setOpen(false);
+      setPhase("closed");
+      return;
+    }
+    setTarget(trigger.current?.getBoundingClientRect() ?? null);
+    setPhase("closing");
+  };
 
   useEffect(() => {
     if (reading) closeButton.current?.focus({ preventScroll: true });
@@ -78,12 +100,17 @@ export function BuildingNote({ className }: { className?: string }) {
     <DialogPrimitive.Root
       open={open}
       onOpenChange={(next) => {
-        setOpen(next);
-        setPhase(next ? "opening" : "closed");
+        if (next) {
+          setOpen(true);
+          setPhase("opening");
+        } else {
+          requestClose();
+        }
       }}
     >
       <DialogPrimitive.Trigger asChild>
         <button
+          ref={trigger}
           type="button"
           className={cn(
             "group relative block w-full max-w-[420px] rounded-[12px] text-left outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4",
@@ -95,9 +122,12 @@ export function BuildingNote({ className }: { className?: string }) {
             {/* While it is open the envelope lives in the dialog; this keeps its place on the page. */}
             {open && !reduceMotion ? null : (
               <motion.span
+                key={returned}
                 layoutId={reduceMotion ? undefined : LAYOUT_ID}
                 className="block size-full"
-                transition={{ layout: { type: "spring", stiffness: 140, damping: 22 } }}
+                initial={returned && !reduceMotion ? { y: -14, scale: 0.97, rotate: -2 } : false}
+                animate={{ y: 0, scale: 1, rotate: 0 }}
+                transition={{ layout: { type: "spring", stiffness: 140, damping: 22 }, default: { type: "spring", stiffness: 260, damping: 16 } }}
               >
                 <ClosedEnvelope />
               </motion.span>
@@ -136,7 +166,9 @@ export function BuildingNote({ className }: { className?: string }) {
               </DialogPrimitive.Close>
 
               <AnimatePresence mode="popLayout">
-                {reading ? (
+                {phase === "closing" ? (
+                  <ClosingScene key="closing" target={target} onDone={finishClosing} />
+                ) : reading ? (
                   <ReadingLetter key="letter" reduceMotion={Boolean(reduceMotion)} />
                 ) : (
                   <motion.div key="scene" exit={{ opacity: 0, scale: 1.03, transition: { duration: 0.35, ease: "easeOut" } }} className="relative">
@@ -315,18 +347,7 @@ function OpeningScene({ onDone }: { onDone: () => void }) {
 
       {/* The folded letter (a tri-fold): the middle third faces us; the top and bottom thirds are folded over it. */}
       <motion.div data-sheet className="absolute [transform-style:preserve-3d]" style={{ left: "7%", right: "7%", top: height * 0.08, height: panel, zIndex: 2 }}>
-        <PaperFace className="absolute inset-0">
-          <Lines count={4} />
-        </PaperFace>
-        <Fold name="top" panel={panel}>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-55">{LETTER.overline}</p>
-          <p className="mt-1 font-serif text-[18px] italic leading-tight">{LETTER.title}</p>
-          <div className="mt-3"><Lines count={2} /></div>
-        </Fold>
-        <Fold name="bottom" panel={panel}>
-          <Lines count={3} />
-          <p className="mt-3 text-right font-serif text-[16px] italic opacity-75">— {LETTER.signature}</p>
-        </Fold>
+        <SheetPanels panel={panel} />
       </motion.div>
 
       {/* Front of the envelope */}
@@ -361,8 +382,73 @@ function OpeningScene({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** The three thirds of the letter: the middle faces us, the top and bottom fold over it. */
+function SheetPanels({ panel, open = false }: { panel: number; open?: boolean }) {
+  return (
+    <>
+      <PaperFace className="absolute inset-0">
+        <Lines count={4} />
+      </PaperFace>
+      <Fold name="top" panel={panel} open={open}>
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-55">{LETTER.overline}</p>
+        <p className="mt-1 font-serif text-[18px] italic leading-tight">{LETTER.title}</p>
+        <div className="mt-3"><Lines count={2} /></div>
+      </Fold>
+      <Fold name="bottom" panel={panel} open={open}>
+        <Lines count={3} />
+        <p className="mt-3 text-right font-serif text-[16px] italic opacity-75">— {LETTER.signature}</p>
+      </Fold>
+    </>
+  );
+}
+
+/**
+ * Closing: the letter becomes the open sheet again, folds its bottom third up
+ * and its top third down, then flies back into the envelope on the page.
+ */
+function ClosingScene({ target, onDone }: { target: DOMRect | null; onDone: () => void }) {
+  const [scope, animate] = useAnimate();
+  const [width] = useState(() => (typeof window === "undefined" ? 420 : Math.min(window.innerWidth * 0.86, 420)));
+  const panel = Math.round((width / ENVELOPE_RATIO) * 0.56);
+  const done = useRef(onDone);
+  useLayoutEffect(() => {
+    done.current = onDone;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const fold = { duration: 0.42, ease: [0.45, 0, 0.25, 1] as const };
+    void (async () => {
+      await animate(scope.current, { opacity: [0, 1], scale: [1.18, 1.12] }, { duration: 0.22, ease: "easeOut" });
+      animate("[data-bottom-shade]", { opacity: 0.28 }, fold);
+      await animate("[data-bottom]", { rotateX: 178 }, fold);
+      animate("[data-top-shade]", { opacity: 0.28 }, fold);
+      await animate("[data-top]", { rotateX: -178 }, fold);
+      if (cancelled || !scope.current) return;
+      // Fly back to the envelope's spot on the page, shrinking into it.
+      const here = (scope.current as HTMLElement).getBoundingClientRect();
+      const toX = target ? target.left + target.width / 2 - (here.left + here.width / 2) : 0;
+      const toY = target ? target.top + target.height * 0.45 - (here.top + here.height / 2) : 120;
+      const scale = target ? Math.max(0.3, ((target.width * 0.86) / here.width) * 1.12) : 0.6;
+      await animate(scope.current, { x: toX, y: toY, scale, rotate: [0, -6, -2], opacity: [1, 1, 0] }, { duration: 0.62, ease: [0.5, 0, 0.2, 1] });
+      if (!cancelled) done.current();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [animate, scope, target]);
+
+  return (
+    <div className="relative [perspective:1400px]" style={{ width: width * 0.86, height: panel }}>
+      <motion.div ref={scope} className="absolute inset-0 [transform-style:preserve-3d]" style={{ opacity: 0 }}>
+        <SheetPanels panel={panel} open />
+      </motion.div>
+    </div>
+  );
+}
+
 /** One folded third of the letter: printed side, paper back, and a shade that lifts as it opens. */
-function Fold({ name, panel, children }: { name: "top" | "bottom"; panel: number; children: ReactNode }) {
+function Fold({ name, panel, open = false, children }: { name: "top" | "bottom"; panel: number; open?: boolean; children: ReactNode }) {
   const top = name === "top";
   const marker = top ? { "data-top": "" } : { "data-bottom": "" };
   const shadeMarker = top ? { "data-top-shade": "" } : { "data-bottom-shade": "" };
@@ -371,11 +457,11 @@ function Fold({ name, panel, children }: { name: "top" | "bottom"; panel: number
       {...marker}
       className={cn("absolute inset-x-0 [transform-style:preserve-3d]", top ? "bottom-full origin-bottom" : "top-full origin-top")}
       style={{ height: panel }}
-      initial={{ rotateX: top ? -178 : 178 }}
+      initial={{ rotateX: open ? 0 : top ? -178 : 178 }}
     >
       <PaperFace className="absolute inset-0 [backface-visibility:hidden]">
         {children}
-        <motion.div {...shadeMarker} className="pointer-events-none absolute inset-0 bg-[#6b5530]" style={{ opacity: 0.28 }} />
+        <motion.div {...shadeMarker} className="pointer-events-none absolute inset-0 bg-[#6b5530]" style={{ opacity: open ? 0 : 0.28 }} />
       </PaperFace>
       <div
         className="absolute inset-0 rounded-[3px] [backface-visibility:hidden] [transform:rotateX(180deg)]"
