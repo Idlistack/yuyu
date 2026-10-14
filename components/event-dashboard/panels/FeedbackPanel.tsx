@@ -51,6 +51,7 @@ export async function FeedbackPanel({ ctx }: { ctx: EventDashboardContext }) {
       fields={fields}
       eventTitle={event.title}
       eventDateLabel={formatDate(event.startDateTime, event.timezone)}
+      organisationName={organisation.name}
       responses={canViewResponses ? (
         <ResponsesCard
           insights={insights}

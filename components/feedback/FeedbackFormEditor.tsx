@@ -18,7 +18,7 @@ import { feedbackTemplates, type FeedbackTemplate } from "@/lib/feedbackTemplate
 import { cn } from "@/lib/cn";
 
 import { CertificateBuilder } from "./CertificateBuilder";
-import { parseCertificateTemplate, type CertificateTemplate } from "@/lib/certificateTemplate";
+import { certificateMergeTags, fillCertificateText, parseCertificateTemplate, type CertificateMergeValues, type CertificateTemplate } from "@/lib/certificateTemplate";
 
 type Field = { id: string; key: string; label: string; type: RegistrationFieldType; required: boolean; options: string[] };
 
@@ -35,6 +35,7 @@ export function FeedbackFormEditor(props: {
   /** Used only for the small certificate preview. */
   eventTitle?: string;
   eventDateLabel?: string;
+  organisationName?: string;
 }) {
   const [isOpen, setIsOpen] = useState(props.form?.isOpen ?? false);
   const [title, setTitle] = useState(props.form?.title ?? "Event feedback");
@@ -250,7 +251,7 @@ export function FeedbackFormEditor(props: {
               <h2 id="feedback-certificate-title" className="text-h4 text-ink">Certificate</h2>
               <Switch aria-label="Offer certificates" checked={certificateEnabled} onCheckedChange={toggleCertificate} disabled={pending || certificateBusy} />
             </div>
-            <CertificatePreview template={certificateTemplate} eventTitle={props.eventTitle} eventDateLabel={props.eventDateLabel} muted={!certificateEnabled} />
+            <CertificatePreview template={certificateTemplate} eventTitle={props.eventTitle} eventDateLabel={props.eventDateLabel} organisationName={props.organisationName} muted={!certificateEnabled} />
             <p className="text-caption text-ink-muted">
               {certificateEnabled
                 ? "A JPEG certificate is offered after someone submits feedback. Upload your own artwork and place the name."
@@ -276,10 +277,10 @@ export function FeedbackFormEditor(props: {
       ) : null}
 
       <Dialog open={certificateDialog} onOpenChange={(next) => { if (!next && !certificateBusy) setCertificateDialog(false); }}>
-        <DialogContent size="lg">
+        <DialogContent size="xl">
           <DialogHeader title="Design certificate" description="Changes apply once you save them." />
           <DialogBody>
-            <CertificateBuilder organisationSlug={props.organisationSlug} eventId={props.eventId} value={certificateTemplate} onChange={(value) => { setCertificateTemplate(value); markDirty(); }} disabled={pending} onBusyChange={setCertificateBusy} />
+            <CertificateBuilder organisationSlug={props.organisationSlug} eventId={props.eventId} value={certificateTemplate} onChange={(value) => { setCertificateTemplate(value); markDirty(); }} disabled={pending} onBusyChange={setCertificateBusy} eventTitle={props.eventTitle} eventDateLabel={props.eventDateLabel} organisationName={props.organisationName} />
           </DialogBody>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setCertificateDialog(false)} disabled={certificateBusy}>Done</Button>
@@ -347,20 +348,37 @@ export function FeedbackFormEditor(props: {
   );
 }
 
-/** Small, decorative preview of the certificate: uploaded artwork with the name area, or the standard layout. */
-function CertificatePreview({ template, eventTitle, eventDateLabel, muted }: { template: CertificateTemplate | null; eventTitle?: string; eventDateLabel?: string; muted: boolean }) {
+/** Small, decorative preview of the certificate: uploaded artwork with every layer outlined, or the standard layout. */
+function CertificatePreview({ template, eventTitle, eventDateLabel, organisationName, muted }: { template: CertificateTemplate | null; eventTitle?: string; eventDateLabel?: string; organisationName?: string; muted: boolean }) {
+  const values: CertificateMergeValues = {
+    name: certificateMergeTags.name.sample,
+    event: eventTitle || certificateMergeTags.event.sample,
+    eventDate: eventDateLabel || certificateMergeTags.eventDate.sample,
+    organisation: organisationName || certificateMergeTags.organisation.sample,
+    issueDate: certificateMergeTags.issueDate.sample,
+  };
   return (
     <div aria-hidden className={cn("overflow-hidden rounded-xl border border-line bg-canvas transition-opacity", muted && "opacity-50")}>
       {template ? (
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element -- served by the app's private upload route */}
           <img src={`/api/uploads/${template.backgroundKey}`} alt="" className="block h-auto w-full" />
-          <span
-            className="absolute flex items-center justify-center rounded-md border-[1.5px] border-dashed border-accent text-[11px] font-bold text-ink"
-            style={{ left: `${template.x}%`, top: `${template.y}%`, width: `${template.width}%`, height: `${template.height}%` }}
-          >
-            Attendee name
-          </span>
+          {template.elements.map((element) => (
+            <span
+              key={element.id}
+              className="absolute flex items-center justify-center overflow-hidden rounded-[3px] border border-dashed border-accent"
+              style={{ left: `${element.x}%`, top: `${element.y}%`, width: `${element.width}%`, height: `${element.height}%` }}
+            >
+              {element.type === "text" ? (
+                <span className="truncate px-0.5 text-[10px] font-bold leading-tight text-ink" style={{ color: element.color }}>
+                  {fillCertificateText(element.text, values).replace(/\s+/g, " ")}
+                </span>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- served by the app's private upload route
+                <img src={`/api/uploads/${element.key}`} alt="" className="size-full object-contain" />
+              )}
+            </span>
+          ))}
         </div>
       ) : (
         <div className="flex aspect-[1.414] flex-col items-center justify-center gap-1.5 p-4 text-center">

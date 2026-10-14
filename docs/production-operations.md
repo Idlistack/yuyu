@@ -13,7 +13,7 @@
 
 ## Deploy procedure
 
-Certificate designer releases require the `20260916000000_certificate_templates` migration before application rollout. Certificate artwork is re-encoded as WebP in private storage and delivered through the application image route; upload blank artwork without personal data. Keep the Docker image's DejaVu fonts installed (Serif, Sans, and Sans Mono). Custom certificates use the saved layout snapshot on each response.
+Certificate designer releases require the `20260916000000_certificate_templates` migration before application rollout. Certificate artwork and image layers (logos, signatures, seals under `certificate-assets/`) are re-encoded as WebP in private storage and delivered through the application image route; upload blank artwork without personal data. Keep the Docker image's DejaVu fonts installed (Serif, Sans, and Sans Mono). Custom certificates use the saved layout snapshot on each response.
 
 For a non-Kubernetes container host, follow the current
 [production Docker deployment guide](DEPLOYMENT_DOCKER.md). The repository's
