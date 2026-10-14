@@ -333,6 +333,8 @@ model EventBroadcast {
   subject         String
   /// Sanitised HTML template with {{placeholders}}; rendered per recipient.
   body            String
+  /// Visual design id from lib/email/broadcastDesigns.ts; content is the same for every design.
+  design          String                    @default("classic")
   recipientCount  Int                       @default(0)
   createdAt       DateTime                  @default(now())
 

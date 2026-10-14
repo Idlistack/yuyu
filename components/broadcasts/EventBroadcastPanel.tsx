@@ -26,6 +26,8 @@ import { SendConfirmDialog } from "./SendConfirmDialog";
 import { recipientDots, recipientSummary, sendBarLabel } from "@/components/event-dashboard/emails/recipients";
 import { BroadcastEmailEditor } from "./BroadcastEmailEditor";
 import { BroadcastPreviewFrame } from "./BroadcastPreviewFrame";
+import { DesignPicker } from "./DesignPicker";
+import { DEFAULT_BROADCAST_DESIGN, type BroadcastDesignId } from "@/lib/email/broadcastDesigns";
 
 export type BroadcastHistoryRow = {
   id: string;
@@ -33,6 +35,7 @@ export type BroadcastHistoryRow = {
   body: string;
   statuses: RsvpStatus[];
   attendance: BroadcastAttendanceFilter;
+  design: BroadcastDesignId;
   recipientCount: number;
   createdAt: string;
   /** Pre-formatted on the server in the event timezone ("3 days ago", "13 Oct 2026"). */
@@ -77,15 +80,17 @@ function StepHeading({ step, id, title, aside }: { step: number; id: string; tit
 const cardClass = "flex min-w-0 flex-col gap-4 rounded-xl border border-line bg-canvas p-4 sm:p-5";
 
 const UNDO_SECONDS = 5;
-type SendPayload = { statuses: RsvpStatus[]; attendance: BroadcastAttendanceFilter; subject: string; body: string; count: number };
+type SendPayload = { statuses: RsvpStatus[]; attendance: BroadcastAttendanceFilter; subject: string; body: string; design: BroadcastDesignId; count: number };
 
 export function EventBroadcastPanel(props: {
   organisationSlug: string;
   eventId: string;
   statusCounts: Record<RsvpStatus, number>;
   history: BroadcastHistoryRow[];
+  /** Event branding for the design thumbnails; the server renders the real thing. */
+  brand: { accentColor: string | null; coverImageUrl: string | null };
 }) {
-  const { organisationSlug, eventId, statusCounts, history } = props;
+  const { organisationSlug, eventId, statusCounts, history, brand } = props;
   const router = useRouter();
   const { showToast } = useToast();
   const initial = useMemo(() => defaultBroadcastTemplate(), []);
@@ -99,6 +104,7 @@ export function EventBroadcastPanel(props: {
   const [countState, setCountState] = useState<{ key: string; count: number; error: string | null }>({ key: "", count: 0, error: null });
   const [preview, setPreview] = useState<{ key: string; subject: string; html: string; error: string | null }>({ key: "", subject: "", html: "", error: null });
   const [previewWidth, setPreviewWidth] = useState<"desktop" | "mobile">("desktop");
+  const [design, setDesign] = useState<BroadcastDesignId>(DEFAULT_BROADCAST_DESIGN);
   const [confirmOpen, setConfirmOpen] = useState(false);
   // After confirming, sending waits UNDO_SECONDS so a mistake can still be undone.
   const [countdown, setCountdown] = useState<{ left: number; count: number } | null>(null);
@@ -112,7 +118,7 @@ export function EventBroadcastPanel(props: {
   const recipientCount: number | null = statuses.length === 0 ? 0 : countReady ? countState.count : null;
   const countError = countReady ? countState.error : null;
 
-  const previewKey = `${subject}\u0000${body}`;
+  const previewKey = `${design}\u0000${subject}\u0000${body}`;
   const previewReady = preview.key === previewKey;
   const hasContent = subject.trim().length > 0 && broadcastHtmlToText(body).trim().length > 0;
 
@@ -145,7 +151,7 @@ export function EventBroadcastPanel(props: {
     if (!hasContent) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const result = await previewEventBroadcast({ organisationSlug, eventId, subject, body });
+      const result = await previewEventBroadcast({ organisationSlug, eventId, subject, body, design });
       if (cancelled) return;
       setPreview(result.ok
         ? { key: previewKey, subject: result.data?.subject ?? "", html: result.data?.html ?? "", error: null }
@@ -155,7 +161,7 @@ export function EventBroadcastPanel(props: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [organisationSlug, eventId, subject, body, hasContent, previewKey]);
+  }, [organisationSlug, eventId, subject, body, design, hasContent, previewKey]);
 
   function toggleStatus(value: RsvpStatus) {
     setStatuses((current) => (current.includes(value) ? current.filter((status) => status !== value) : [...current, value]));
@@ -191,6 +197,7 @@ export function EventBroadcastPanel(props: {
     setBody(row.body);
     setStatuses(row.statuses);
     setAttendance(row.attendance);
+    setDesign(row.design);
     showToast("Loaded the previous email into the editor", "success");
   }
 
@@ -205,7 +212,7 @@ export function EventBroadcastPanel(props: {
       sendTimer.current = null;
       setCountdown(null);
       startTransition(async () => {
-        const result = await sendEventBroadcast({ organisationSlug, eventId, statuses: payload.statuses, attendance: payload.attendance, subject: payload.subject, body: payload.body });
+        const result = await sendEventBroadcast({ organisationSlug, eventId, statuses: payload.statuses, attendance: payload.attendance, subject: payload.subject, body: payload.body, design: payload.design });
         if (!result.ok) return showToast(result.error, "error");
         showToast(`Queued for ${result.data?.recipientCount ?? 0} recipients`, "success");
         router.refresh();
@@ -370,6 +377,10 @@ export function EventBroadcastPanel(props: {
                 ]}
               />
             </div>
+            <div className="flex flex-col gap-2 rounded-xl border border-line bg-canvas p-3">
+              <p className="text-label text-ink">Design</p>
+              <DesignPicker value={design} onChange={setDesign} accentColor={brand.accentColor} coverImageUrl={brand.coverImageUrl} />
+            </div>
             <p className="text-caption text-ink-muted">
               Rendered by the server with example values, exactly as it will arrive. Each attendee sees their own name and, when confirmed, their own ticket link.
             </p>
@@ -442,7 +453,7 @@ export function EventBroadcastPanel(props: {
             disabled={pending || !hasContent}
             onClick={() => {
               startTransition(async () => {
-                const result = await sendEventBroadcastTest({ organisationSlug, eventId, subject, body });
+                const result = await sendEventBroadcastTest({ organisationSlug, eventId, subject, body, design });
                 if (!result.ok) return showToast(result.error, "error");
                 showToast(`Test email queued to ${result.data?.to ?? "your address"}`, "success");
               });
@@ -466,7 +477,7 @@ export function EventBroadcastPanel(props: {
         onConfirm={() => {
           setConfirmOpen(false);
           // Snapshot what was reviewed; later edits during the countdown don't change it.
-          startCountdown({ statuses, attendance, subject, body, count: recipientCount ?? 0 });
+          startCountdown({ statuses, attendance, subject, body, design, count: recipientCount ?? 0 });
         }}
       />
     </div>

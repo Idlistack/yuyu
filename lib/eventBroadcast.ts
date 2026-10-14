@@ -3,6 +3,8 @@ import "server-only";
 import type { BroadcastAttendanceFilter, Prisma, RsvpStatus } from "@prisma/client";
 import sanitizeHtml from "sanitize-html";
 import { prisma } from "@/lib/db";
+import type { BroadcastBrand } from "@/lib/email/broadcastDesigns";
+import { formatBroadcastEventDate } from "@/lib/broadcastTemplate";
 
 type BroadcastClient = Prisma.TransactionClient | typeof prisma;
 
@@ -100,4 +102,28 @@ export function sanitizeBroadcastHtml(html: string): string {
     // sanitize-html keeps relative targets; a typo like {{nope}} would become a broken relative link.
     .replace(/<a\b([^>]*?)\s*href="([^"]*)"([^>]*)>/g, (match, before: string, href: string, after: string) =>
       /^(https?:\/\/|mailto:|\{\{(ticketLink|eventUrl|feedbackUrl|scheduleUrl)\}\})/.test(href) ? match : `<a${before}${after}>`);
+}
+
+/** Fields a broadcast design may use, selected alongside the event. */
+export const broadcastBrandSelect = {
+  coverImageUrl: true,
+  page: { select: { accentColor: true } },
+} as const;
+
+/** Event branding for a broadcast design: accent, cover, organisation logo, date line and link. */
+export function broadcastBrandFor(event: {
+  slug: string;
+  startDateTime: Date;
+  timezone: string;
+  coverImageUrl: string | null;
+  page: { accentColor: string | null } | null;
+  organisation: { slug: string; logoUrl: string | null };
+}): BroadcastBrand {
+  return {
+    accentColor: event.page?.accentColor ?? null,
+    coverImageUrl: event.coverImageUrl,
+    logoUrl: event.organisation.logoUrl,
+    dateLine: formatBroadcastEventDate(event.startDateTime, event.timezone),
+    eventUrl: broadcastEventUrl(event.organisation.slug, event.slug),
+  };
 }

@@ -2,6 +2,7 @@ import { BroadcastAttendanceFilter, EventPrivacyType, EventStatus, RsvpStatus } 
 import { z } from "zod";
 import { isValidTimeZone } from "@/lib/timeZone";
 import { isUploadedImageUrl } from "@/lib/uploadUrl";
+import { BROADCAST_DESIGN_IDS, DEFAULT_BROADCAST_DESIGN } from "@/lib/email/broadcastDesigns";
 
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const httpUrlSchema = z
@@ -541,6 +542,7 @@ const broadcastAudienceFields = {
 };
 
 const broadcastSubjectSchema = z.string().trim().min(1, "Subject is required").max(150, "Keep the subject under 150 characters");
+const broadcastDesignSchema = z.enum(BROADCAST_DESIGN_IDS).default(DEFAULT_BROADCAST_DESIGN);
 const broadcastBodySchema = z.string().trim().min(1, "Message is required").max(20000, "Keep the message under 20,000 characters");
 
 export const broadcastAudienceSchema = orgScoped.extend(broadcastAudienceFields);
@@ -549,12 +551,14 @@ export const sendEventBroadcastSchema = orgScoped.extend({
   ...broadcastAudienceFields,
   subject: broadcastSubjectSchema,
   body: broadcastBodySchema,
+  design: broadcastDesignSchema,
 });
 
 export const sendEventBroadcastTestSchema = orgScoped.extend({
   eventId: z.string().trim().min(1),
   subject: broadcastSubjectSchema,
   body: broadcastBodySchema,
+  design: broadcastDesignSchema,
 });
 
 export const previewEventBroadcastSchema = sendEventBroadcastTestSchema;
