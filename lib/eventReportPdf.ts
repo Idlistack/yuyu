@@ -233,7 +233,7 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
   // ---------- Pages and flow ----------
 
   const pages: PDFPage[] = [];
-  const contents: Array<{ title: string; page: number }> = [];
+  const contents: string[] = [];
   let page!: PDFPage;
   let y = 0;
 
@@ -268,7 +268,7 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
     // The first section opens after the cover; later ones share a page when a good part of it is left.
     if (pages.length === 1 || y - 280 < BOTTOM) newPage();
     else if (y < TOP - 1) y -= 30;
-    contents.push({ title, page: pages.length });
+    contents.push(title);
     drawText(page, overline.toUpperCase(), MARGIN, y - 8, T.overline(A.text));
     drawText(page, title, MARGIN, y - 36, T.display(26));
     y -= 52;
@@ -662,11 +662,9 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
   let contentsY = contentsTop;
   drawText(cover, "IN THIS REPORT", MARGIN, contentsY, T.overline());
   contentsY -= 12;
-  for (const entry of contents) {
-    const number = String(entry.page);
+  for (const title of contents) {
     cover.drawLine({ start: { x: MARGIN, y: contentsY - 4 }, end: { x: PAGE[0] - MARGIN, y: contentsY - 4 }, thickness: 0.5, color: C.border });
-    drawText(cover, entry.title, MARGIN, contentsY - 22, T.strong(11));
-    drawText(cover, number, PAGE[0] - MARGIN - textWidth(number, T.strong(11, C.textMuted)), contentsY - 22, T.strong(11, C.textMuted));
+    drawText(cover, title, MARGIN, contentsY - 22, T.strong(11));
     contentsY -= 30;
   }
 
