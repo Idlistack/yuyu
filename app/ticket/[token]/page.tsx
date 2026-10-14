@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DotFace } from "@/components/brand/DotFace";
-import { ArrowLeft, CalendarPlus, Check } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CalendarPlus, Check } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { TicketQrPanel } from "@/components/ticket/TicketQrPanel";
 import { CancelRsvpButton } from "@/components/ticket/CancelRsvpButton";
@@ -10,6 +10,7 @@ import { TicketDownloadButton } from "@/components/ticket/TicketDownloadButton";
 import { TicketStatusStorageSync } from "@/components/ticket/TicketStatusStorageSync";
 import { HideAfterLiveCheckIn, LiveCheckedInChip, LiveTicketCard, LiveTicketProvider } from "@/components/ticket/LiveTicket";
 import { safeTimeZone } from "@/lib/timeZone";
+import { safeHttpUrl } from "@/lib/safeHttpUrl";
 import { googleCalendarEventUrl, type CalendarEvent } from "@/lib/calendarInvite";
 import { accentStyle, INK_ACCENT } from "@/lib/theme/accent";
 import { formatDayShort, formatTime, formatTimeZoneName } from "@/lib/format/datetime";
@@ -90,6 +91,8 @@ export default async function TicketPage({ params }: Props) {
           endDateTime: true,
           timezone: true,
           location: true,
+          mapLinkUrl: true,
+          isOnline: true,
           slug: true,
           page: { select: { accentColor: true } },
           organisation: { select: { slug: true, name: true } },
@@ -120,6 +123,7 @@ export default async function TicketPage({ params }: Props) {
   let start: Date;
   let timeZone: string;
   let location: string | null = null;
+  let mapHref: string | null = null;
   let accent: string | null | undefined;
   let calendarEvent: CalendarEvent;
 
@@ -132,6 +136,7 @@ export default async function TicketPage({ params }: Props) {
     start = ev.startDateTime;
     timeZone = safeTimeZone(ev.timezone);
     location = ev.location || null;
+    mapHref = ev.isOnline ? null : safeHttpUrl(ev.mapLinkUrl);
     accent = ev.page?.accentColor;
     calendarEvent = {
       title: ev.title,
@@ -183,7 +188,22 @@ export default async function TicketPage({ params }: Props) {
         {location ? (
           <div className="col-span-2">
             <dt className="text-overline text-ink-muted">Venue</dt>
-            <dd className="break-words text-[15px] font-bold text-ink">{location}</dd>
+            <dd className="break-words text-[15px] font-bold text-ink">
+              {mapHref ? (
+                <a
+                  href={mapHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline-offset-4 decoration-accent hover:underline focus-visible:underline"
+                >
+                  {location}
+                  <ArrowUpRight aria-hidden className="ml-0.5 inline-block size-4 align-[-2px] text-ink-muted" />
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              ) : (
+                location
+              )}
+            </dd>
           </div>
         ) : null}
         <div className="col-span-2">
