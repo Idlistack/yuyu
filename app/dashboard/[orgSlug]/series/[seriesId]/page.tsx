@@ -7,7 +7,7 @@ import { isOrgAdmin, requireOrgDashboardAccess } from "@/lib/permissions";
 import { canViewEventDashboard } from "@/lib/eventAccess";
 import { EditSeriesForm } from "@/components/series/EditSeriesForm";
 import { SeriesInvitePanel } from "@/components/invites/SeriesInvitePanel";
-import { AttendeeTable } from "@/components/attendees/AttendeeTable";
+import { GuestsPeople } from "@/components/event-dashboard/panels/GuestsPeople";
 import { ScheduleManager } from "@/components/schedule/ScheduleManager";
 import { EventReportDownloadButton } from "@/components/reports/EventReportDownloadButton";
 import { ArrowUpRight } from "lucide-react";
@@ -162,15 +162,16 @@ export default async function SeriesManagePage({ params }: Props) {
       ) : null}
 
       {firstInstanceId && canManageRegistrations ? (
-        <section aria-labelledby="series-attendees-title" className="flex flex-col gap-3">
-          <h2 id="series-attendees-title" className="text-h4 text-ink">Attendees (first upcoming occurrence)</h2>
-          <AttendeeTable
+        <section aria-label="Attendees (first upcoming occurrence)" className="min-w-0">
+          <GuestsPeople
             organisationSlug={organisation.slug}
-            eventInstanceId={firstInstanceId}
+            target={{ kind: "instance", instanceId: firstInstanceId, seriesId: series.id }}
+            title="Attendees (first upcoming occurrence)"
+            timeZone={series.timezone}
+            now={now.toISOString()}
             attendees={attendees}
-            canManage
+            truncated={attendeesTruncated}
             registrationFields={[]}
-            collectionTruncated={attendeesTruncated}
           />
         </section>
       ) : null}

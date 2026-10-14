@@ -2,7 +2,7 @@ import "server-only";
 
 import type { Prisma, RegistrationFieldType } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { isRatingField, isTextField, ratingDistribution, type FeedbackInsights } from "@/components/event-dashboard/feedback/helpers";
+import { isRatingField, isTextField, RATING_DOTS, ratingDistribution, ratingScale, type FeedbackInsights } from "@/components/event-dashboard/feedback/helpers";
 
 /*
  * Aggregate feedback insights for the event dashboard. Every query is scoped to
@@ -51,7 +51,7 @@ export async function loadFeedbackInsights(formId: string, fields: InsightField[
       const key = group.valueText.trim();
       counts[key] = (counts[key] ?? 0) + group._count._all;
     }
-    return { fieldId: field.id, label: field.label, ...ratingDistribution(field.options, counts) };
+    return { fieldId: field.id, label: field.label, ...ratingDistribution(field.options, counts, RATING_DOTS, ratingScale(field) ?? undefined) };
   });
 
   const texts = textResults.map(({ field, total, recent }) => ({ fieldId: field.id, label: field.label, total, recent }));

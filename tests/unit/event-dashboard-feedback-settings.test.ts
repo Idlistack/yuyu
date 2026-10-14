@@ -5,6 +5,7 @@ import {
   isTextField,
   questionTypeLabel,
   ratingDistribution,
+  ratingScale,
 } from "@/components/event-dashboard/feedback/helpers";
 import {
   PERMISSION_OPTIONS,
@@ -21,7 +22,11 @@ describe("feedback rating detection", () => {
   });
 
   it("rejects word options, single options, multi-select and free text", () => {
-    expect(isRatingField({ type: "RADIO", options: ["Excellent", "Good", "Okay", "Poor"] })).toBe(false);
+    // Known word scales count as ratings (the built-in templates use them); unknown words don't.
+    expect(isRatingField({ type: "RADIO", options: ["Excellent", "Good", "Okay", "Poor"] })).toBe(true);
+    expect(isRatingField({ type: "RADIO", options: ["Definitely", "Probably", "Not sure", "Probably not"] })).toBe(true);
+    expect(isRatingField({ type: "RADIO", options: ["Red", "Green", "Blue"] })).toBe(false);
+    expect(isRatingField({ type: "RADIO", options: ["Excellent", "Agree"] })).toBe(false);
     expect(isRatingField({ type: "RADIO", options: ["1", "2", "lots"] })).toBe(false);
     expect(isRatingField({ type: "RADIO", options: ["5"] })).toBe(false);
     expect(isRatingField({ type: "MULTI_SELECT", options: ["1", "2", "3"] })).toBe(false);
@@ -95,5 +100,26 @@ describe("co-organiser permission helpers", () => {
     expect(inviteExpiryLabel(new Date("2026-10-15T13:00:00Z"), now)).toBe("Invite expires tomorrow");
     expect(inviteExpiryLabel("2026-10-20T13:00:00Z", now)).toBe("Invite expires in 6 days");
     expect(inviteExpiryLabel(new Date("2026-10-13T12:00:00Z"), now)).toBe("Invite expired");
+  });
+});
+
+describe("word-scale ratings", () => {
+  it("orders word answers best first, reports the most common answer and no average", () => {
+    const field = { type: "RADIO" as const, options: ["Poor", "Okay", "excellent", "Good"] };
+    const scale = ratingScale(field);
+    expect(scale?.kind).toBe("words");
+    const result = ratingDistribution(field.options, { excellent: 2, Good: 5, Okay: 5, Poor: 1 }, 10, scale ?? undefined);
+    expect(result.rows.map((row) => row.value)).toEqual(["excellent", "Good", "Okay", "Poor"]);
+    expect(result.total).toBe(13);
+    expect(result.average).toBeNull();
+    expect(result.top).toBe("Good");
+    expect(questionTypeLabel(field)).toBe("Rating excellent–Poor");
+  });
+
+  it("keeps numeric scales unchanged", () => {
+    const result = ratingDistribution(["1", "2", "3"], { "3": 2, "1": 2 }, 10, { kind: "numeric" });
+    expect(result.rows.map((row) => row.value)).toEqual(["3", "2", "1"]);
+    expect(result.average).toBe(2);
+    expect(result.top).toBe("3");
   });
 });

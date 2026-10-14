@@ -8,7 +8,7 @@ import { Callout } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/field";
 import { updateRsvpRegistration } from "@/app/actions/rsvp-admin";
-import type { AttendeeRow } from "@/components/attendees/AttendeeTable";
+import type { AttendeeRow } from "@/components/attendees/types";
 import type { ManualRsvpField } from "@/components/attendees/ManualRsvpDialog";
 import { useToast } from "@/components/feedback/ToastProvider";
 

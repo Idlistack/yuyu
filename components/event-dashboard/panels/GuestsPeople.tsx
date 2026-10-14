@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Callout, EmptyState } from "@/components/ui/display";
 import { NativeSelect, SearchInput } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
-import type { AttendeeRow } from "@/components/attendees/AttendeeTable";
+import type { AttendeeRow } from "@/components/attendees/types";
 import { ManualRsvpDialog } from "@/components/attendees/ManualRsvpDialog";
 import { EditRsvpDialog } from "@/components/attendees/EditRsvpDialog";
 import { ExportEmailsButton } from "@/components/attendees/ExportEmailsButton";
@@ -41,10 +41,20 @@ const FILTER_DOTS: Record<GuestStatusFilter, string> = {
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * Whose registrations the list shows. A one-off event gets the full toolset;
+ * a series date (RSVPs keyed by `eventInstanceId`) only gets the actions that
+ * accept an instance id, so manual add, the CSV/email exports and undo
+ * check-in are hidden there.
+ */
+export type GuestListTarget =
+  | { kind: "event"; eventId: string; eventTitle: string }
+  | { kind: "instance"; instanceId: string; seriesId: string };
+
 export function GuestsPeople({
   organisationSlug,
-  eventId,
-  eventTitle,
+  target,
+  title = "Guests",
   timeZone,
   now,
   attendees,
@@ -52,8 +62,8 @@ export function GuestsPeople({
   registrationFields,
 }: {
   organisationSlug: string;
-  eventId: string;
-  eventTitle: string;
+  target: GuestListTarget;
+  title?: string;
   timeZone: string;
   /** Server render time (ISO) so relative labels match between server and client. */
   now: string;
@@ -73,6 +83,9 @@ export function GuestsPeople({
   const [editGuest, setEditGuest] = useState<AttendeeRow | null>(null);
   const [removeGuest, setRemoveGuest] = useState<AttendeeRow | null>(null);
   const [undoGuest, setUndoGuest] = useState<AttendeeRow | null>(null);
+
+  const eventId = target.kind === "event" ? target.eventId : undefined;
+  const scope = target.kind === "event" ? { eventId: target.eventId } : { eventInstanceId: target.instanceId };
 
   const counts = useMemo(() => countGuestFilters(attendees), [attendees]);
   const visible = useMemo(() => filterGuests(attendees, { status, kind, query }), [attendees, status, kind, query]);
@@ -94,9 +107,9 @@ export function GuestsPeople({
   }
 
   const actions: GuestRowActions = {
-    approve: (guest) => run(guest, () => approveRsvp({ organisationSlug, rsvpId: guest.id, eventId }), "Approved"),
-    decline: (guest) => run(guest, () => rejectRsvp({ organisationSlug, rsvpId: guest.id, eventId }), "Declined"),
-    promote: (guest) => run(guest, () => promoteFromWaitlist({ organisationSlug, rsvpId: guest.id, eventId }), "Spot given"),
+    approve: (guest) => run(guest, () => approveRsvp({ organisationSlug, rsvpId: guest.id, ...scope }), "Approved"),
+    decline: (guest) => run(guest, () => rejectRsvp({ organisationSlug, rsvpId: guest.id, ...scope }), "Declined"),
+    promote: (guest) => run(guest, () => promoteFromWaitlist({ organisationSlug, rsvpId: guest.id, ...scope }), "Spot given"),
     copyTicket: async (guest) => {
       try {
         await navigator.clipboard.writeText(guest.ticketUrl);
@@ -106,7 +119,7 @@ export function GuestsPeople({
       }
     },
     edit: (guest) => setEditGuest(guest),
-    undoCheckIn: (guest) => setUndoGuest(guest),
+    undoCheckIn: eventId ? (guest) => setUndoGuest(guest) : undefined,
     remove: (guest) => setRemoveGuest(guest),
   };
 
@@ -121,26 +134,30 @@ export function GuestsPeople({
     <div className="flex min-w-0 flex-col gap-4">
       {truncated ? (
         <Callout tone="warning">
-          Only the 250 most recent registrations are loaded in this browser view, and its email export is limited to those records. Download the full attendee CSV for the complete list.
+          {target.kind === "event"
+            ? "Only the 250 most recent registrations are loaded in this browser view, and its email export is limited to those records. Download the full attendee CSV for the complete list."
+            : "Only the 250 most recent registrations are loaded in this browser view."}
         </Callout>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-h4 text-ink">Guests</h2>
-        <div className="flex flex-wrap gap-2">
-          <ExportEmailsButton size="md" eventTitle={eventTitle} attendees={visible} title="Export emails for the guests shown" />
-          <Button asChild variant="secondary" startIcon={<Download />}>
-            <a href={`/api/exports/events/${eventId}/attendees`}>Download CSV</a>
-          </Button>
-          <Button variant="primary" startIcon={<Plus />} onClick={() => setManualRsvpOpen(true)}>
-            Add guest
-          </Button>
-        </div>
+        <h2 className="text-h4 text-ink">{title}</h2>
+        {target.kind === "event" ? (
+          <div className="flex flex-wrap gap-2">
+            <ExportEmailsButton size="md" eventTitle={target.eventTitle} attendees={visible} title="Export emails for the guests shown" />
+            <Button asChild variant="secondary" startIcon={<Download />}>
+              <a href={`/api/exports/events/${target.eventId}/attendees`}>Download CSV</a>
+            </Button>
+            <Button variant="primary" startIcon={<Plus />} onClick={() => setManualRsvpOpen(true)}>
+              Add guest
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {attendees.length === 0 ? (
         <EmptyState mood="sleepy" title="No guests yet.">
-          Registrations appear here as people sign up. You can also add a guest yourself.
+          Registrations appear here as people sign up.{eventId ? " You can also add a guest yourself." : null}
         </EmptyState>
       ) : (
         <>
@@ -220,12 +237,12 @@ export function GuestsPeople({
         </>
       )}
 
-      {manualRsvpOpen ? <ManualRsvpDialog organisationSlug={organisationSlug} eventId={eventId} fields={registrationFields} onClose={() => setManualRsvpOpen(false)} onAdded={() => router.refresh()} /> : null}
+      {manualRsvpOpen && eventId ? <ManualRsvpDialog organisationSlug={organisationSlug} eventId={eventId} fields={registrationFields} onClose={() => setManualRsvpOpen(false)} onAdded={() => router.refresh()} /> : null}
 
       {editGuest ? (
         <EditRsvpDialog
           organisationSlug={organisationSlug}
-          eventId={eventId}
+          {...scope}
           attendee={editGuest}
           fields={registrationFields}
           onClose={() => setEditGuest(null)}
@@ -242,10 +259,10 @@ export function GuestsPeople({
         loading={pending}
         onCancel={() => setUndoGuest(null)}
         onConfirm={() => {
-          if (!undoGuest) return;
-          const target = undoGuest;
+          if (!undoGuest || !eventId) return;
+          const guest = undoGuest;
           setUndoGuest(null);
-          run(target, () => undoCheckIn({ organisationSlug, eventId, rsvpId: target.id }), "Check-in undone");
+          run(guest, () => undoCheckIn({ organisationSlug, eventId, rsvpId: guest.id }), "Check-in undone");
         }}
       />
 
@@ -258,10 +275,10 @@ export function GuestsPeople({
         onCancel={() => setRemoveGuest(null)}
         onConfirm={() => {
           if (!removeGuest) return;
-          const target = removeGuest;
+          const guest = removeGuest;
           setRemoveGuest(null);
           startTransition(async () => {
-            const res = await deleteRsvp({ organisationSlug, rsvpId: target.id, eventId });
+            const res = await deleteRsvp({ organisationSlug, rsvpId: guest.id, ...scope });
             if (!res.ok) {
               showToast(res.error, "error");
               return;

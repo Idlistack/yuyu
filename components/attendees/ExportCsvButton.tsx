@@ -2,7 +2,7 @@
 
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { AttendeeRow } from "@/components/attendees/AttendeeTable";
+import type { AttendeeRow } from "@/components/attendees/types";
 import { buildCsv } from "@/lib/csv";
 
 export function ExportCsvButton(props: {

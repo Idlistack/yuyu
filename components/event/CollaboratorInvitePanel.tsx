@@ -10,6 +10,7 @@ import { Avatar, Chip } from "@/components/ui/display";
 import { Field, Input } from "@/components/ui/field";
 import {
   createEventCollaboratorInvite,
+  cancelEventCollaboratorInvite,
   revokeEventCollaborator,
   updateEventCollaboratorPermissions,
 } from "@/app/actions/event-collaborators";
@@ -97,6 +98,7 @@ export function CollaboratorInvitePanel({
   const [editedPermissions, setEditedPermissions] = useState<EventPermission[]>([]);
   const [pending, startTransition] = useTransition();
   const [revokeTarget, setRevokeTarget] = useState<Collaborator | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<PendingInvite | null>(null);
   const { showToast } = useToast();
   const router = useRouter();
   const refreshAfter = (message: string) => {
@@ -125,6 +127,13 @@ export function CollaboratorInvitePanel({
       if (!result.ok) return showToast(result.error, "error");
       setRevokeTarget(null);
       refreshAfter("Co-organiser access removed");
+    });
+  const cancelInvite = (inviteId: string) =>
+    startTransition(async () => {
+      const result = await cancelEventCollaboratorInvite({ organisationSlug, eventId, inviteId });
+      if (!result.ok) return showToast(result.error, "error");
+      setCancelTarget(null);
+      refreshAfter("Invite cancelled");
     });
   const savePermissions = (collaboratorId: string) =>
     startTransition(async () => {
@@ -205,6 +214,9 @@ export function CollaboratorInvitePanel({
               </div>
               {pendingInvite.permissions ? <PermissionChips permissions={pendingInvite.permissions} /> : null}
               <Chip size="sm" tone="warning">Invited</Chip>
+              <Button size="sm" variant="dangerQuiet" aria-label={`Cancel the invite for ${pendingInvite.email}`} onClick={() => setCancelTarget(pendingInvite)} disabled={pending}>
+                Cancel invite
+              </Button>
             </li>
           ))}
         </ul>
@@ -239,6 +251,15 @@ export function CollaboratorInvitePanel({
         loading={pending}
         onCancel={() => setRevokeTarget(null)}
         onConfirm={() => revokeTarget && revoke(revokeTarget.id)}
+      />
+      <ConfirmationDialog
+        open={Boolean(cancelTarget)}
+        title="Cancel invite?"
+        message={`The invite link sent to ${cancelTarget?.email ?? "this person"} will stop working.`}
+        confirmLabel="Cancel invite"
+        loading={pending}
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={() => cancelTarget && cancelInvite(cancelTarget.id)}
       />
     </section>
   );

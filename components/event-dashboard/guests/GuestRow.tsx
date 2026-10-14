@@ -5,7 +5,7 @@ import { ChevronDown, Copy, MoreHorizontal, Pencil, RotateCcw, Trash2, UserX } f
 import { Button, IconButton } from "@/components/ui/button";
 import { Avatar, Chip, type ChipTone } from "@/components/ui/display";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
-import type { AttendeeRow } from "@/components/attendees/AttendeeTable";
+import type { AttendeeRow } from "@/components/attendees/types";
 import { cn } from "@/lib/cn";
 import { GUEST_STATUS_LABELS, describeCheckIn, describeGuestWhen, guestDisplayName, guestEmail } from "./guestList";
 
@@ -29,7 +29,8 @@ export type GuestRowActions = {
   promote: (guest: AttendeeRow) => void;
   copyTicket: (guest: AttendeeRow) => void;
   edit: (guest: AttendeeRow) => void;
-  undoCheckIn: (guest: AttendeeRow) => void;
+  /** Omitted where no undo-check-in action exists for the target (series dates). */
+  undoCheckIn?: (guest: AttendeeRow) => void;
   remove: (guest: AttendeeRow) => void;
 };
 
@@ -99,8 +100,8 @@ export function GuestRow({ guest, timeZone, now, busy, disabled, actions }: { gu
             <MenuItem icon={<Pencil />} onSelect={() => actions.edit(guest)}>
               {guest.user ? "View registration" : "Edit registration or transfer ticket"}
             </MenuItem>
-            {guest.checkedInAt ? (
-              <MenuItem icon={<RotateCcw />} onSelect={() => actions.undoCheckIn(guest)}>
+            {guest.checkedInAt && actions.undoCheckIn ? (
+              <MenuItem icon={<RotateCcw />} onSelect={() => actions.undoCheckIn?.(guest)}>
                 Undo check-in
               </MenuItem>
             ) : null}

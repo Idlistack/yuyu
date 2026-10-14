@@ -87,6 +87,10 @@ export function ResponsesCard({
                     <p className="text-caption text-ink-muted">
                       Average {rating.average.toFixed(1)} from {rating.total} {rating.total === 1 ? "rating" : "ratings"}
                     </p>
+                  ) : rating.top ? (
+                    <p className="text-caption text-ink-muted">
+                      Most said “{rating.top}” · {rating.total} {rating.total === 1 ? "answer" : "answers"}
+                    </p>
                   ) : null}
                 </>
               )}
