@@ -1,24 +1,44 @@
 import { cn } from "@/lib/cn";
-import { DotGrid } from "./DotGrid";
-import { MARK, MARK_BRIGHT } from "./patterns";
 
-/** Arms (rows 0–1), then the stem (rows 2–3), then the host dot: the Y lights up from the arms down. */
-const STEP_BY_ROW = [0, 0, 1, 1, 2];
+/** Two marigold dots and an ink dot, hopping left to right in turn. */
+const DOTS = [
+  { colour: "bg-brand-marigold", jumpDelay: 0 },
+  { colour: "bg-brand-marigold", jumpDelay: 160 },
+  { colour: "bg-ink", jumpDelay: 320 },
+] as const;
 
 /**
- * Loading indicator: the dot sign lighting up from the arms down. With
- * reduced motion it is the static full mark. Announces `label` politely.
+ * Loading indicator: three dots jumping in sequence. `size` is
+ * the overall width. With reduced motion the dots sit still. Announces
+ * `label` politely.
  */
 export function DotLoader({ size = 48, label = "Loading", className }: { size?: number; label?: string; className?: string }) {
+  const dot = size / 4.2;
   return (
     <span role="status" className={cn("inline-flex flex-col items-center", className)}>
-      <DotGrid
-        pattern={size >= 48 ? MARK : MARK_BRIGHT}
-        dot={size / 6}
-        cellClassName={(cell) => (cell === "X" || cell === "O" ? "yy-dot-loader-cell" : undefined)}
-        cellStyle={(cell, row) => (cell === "X" || cell === "O" ? { animationDelay: `${STEP_BY_ROW[row]! * 240}ms` } : undefined)}
-      />
+      <span
+        aria-hidden="true"
+        className="flex items-end"
+        style={{ gap: dot * 0.6, height: dot * 1.8 }}
+      >
+        {DOTS.map(({ colour, jumpDelay }, index) => (
+          <span
+            key={index}
+            className={cn("yy-dot-loader-jump block shrink-0 rounded-full", colour)}
+            style={{ width: dot, height: dot, animationDelay: `${jumpDelay}ms` }}
+          />
+        ))}
+      </span>
       <span className="sr-only">{label}</span>
     </span>
+  );
+}
+
+/** Route-level loading state: the dot loader fixed in the centre of the viewport. */
+export function PageLoader({ label }: { label?: string }) {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+      <DotLoader size={56} label={label} />
+    </div>
   );
 }

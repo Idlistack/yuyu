@@ -387,13 +387,14 @@
   :root:not([data-color-mode]) .yy-img-dark { display: block; }
 }
 
-/* DotLoader (components/brand/DotLoader.tsx): each lit dot of the sign starts
-   soft and lights up, arms first; with reduced motion it ends lit (static mark). */
-@keyframes yy-dot-light {
-  0%, 35% { background-color: var(--yy-brand-dot-off); }
+/* DotLoader (components/brand/DotLoader.tsx): the three dots hop one after
+   the other; with reduced motion they rest on the baseline. */
+@keyframes yy-dot-jump {
+  0%, 45%, 100% { transform: translateY(0); }
+  20% { transform: translateY(-80%); }
 }
-.yy-dot-loader-cell {
-  animation: yy-dot-light 1.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+.yy-dot-loader-jump {
+  animation: yy-dot-jump 1.2s cubic-bezier(0.45, 0, 0.3, 1) infinite;
 }
 
 /* Dot faces (components/brand/DotFace.tsx): on hover of the face or a .group
