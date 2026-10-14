@@ -681,15 +681,17 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
 
   // ---------- About this report ----------
 
-  ensure(150);
+  ensure(172);
   y -= 12;
-  box(page, MARGIN, y, CONTENT_WIDTH, 118, { fill: C.tintPeach, radius: 16 });
+  box(page, MARGIN, y, CONTENT_WIDTH, 140, { fill: C.tintPeach, radius: 16 });
   dotMark(page, MARGIN + 18, y - 18, 22);
   drawText(page, "About this report", MARGIN + 50, y - 32, T.heading(13));
-  const about = `Numbers come from Yuyu's records on ${formatDate(now, tz)}. Times are in ${formatTimeZoneName(metrics.startDateTime, tz)} (${tz}). This report holds counts only: no guest is named, and no email address, phone number, ticket or written answer is included. Keep it with your event records, or share it with your team, partners and sponsors.`;
+  const generated = `Report generated on ${formatDayLong(now, tz, new Date(0))} at ${formatTime(now, tz)} ${formatTimeZoneName(now, tz)}`;
+  drawText(page, generated, MARGIN + 50, y - 52, T.strong(10));
+  const about = `Numbers reflect Yuyu's records at that moment. Times are in ${formatTimeZoneName(metrics.startDateTime, tz)} (${tz}). This report holds counts only: no guest is named, and no email address, phone number, ticket or written answer is included. Keep it with your event records, or share it with your team, partners and sponsors.`;
   const aboutLines = wrap(about, T.body(9.5), CONTENT_WIDTH - 68);
-  aboutLines.slice(0, 5).forEach((line, index) => drawText(page, line, MARGIN + 50, y - 52 - index * 14, T.body(9.5)));
-  y -= 130;
+  aboutLines.slice(0, 5).forEach((line, index) => drawText(page, line, MARGIN + 50, y - 74 - index * 14, T.body(9.5)));
+  y -= 152;
 
   // ---------- Footers ----------
 
