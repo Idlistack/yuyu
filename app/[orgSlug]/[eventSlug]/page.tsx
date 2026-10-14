@@ -178,6 +178,7 @@ export default async function EventPage({ params }: Props) {
         slug: session.slug,
         title: session.title,
         start: session.effectiveStartDateTime.toISOString(),
+        end: session.effectiveEndDateTime.toISOString(),
         type: session.type,
         trackId: session.trackId,
         trackName: session.track.name,
@@ -221,6 +222,8 @@ export default async function EventPage({ params }: Props) {
         event.endDateTime > new Date() &&
         !isRegistrationClosed(event)
       }
+      registrationFull={event.capacity != null && confirmed >= event.capacity}
+      approvalRequired={event.privacyType === EventPrivacyType.APPROVAL_REQUIRED}
     />
   );
 }

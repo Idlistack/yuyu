@@ -239,3 +239,17 @@
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Organiser-written rich text (sanitised HTML from the event page editor). */
+@layer components {
+  .yy-prose { color: var(--yy-text-secondary); font-size: 16px; line-height: 1.6; overflow-wrap: anywhere; }
+  .yy-prose > * + * { margin-top: 0.85em; }
+  .yy-prose h2 { font-family: var(--font-display); font-weight: 800; font-size: 24px; line-height: 1.2; color: var(--yy-text); margin-top: 1.4em; }
+  .yy-prose h3 { font-family: var(--font-display); font-weight: 800; font-size: 20px; line-height: 1.25; color: var(--yy-text); margin-top: 1.2em; }
+  .yy-prose strong { color: var(--yy-text); font-weight: 700; }
+  .yy-prose a { color: var(--yy-accent-text); text-decoration: underline; text-underline-offset: 3px; }
+  .yy-prose ul { list-style: disc; padding-left: 1.4em; }
+  .yy-prose ol { list-style: decimal; padding-left: 1.4em; }
+  .yy-prose li + li { margin-top: 0.3em; }
+  .yy-prose blockquote { border-left: 3px solid var(--yy-border-strong); padding-left: 1em; color: var(--yy-text-muted); }
+}
