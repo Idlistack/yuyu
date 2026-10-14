@@ -4,7 +4,7 @@ import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactN
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { controlClasses } from "./field";
+import { controlClasses } from "./styles";
 
 /**
  * Custom select for rich options (descriptions, grouped items). Prefer

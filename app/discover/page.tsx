@@ -1,23 +1,15 @@
-import Typography from "@mui/material/Typography";
-import Stack from "@mui/material/Stack";
-import Grid from "@mui/material/Grid";
-import Button from "@mui/material/Button";
-import MenuItem from "@mui/material/MenuItem";
-import TextField from "@mui/material/TextField";
-import Paper from "@mui/material/Paper";
-import InputAdornment from "@mui/material/InputAdornment";
-import Chip from "@mui/material/Chip";
-import SearchIcon from "@mui/icons-material/Search";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import ClearIcon from "@mui/icons-material/Clear";
-import NavigateBeforeIcon from "@mui/icons-material/NavigateBefore";
-import NavigateNextIcon from "@mui/icons-material/NavigateNext";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { EventPrivacyType, EventStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { DiscoverEventCard } from "@/components/event/DiscoverEventCard";
-import { InstanceCard } from "@/components/event/InstanceCard";
 import type { Metadata } from "next";
-import Alert from "@mui/material/Alert";
+import { PublicEventCard } from "@/components/events/PublicEventCard";
+import { Button } from "@/components/ui/button";
+import { Callout, EmptyState } from "@/components/ui/display";
+import { controlClasses } from "@/components/ui/styles";
+import { cn } from "@/lib/cn";
+import { INK_ACCENT } from "@/lib/theme/accent";
+import { describeRecurrence, recurrenceChip } from "@/lib/format/recurrence";
 import { parseDiscoveryDateRange } from "@/lib/dateFilter";
 import { paginationWindow } from "@/lib/pagination";
 
@@ -155,9 +147,15 @@ export default async function DiscoverPage({
   const eventIds = indexRows.filter((row) => row.kind === "event").map((row) => row.id);
   const instanceIds = indexRows.filter((row) => row.kind === "instance").map((row) => row.id);
   const [events, instances] = await Promise.all([
-    prisma.event.findMany({ where: { id: { in: eventIds } }, include: { organisation: { select: { slug: true, name: true } } } }),
+    prisma.event.findMany({ where: { id: { in: eventIds } }, include: { organisation: { select: { slug: true, name: true } }, page: { select: { accentColor: true } } } }),
     prisma.eventInstance.findMany({ where: { id: { in: instanceIds } }, include: { series: { include: { organisation: { select: { slug: true, name: true } } } } } }),
   ]);
+  // Confirmed counts only for events whose organiser shows registration counts publicly.
+  const countedEventIds = events.filter((event) => event.showRegistrationCount).map((event) => event.id);
+  const goingRows = countedEventIds.length > 0
+    ? await prisma.rSVP.groupBy({ by: ["eventId"], where: { eventId: { in: countedEventIds }, status: "CONFIRMED" }, _count: { _all: true } })
+    : [];
+  const goingByEvent = new Map(goingRows.map((row) => [row.eventId, row._count._all]));
   const eventsById = new Map(events.map((event) => [event.id, event]));
   const instancesById = new Map(instances.map((instance) => [instance.id, instance]));
   type PageItem =
@@ -184,245 +182,145 @@ export default async function DiscoverPage({
     ...(sp.to ? { to: sp.to } : {}),
   };
 
+  const pageHref = (target: number) => `/discover${buildQueryString({ ...baseParams, page: String(target) })}`;
+  const sortHref = (target: "upcoming" | "popular") => `/discover${buildQueryString({ ...(q ? { q } : {}), ...(sp.from ? { from: sp.from } : {}), ...(sp.to ? { to: sp.to } : {}), ...(target !== "upcoming" ? { sort: target } : {}) })}`;
+  const clearSearchHref = `/discover${buildQueryString({ ...(sort !== "upcoming" ? { sort } : {}), ...(sp.from ? { from: sp.from } : {}), ...(sp.to ? { to: sp.to } : {}) })}`;
+
   return (
-    <Stack spacing={3} sx={{ py: { xs: 3, sm: 4 } }}>
-      <Stack spacing={0.5}>
-        <Typography
-          variant="h3"
-          component="h1"
-          sx={{
-            fontWeight: 700,
-            letterSpacing: "-1px",
-            color: "text.primary",
-          }}
-        >
-          Discover events
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Browse public events from organisations on Yuyu.
-        </Typography>
-      </Stack>
+    <div className="flex flex-col gap-8">
+      <header>
+        <h1 className="text-display-m text-ink">Discover events</h1>
+        <p className="mt-2 text-body-l text-ink-secondary">Free, public events from communities on Yuyu.</p>
+      </header>
 
-      {/* Modern Filter panel */}
-      <Paper
-        variant="outlined"
-        component="form"
-        action="/discover"
-        method="get"
-        sx={{
-          p: 1.25,
-          borderRadius: "16px",
-          backgroundColor: "background.paper",
-          borderColor: "divider",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.1)",
-        }}
-      >
-        <Stack direction={{ xs: "column", lg: "row" }} spacing={1} sx={{ alignItems: { xs: "stretch", lg: "center" } }}>
-            <TextField
-              name="q"
-              placeholder="Search events"
-              size="small"
-              defaultValue={q}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon color="disabled" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-              sx={{ flexGrow: 1, minWidth: { xs: "100%", lg: 220 } }}
-            />
+      <div className="flex flex-col gap-3.5">
+        <form action="/discover" method="get" role="search" className="flex flex-col gap-2.5 lg:flex-row lg:items-end">
+          {sort !== "upcoming" ? <input type="hidden" name="sort" value={sort} /> : null}
+          <div className="relative min-w-0 flex-1">
+            <label htmlFor="discover-q" className="sr-only">Search events</label>
+            <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-ink-muted" />
+            <input id="discover-q" name="q" type="search" defaultValue={q} placeholder="Search events" maxLength={MAX_QUERY_LENGTH} className={cn(controlClasses, "h-[52px] rounded-full pl-11 pr-12 [&::-webkit-search-cancel-button]:appearance-none")} />
+            {q ? (
+              <Link href={clearSearchHref} aria-label="Clear search" className="absolute right-2 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-ink-muted hover:text-ink">
+                <X aria-hidden className="size-4" />
+              </Link>
+            ) : null}
+          </div>
+          <fieldset className="flex gap-2.5">
+            <legend className="sr-only">When</legend>
+            <label className="flex min-w-0 flex-1 flex-col rounded-[18px] border border-line-strong px-4 py-1.5 focus-within:border-[var(--yy-focus)] lg:w-[170px] lg:flex-none">
+              <span className="text-xs text-ink-muted">From</span>
+              <input name="from" type="date" defaultValue={sp.from ?? ""} className="bg-transparent text-[15px] text-ink outline-none" />
+            </label>
+            <label className="flex min-w-0 flex-1 flex-col rounded-[18px] border border-line-strong px-4 py-1.5 focus-within:border-[var(--yy-focus)] lg:w-[170px] lg:flex-none">
+              <span className="text-xs text-ink-muted">To</span>
+              <input name="to" type="date" defaultValue={sp.to ?? ""} className="bg-transparent text-[15px] text-ink outline-none" />
+            </label>
+          </fieldset>
+          <Button type="submit" variant="primary" size="lg" className="lg:h-[52px]">Search</Button>
+        </form>
 
-            <TextField
-              select
-              name="sort"
-              label="Sort By"
-              size="small"
-              defaultValue={sort}
-              sx={{ minWidth: { xs: "100%", sm: 155 }, flexShrink: 0 }}
-            >
-              <MenuItem value="upcoming">Upcoming First</MenuItem>
-              <MenuItem value="popular">Popularity</MenuItem>
-            </TextField>
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", lg: "auto" } }}>
-              <TextField
-                name="from"
-                label="From Date"
-                type="date"
-                size="small"
-                slotProps={{ inputLabel: { shrink: true } }}
-                defaultValue={sp.from ?? ""}
-                sx={{ width: { xs: "100%", sm: 142 } }}
-              />
-              <TextField
-                name="to"
-                label="To Date"
-                type="date"
-                size="small"
-                slotProps={{ inputLabel: { shrink: true } }}
-                defaultValue={sp.to ?? ""}
-                sx={{ width: { xs: "100%", sm: 142 } }}
-              />
-            </Stack>
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ width: { xs: "100%", lg: "auto" }, justifyContent: "flex-end", flexShrink: 0 }}
-            >
-              {hasActiveFilters && (
-                <Button
-                  href="/discover"
-                  variant="text"
-                  startIcon={<ClearIcon />}
-                  sx={{
-                    color: "text.secondary",
-                    minWidth: 0,
-                    px: 1,
-                    textTransform: "none",
-                    transition: "color 0.2s",
-                    "&:hover": { color: "text.primary", backgroundColor: "action.hover" },
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              )}
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={<FilterListIcon />}
-                sx={{
-                  backgroundColor: "#0A84FF",
-                  color: "#FFFFFF",
-                  fontWeight: 600,
-                  px: 2,
-                  borderRadius: "8px",
-                  textTransform: "none",
-                  "&:hover": {
-                    backgroundColor: "#0A84FF",
-                    opacity: 0.9,
-                  },
-                }}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav aria-label="Sort events" className="flex gap-2">
+            {(["upcoming", "popular"] as const).map((option) => (
+              <Link
+                key={option}
+                href={sortHref(option)}
+                aria-current={sort === option ? "true" : undefined}
+                className={cn(
+                  "inline-flex min-h-9 items-center rounded-full border px-3.5 text-sm font-semibold transition-colors",
+                  sort === option ? "border-[1.5px] border-primary bg-primary text-on-primary" : "border-line-strong bg-canvas text-ink-secondary hover:bg-subtle hover:text-ink",
+                )}
               >
-                Apply Filters
-              </Button>
-            </Stack>
-        </Stack>
-      </Paper>
+                {option === "upcoming" ? "Upcoming" : "Popular"}
+              </Link>
+            ))}
+          </nav>
+          {totalItems > 0 ? (
+            <p className="text-sm text-ink-muted" aria-live="polite">
+              {q ? <>{totalItems} {totalItems === 1 ? "event matches" : "events match"} “{q}”</> : <>Showing {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, totalItems)} of {totalItems} {totalItems === 1 ? "event" : "events"}</>}
+              {totalPages > 1 ? <> · Page {safePage} of {totalPages}</> : null}
+            </p>
+          ) : null}
+        </div>
+      </div>
 
-      {dateRangeError ? <Alert severity="warning">{dateRangeError} Date filtering was not applied.</Alert> : null}
+      {dateRangeError ? <Callout tone="warning" title={dateRangeError}>Date filtering was not applied.</Callout> : null}
 
-      {/* Results */}
-      {totalItems > 0 ? (
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" } }}>
-          <Stack spacing={0.25}>
-            <Typography variant="h6" component="h2" sx={{ fontWeight: 700, letterSpacing: "-0.3px" }}>
-              {q ? "Search results" : "Upcoming events"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Showing {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, totalItems)} of {totalItems} event{totalItems === 1 ? "" : "s"}
-            </Typography>
-          </Stack>
-          {totalPages > 1 ? <Chip label={`Page ${safePage} of ${totalPages}`} size="small" variant="outlined" /> : null}
-        </Stack>
-      ) : null}
-
+      <h2 className="sr-only">{q ? "Search results" : "Upcoming events"}</h2>
       {pageItems.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 6, textAlign: "center", borderRadius: "18px", borderColor: "divider", backgroundColor: "background.paper" }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Nothing matches just yet</Typography>
-          <Typography color="text.secondary" variant="body2" sx={{ mt: 0.75 }}>
-            Try clearing a filter or searching for something else.
-          </Typography>
-        </Paper>
+        <EmptyState
+          title="Nothing matches just yet"
+          action={hasActiveFilters ? <Button asChild variant="secondary" size="sm"><Link href="/discover">Clear filters</Link></Button> : undefined}
+        >
+          Try clearing a filter or searching for something else.
+        </EmptyState>
       ) : (
-        <Grid container spacing={1.5}>
-          {pageItems.map((row) =>
-            row.kind === "event" ? (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={row.id}>
-                <DiscoverEventCard
-                  orgSlug={row.orgSlug}
-                  organisationName={row.event.organisation.name}
-                  event={row.event}
+        <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {pageItems.map((row) => (
+            <li key={row.id}>
+              {row.kind === "event" ? (
+                <PublicEventCard
+                  event={{
+                    href: `/${row.orgSlug}/${row.event.slug}`,
+                    title: row.event.title,
+                    startDateTime: row.event.startDateTime,
+                    timezone: row.event.timezone,
+                    location: row.event.location,
+                    isOnline: row.event.isOnline,
+                    coverImageUrl: row.event.coverImageUrl,
+                    accentColor: row.event.page?.accentColor,
+                    organisationName: row.event.organisation.name,
+                    goingCount: row.event.showRegistrationCount ? goingByEvent.get(row.event.id) ?? 0 : null,
+                  }}
                 />
-              </Grid>
-            ) : (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={row.id}>
-                <InstanceCard
-                  orgSlug={row.orgSlug}
-                  instanceId={row.instance.id}
-                  title={row.instance.series.title}
-                  description={row.instance.series.description}
-                  startDateTime={row.instance.startDateTime}
-                  endDateTime={row.instance.endDateTime}
-                  timezone={row.instance.series.timezone}
+              ) : (
+                <PublicEventCard
+                  event={{
+                    href: `/${row.orgSlug}/i/${row.instance.id}`,
+                    title: row.instance.series.title,
+                    startDateTime: row.instance.startDateTime,
+                    timezone: row.instance.series.timezone,
+                    fallbackAccent: INK_ACCENT,
+                    organisationName: row.instance.series.organisation.name,
+                    recurrenceChip: recurrenceChip(row.instance.series.recurrenceRule),
+                    recurrenceText: describeRecurrence(row.instance.series.recurrenceRule),
+                  }}
                 />
-              </Grid>
-            ),
-          )}
-        </Grid>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
 
-      {/* Pagination controls */}
       {totalPages > 1 ? (
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{
-            justifyContent: "center",
-            alignItems: "center",
-            pt: 2,
-          }}
-        >
-          <Button
-            href={`/discover${buildQueryString({ ...baseParams, page: String(safePage - 1) })}`}
-            variant="outlined"
-            size="small"
-            disabled={safePage <= 1}
-            startIcon={<NavigateBeforeIcon />}
-            sx={{ borderRadius: 2 }}
-          >
-            Previous
-          </Button>
-
-          {/* Page number buttons - show up to 7 pages */}
+        <nav aria-label="Pagination" className="flex flex-wrap items-center justify-center gap-1.5 pt-2">
+          {safePage > 1 ? (
+            <Button asChild variant="secondary" size="sm">
+              <Link href={pageHref(safePage - 1)}><ChevronLeft aria-hidden className="size-4" />Previous</Link>
+            </Button>
+          ) : (
+            <Button variant="secondary" size="sm" disabled><ChevronLeft aria-hidden className="size-4" />Previous</Button>
+          )}
           {paginationWindow(safePage, totalPages).map((p) => (
-              <Button
-                key={p}
-                href={`/discover${buildQueryString({ ...baseParams, page: String(p) })}`}
-                variant={p === safePage ? "contained" : "text"}
-                size="small"
-                sx={{
-                  minWidth: 40,
-                  borderRadius: 2,
-                  ...(p === safePage
-                    ? {
-                        backgroundColor: "#0A84FF",
-                        color: "#FFFFFF",
-                        fontWeight: 600,
-                      }
-                    : {
-                        color: "#8E8E93",
-                      }),
-                }}
-              >
-                {p}
-              </Button>
-            ))}
-
-          <Button
-            href={`/discover${buildQueryString({ ...baseParams, page: String(safePage + 1) })}`}
-            variant="outlined"
-            size="small"
-            disabled={safePage >= totalPages}
-            endIcon={<NavigateNextIcon />}
-            sx={{ borderRadius: 2 }}
-          >
-            Next
-          </Button>
-        </Stack>
+            <Link
+              key={p}
+              href={pageHref(p)}
+              aria-current={p === safePage ? "page" : undefined}
+              className={cn("inline-flex size-9 items-center justify-center rounded-full text-sm font-semibold", p === safePage ? "bg-primary text-on-primary" : "text-ink-secondary hover:bg-emphasis")}
+            >
+              {p}
+            </Link>
+          ))}
+          {safePage < totalPages ? (
+            <Button asChild variant="secondary" size="sm">
+              <Link href={pageHref(safePage + 1)}>Next<ChevronRight aria-hidden className="size-4" /></Link>
+            </Button>
+          ) : (
+            <Button variant="secondary" size="sm" disabled>Next<ChevronRight aria-hidden className="size-4" /></Button>
+          )}
+        </nav>
       ) : null}
-    </Stack>
+    </div>
   );
 }

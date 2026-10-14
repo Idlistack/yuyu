@@ -14,10 +14,9 @@ import {
 } from "react";
 import { AlertCircle, ChevronDown, Eye, EyeOff, Lock, Search, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { controlClasses } from "./styles";
 
-/** Shared look for text inputs, textareas, and selects (docs/DESIGN.md §4.2). */
-export const controlClasses =
-  "block w-full rounded-md border border-line-strong bg-canvas px-3.5 py-[11px] text-base text-ink placeholder:text-ink-disabled transition-colors duration-[180ms] ease-yy hover:border-ink-muted focus:border-[var(--yy-focus)] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--yy-focus)] disabled:cursor-not-allowed disabled:bg-subtle disabled:text-ink-muted aria-[invalid=true]:border-danger-fg read-only:bg-subtle read-only:border-line";
+export { controlClasses };
 
 type FieldProps = {
   label: ReactNode;
