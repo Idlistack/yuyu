@@ -8,7 +8,7 @@ import { ToastProvider } from "@/components/feedback/ToastProvider";
 import { TooltipProvider } from "@/components/ui/menu";
 import { COLOR_MODE_COOKIE, COLOR_MODE_STORAGE_KEY, type ColorMode } from "@/lib/colorMode";
 
-type ColorModePreference = ColorMode | "system";
+export type ColorModePreference = ColorMode | "system";
 
 function readPreference(): ColorModePreference {
   try {
@@ -43,8 +43,12 @@ type ColorModeOrigin = { x: number; y: number };
 
 const ColorModeContext = createContext<{
   mode: ColorMode;
+  /** The stored choice; "system" follows the operating system. */
+  preference: ColorModePreference;
   /** Pass the click point to reveal the new mode from there. */
   toggleColorMode: (origin?: ColorModeOrigin) => void;
+  /** Pick light, dark or system explicitly (same storage as the toggle). */
+  setColorModePreference: (next: ColorModePreference, origin?: ColorModeOrigin) => void;
 } | null>(null);
 
 function applyColorMode(next: ColorMode) {
@@ -157,26 +161,34 @@ export function Providers({
     }
   }, [preference]);
 
-  const colorMode = useMemo(
-    () => ({
+  const colorMode = useMemo(() => {
+    const setColorModePreference = (next: ColorModePreference, origin?: ColorModeOrigin) => {
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      try {
+        if (next === "system") window.localStorage.removeItem(COLOR_MODE_STORAGE_KEY);
+        else window.localStorage.setItem(COLOR_MODE_STORAGE_KEY, next);
+      } catch {
+        // Ignore blocked storage; the cookie still carries the choice.
+      }
+      document.cookie = next === "system"
+        ? `${COLOR_MODE_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`
+        : `${COLOR_MODE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+      const resolved: ColorMode = next === "system" ? (readSystemDark() ? "dark" : "light") : next;
+      const commit = () => {
+        // Tokens and React state (icons, labels) change in the same frame.
+        applyColorMode(resolved);
+        flushSync(() => window.dispatchEvent(new Event("yuyu:color-mode-change")));
+      };
+      if (resolved === mode) commit();
+      else transitionColorMode(commit, origin);
+    };
+    return {
       mode,
-      toggleColorMode: (origin?: ColorModeOrigin) => {
-        const next: ColorMode = mode === "dark" ? "light" : "dark";
-        try {
-          window.localStorage.setItem(COLOR_MODE_STORAGE_KEY, next);
-        } catch {
-          // Ignore blocked storage; the cookie still carries the choice.
-        }
-        document.cookie = `${COLOR_MODE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax${window.location.protocol === "https:" ? "; Secure" : ""}`;
-        transitionColorMode(() => {
-          // Tokens and React state (icons, labels) change in the same frame.
-          applyColorMode(next);
-          flushSync(() => window.dispatchEvent(new Event("yuyu:color-mode-change")));
-        }, origin);
-      },
-    }),
-    [mode],
-  );
+      preference,
+      setColorModePreference,
+      toggleColorMode: (origin?: ColorModeOrigin) => setColorModePreference(mode === "dark" ? "light" : "dark", origin),
+    };
+  }, [mode, preference]);
   return (
     <SessionProvider session={session}>
       <ColorModeContext.Provider value={colorMode}>

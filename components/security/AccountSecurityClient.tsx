@@ -3,24 +3,20 @@
 import { useState, useTransition } from "react";
 import { signOut } from "next-auth/react";
 import QRCode from "react-qr-code";
-import type { ReactNode } from "react";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Callout, SettingsRow } from "@/components/ui/display";
+import { Callout, Chip } from "@/components/ui/display";
 import { Field, Input } from "@/components/ui/field";
 import {
   beginMfaEnrollment,
   confirmMfaEnrollment,
   disableMfa,
-  revokeAllSessions,
 } from "@/app/actions/security";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
+import { AccountCard } from "@/components/account/AccountCard";
 
-export function AccountSecurityClient(props: {
-  mfaEnabled: boolean;
-  /** Rendered between two-step sign-in and signed-in devices. */
-  passwordSection?: ReactNode;
-}) {
+/** Two-step verification card: authenticator enrolment, recovery codes, and disabling. */
+export function AccountSecurityClient(props: { mfaEnabled: boolean }) {
   const [enabled, setEnabled] = useState(props.mfaEnabled);
   const [enrollment, setEnrollment] = useState<{
     secret: string;
@@ -28,16 +24,12 @@ export function AccountSecurityClient(props: {
   } | null>(null);
   const [code, setCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [confirmation, setConfirmation] = useState<"mfa" | "sessions" | null>(
-    null,
-  );
+  const [confirming, setConfirming] = useState(false);
   const run = (task: () => Promise<void>) =>
     startTransition(async () => {
       setError(null);
-      setMessage(null);
       try { await task(); }
       catch { setError("Security settings are temporarily unavailable. Please try again."); }
     });
@@ -53,31 +45,33 @@ export function AccountSecurityClient(props: {
     });
 
   return (
-    <div className="flex flex-col">
-      {error ? <Callout tone="danger" role="alert" className="mb-4">{error}</Callout> : null}
-      {message ? <Callout tone="success" role="status" className="mb-4">{message}</Callout> : null}
+    <AccountCard
+      id="mfa"
+      title="Two-step verification"
+      description="Ask for a six-digit authenticator code when you sign in with your password."
+      action={enabled ? (
+        <Chip size="sm" tone="success" icon={<ShieldCheck />}>On</Chip>
+      ) : (
+        <Chip size="sm" tone="warning" icon={<ShieldAlert />}>Off</Chip>
+      )}
+    >
+      <div className="flex flex-col gap-4">
+        {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
 
-      <section aria-labelledby="mfa-title" className="flex flex-col gap-4 pb-2">
         {!enabled ? (
-          <div className="flex flex-col gap-4 rounded-xl bg-warning-bg p-5 text-warning-fg sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-4 rounded-xl bg-warning-bg p-4 text-warning-fg sm:flex-row sm:items-center sm:p-5">
             <ShieldAlert aria-hidden className="size-5 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <h2 id="mfa-title" className="font-sans text-[17px] font-bold">Two-step sign-in is off</h2>
-              <p className="mt-0.5 text-body-ui">Add an authenticator app so a stolen password isn’t enough. Google sign-in follows your Google security.</p>
-            </div>
+            <p className="min-w-0 flex-1 text-body-ui">Add an authenticator app so a stolen password isn’t enough. Google sign-in follows your Google security.</p>
             {!enrollment ? (
-              <Button variant="primary" className="shrink-0" disabled={pending} onClick={startEnrollment}>
+              <Button variant="primary" className="w-full shrink-0 sm:w-auto" disabled={pending} onClick={startEnrollment}>
                 Set up authenticator
               </Button>
             ) : null}
           </div>
         ) : (
-          <div className="flex items-start gap-4 rounded-xl bg-success-bg p-5 text-success-fg">
+          <div className="flex items-start gap-3 rounded-xl bg-success-bg p-4 text-success-fg sm:p-5">
             <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <h2 id="mfa-title" className="font-sans text-[17px] font-bold">Two-step sign-in is on</h2>
-              <p className="mt-0.5 text-body-ui">Password sign-in needs a six-digit authenticator code. Google sign-in follows your Google security.</p>
-            </div>
+            <p className="min-w-0 flex-1 text-body-ui">Password sign-in needs a six-digit authenticator code. Google sign-in follows your Google security.</p>
           </div>
         )}
 
@@ -91,11 +85,12 @@ export function AccountSecurityClient(props: {
         ) : null}
 
         {enrollment ? (
-          <div className="flex flex-col gap-4 rounded-lg border border-line bg-canvas p-5 sm:flex-row sm:items-start">
+          <div className="flex flex-col gap-4 rounded-xl border border-line bg-subtle p-4 sm:flex-row sm:items-start sm:p-5">
             <div className="w-fit rounded-md bg-white p-3">
               <QRCode value={enrollment.uri} size={180} />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-3">
+              <p className="text-body-ui text-ink-secondary">Scan the code with your authenticator app, then enter the six-digit code it shows.</p>
               <p className="break-all text-sm text-ink-secondary">
                 Manual key: <span className="font-mono text-ink">{enrollment.secret}</span>
               </p>
@@ -104,7 +99,7 @@ export function AccountSecurityClient(props: {
               </Field>
               <Button
                 variant="primary"
-                className="self-start"
+                className="w-full sm:w-auto sm:self-start"
                 disabled={pending}
                 onClick={() =>
                   run(async () => {
@@ -129,33 +124,25 @@ export function AccountSecurityClient(props: {
         ) : null}
 
         {enabled && recoveryCodes.length === 0 ? (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-end">
             <Field label="Authenticator or recovery code" className="sm:w-72">
               <Input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" />
             </Field>
-            <Button variant="dangerQuiet" disabled={pending || !code.trim()} onClick={() => setConfirmation("mfa")}>
+            <Button variant="dangerQuiet" disabled={pending || !code.trim()} onClick={() => setConfirming(true)}>
               Disable MFA
             </Button>
           </div>
         ) : null}
-      </section>
-
-      {props.passwordSection}
-
-      <SettingsRow title="Signed-in devices" description="Revoke every issued session, including this browser. You will need to sign in again.">
-        <Button variant="danger" disabled={pending} onClick={() => setConfirmation("sessions")}>
-          Revoke all sessions
-        </Button>
-      </SettingsRow>
+      </div>
       <ConfirmationDialog
-        open={confirmation === "mfa"}
+        open={confirming}
         title="Disable multi-factor authentication?"
         message="Password sign-in will no longer require an authenticator code. You will be signed out on success."
         confirmLabel="Disable MFA"
         loading={pending}
-        onCancel={() => setConfirmation(null)}
+        onCancel={() => setConfirming(false)}
         onConfirm={() => {
-          setConfirmation(null);
+          setConfirming(false);
           run(async () => {
             const result = await disableMfa({ code });
             if (!result.ok) setError(result.error);
@@ -167,22 +154,6 @@ export function AccountSecurityClient(props: {
           });
         }}
       />
-      <ConfirmationDialog
-        open={confirmation === "sessions"}
-        title="Revoke all sessions?"
-        message="Every signed-in browser and device, including this one, will be signed out immediately."
-        confirmLabel="Revoke sessions"
-        loading={pending}
-        onCancel={() => setConfirmation(null)}
-        onConfirm={() => {
-          setConfirmation(null);
-          run(async () => {
-            const result = await revokeAllSessions();
-            if (!result.ok) setError(result.error);
-            else await signOut({ callbackUrl: "/login" });
-          });
-        }}
-      />
-    </div>
+    </AccountCard>
   );
 }

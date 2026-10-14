@@ -18,7 +18,8 @@ export type Bucket =
   | "checkinStationPin"
   | "search"
   | "apiRead"
-  | "apiWrite";
+  | "apiWrite"
+  | "dataExport";
 
 const limits: Record<Bucket, { max: number; windowMs: number }> = {
   global: { max: 300, windowMs: 60_000 },
@@ -38,6 +39,7 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   search: { max: 60, windowMs: 60_000 },
   apiRead: { max: 600, windowMs: 60_000 },
   apiWrite: { max: 60, windowMs: 60_000 },
+  dataExport: { max: 5, windowMs: 60 * 60_000 },
 };
 
 // Local fallback store

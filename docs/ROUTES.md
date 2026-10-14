@@ -24,6 +24,7 @@ Dynamic segments are shown as `:name` for readability.
 | `/reset-password` | Password-reset request and completion |
 | `/account` | Authenticated account profile settings |
 | `/account/security` | Authenticated password, MFA, recovery-code, and session controls |
+| `/account/registrations` | Authenticated list of the signed-in user's own registrations, tickets, certificates, and personal data download |
 
 ## User and organisation dashboard
 
@@ -59,6 +60,7 @@ Every super-admin page additionally requires a current TOTP verification. Users 
 | `GET /api/ticket/:token/download` | Opaque token | Download the attendee ticket |
 | `GET /api/feedback/certificate/:token` | Opaque token | Download an eligible JPEG certificate |
 | `GET /api/exports/events/:eventId/attendees` | Authenticated organisation admin or event collaborator with `MANAGE_REGISTRATIONS` | Audited full attendee CSV download |
+| `GET /api/exports/account` | Authenticated user (own data only), rate limited per user | Audited (`ACCOUNT_DATA_EXPORTED`) personal JSON export; excludes secrets, hashes, and all bearer tokens |
 | `GET /api/uploads/:key` | Public application route | Stream an allowlisted organisation WebP derivative with immutable/nosniff response controls |
 | `/api/auth/*` | Auth.js | Session, provider, callback, and credential endpoints |
 | `GET /api/v1/events` | Machine bearer credential + `events:read` | Paginated tenant event metadata |

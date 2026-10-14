@@ -682,6 +682,8 @@ model RSVP {
   checkInEvents     CheckInEvent[]
 
   @@index([eventId])
+  /// "Your registrations" and the personal data export look RSVPs up by user.
+  @@index([userId, createdAt])
   @@index([eventId, status, checkedInAt, createdAt, id], map: "RSVP_eventId_status_checkedInAt_createdAt_id_idx")
   @@index([eventInstanceId])
   @@index([eventId, attendeeKey])

@@ -5,6 +5,7 @@
 ## Accounts and authentication
 
 - Email/password signup and sign-in with bcrypt password hashing and one-time inbox verification before account activation.
+- Account area with Profile (name, photo, email status, Light/Dark/System appearance), Registrations (your upcoming and past tickets with cancel, certificates, and a personal JSON data export that never includes passwords, security codes or ticket links), Organisations (memberships and roles, event co-organiser roles, pending co-organiser invites, and leaving an organisation, blocked for the only owner), and Security (password, two-step verification, sign-in methods, recent security activity, sign out everywhere).
 - Optional Google OAuth.
 - Password-reset requests delivered through the transactional outbox.
 - Authenticator-app MFA for credential accounts, including recovery codes.

@@ -3,9 +3,10 @@
 import { useState, useTransition } from "react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Callout, SettingsRow } from "@/components/ui/display";
+import { Callout } from "@/components/ui/display";
 import { Field, PasswordInput } from "@/components/ui/field";
 import { updateAccountPassword } from "@/app/actions/account";
+import { AccountCard } from "@/components/account/AccountCard";
 
 export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -20,14 +21,15 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
     confirmPassword.length > 0 && newPassword !== confirmPassword;
 
   return (
-    <SettingsRow
+    <AccountCard
+      id="account-password"
       title={hasPassword ? "Password" : title}
       description={hasPassword
         ? "Changing your password signs you out on every device."
         : "Add email-and-password sign-in alongside your Google account. You will be signed out after it is set."}
     >
       <form
-        className="flex flex-col gap-4"
+        className="flex max-w-md flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           setError(null);
@@ -72,7 +74,7 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
         <Button
           type="submit"
           variant="primary"
-          className="self-start"
+          className="w-full sm:w-auto sm:self-start"
           disabled={
             pending ||
             !newPassword ||
@@ -84,6 +86,6 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
           {pending ? "Saving…" : hasPassword ? "Update password" : title}
         </Button>
       </form>
-    </SettingsRow>
+    </AccountCard>
   );
 }

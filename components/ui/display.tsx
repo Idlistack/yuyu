@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Info, Repeat, XCircle } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { DotFace } from "@/components/brand/DotFace";
+import { AvatarImage } from "./avatar-image";
 import type { DotFaceMood } from "@/components/brand/patterns";
 
 /* ---------- Chips (docs/DESIGN.md §4.5) ---------- */
@@ -149,10 +150,9 @@ export function Avatar({ name, src, size = "md", tone = "neutral", className }: 
     ink: "bg-primary text-on-primary",
   }[tone];
   return (
-    <span className={cn("relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold", avatarSizes[size], !src && toneClass, className)}>
+    <span className={cn("relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold", avatarSizes[size], toneClass, className)}>
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- user images are served by the app's own upload route
-        <img src={src} alt="" className="size-full object-cover" />
+        <AvatarImage src={src} fallback={<span aria-hidden>{initials(name)}</span>} />
       ) : (
         <span aria-hidden>{initials(name)}</span>
       )}
