@@ -23,7 +23,7 @@ const steps = [
 const features = [
   { title: "Event pages in your colours", body: "A page for every event, with your cover, logo, schedule, speakers, venue and FAQ.", icon: "icon-page" },
   { title: "Registration and waitlists", body: "Custom questions, capacity limits, approvals and automatic waitlist promotion.", icon: "icon-done" },
-  { title: "Tickets and offline check-in", body: "QR tickets in every inbox, a check-in desk on any phone and a PIN-locked door station.", icon: "icon-check-in" },
+  { title: "Tickets and offline check-in", body: "QR tickets that tear away live at check-in, a desk on any phone, a PIN-locked door station and badge printing.", icon: "icon-check-in" },
   { title: "Programme and live schedule", body: "Parallel tracks, sessions and live delays that update for everyone in the room.", icon: "icon-time" },
   { title: "Speakers and sessions", body: "Speaker pages, session pages and resources people can open after the talk.", icon: "icon-speaker" },
   { title: "Feedback and certificates", body: "Quick feedback forms and certificates you design once and send to everyone who came.", icon: "icon-certificate" },

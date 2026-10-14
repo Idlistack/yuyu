@@ -205,7 +205,11 @@ Flat by default: cards use a 1px `--yy-border`, no shadow.
 - Respect `prefers-reduced-motion: reduce` → no translate/scale, fades ≤ 120ms.
 - Success moments (Registered, Checked in): a single 360ms scale-in of the check icon; no confetti.
 - **Colour-mode switch** (`components/providers.tsx`): the new mode grows from the toggle as a soft-edged circle (View Transitions + an animated `--yy-reveal` mask, 720ms, final frame held with `fill: "forwards"` so the old mode never flashes back). The light/dark illustration twins are decoded before the snapshot, waiting at most 150ms. Without View Transitions, colours cross-fade for 420ms. Reduced motion switches instantly.
-- **Loading:** `DotLoader` lights the mark's dots row by row (1.6s loop) on Yuyu chrome. Buttons keep their own pending state. With reduced motion, the mark stays lit and still.
+- **Loading:** `DotLoader` (`components/brand/DotLoader.tsx`) is three dots, two marigold and one ink, hopping left to right in turn (`.yy-dot-loader-jump`, 1.2s loop, 160ms stagger, `role="status"` with a hidden label). `PageLoader` centres it fixed in the viewport for route `loading.tsx` screens (dashboard, organisation, event). There is no root `loading.tsx`: a root Suspense boundary streams a 200 before `notFound()`/redirects run. Buttons keep their own pending state. With reduced motion the dots rest on the baseline.
+- **Dialogs** open in place: overlay fades in (180ms), panel fades and rises 8px from `scale(.98)` (`yy-dialog-in`, 240ms). Centring uses the `translate` property, so the keyframes animate only `transform`; mixing the two made dialogs fly in from the top-left.
+- **Physical objects** (envelope, letter, ticket stub) move on springs, with stages overlapping instead of waiting for each other (the flap is still swinging while the letter slides out). Gravity exits use an ease-in curve such as `[0.45, 0, 0.85, 0.35]`.
+- **Cross-fades between stages:** render each stage as its own full-screen centred layer (`absolute inset-0 grid place-items-center`) so the outgoing and incoming objects share the same spot and nothing shifts.
+- **Restart-safe sequences:** React runs effects twice in development (mount, cleanup, mount). An imperative `animate()` sequence must check it is still the current run after each `await`, stop quietly if its elements have unmounted, and start cleanly from the beginning on the second run. Closing mid-sequence closes straight away.
 
 ### 2.11 Breakpoints
 
@@ -217,14 +221,14 @@ Flat by default: cards use a 1px `--yy-border`, no shadow.
 
 - Icons: 1.8–2px stroke, rounded caps/joins, 16/18/20/24px. Use Lucide (`lucide-react`) to match. Decorative icons get `aria-hidden="true"`; icon-only buttons need `aria-label`.
 - No emoji in UI.
-- Event cover: 16:7 (event page), 2:1 (cards). If none is uploaded, draw a placeholder from the accent: solid accent + 22–24px dot grid at 16–18% white. Never show a broken image.
-- Avatars: photo if present, else initials (1–2 letters, 700 weight) on a tint: `--yy-accent-soft` on event pages; status tint in activity feeds; `--yy-bg-emphasis` for users.
+- Event cover: 16:7 (event page), 2:1 (cards). If none is uploaded, draw a placeholder from the accent: solid accent + 22–24px dot grid at 16–18% white. Never show a broken image. Covers are set through the cover photo editor (§4.16).
+- Avatars: photo if present, else initials (1–2 letters, 700 weight) on a tint: `--yy-accent-soft` on event pages; status tint in activity feeds; `--yy-bg-emphasis` for users. Render photos with `AvatarImage` (`components/ui/avatar-image.tsx`), which swaps to the initials if the image fails to load (missing Gravatar, deleted upload, blocked by CSP) instead of a broken-image icon.
 - Organisation logo: square, radius 9–28 depending on size; fallback = initials on the org accent.
 - Logos of sponsors: real logo in a 40×40 tile; fallback dashed tile. Never repeat the name twice.
 - **Dot illustrations** (Yuyu's own pages only): 7×7 dot icons and faces from `components/brand` or `/public/landing`. Every landing SVG has a `-dark.svg` twin, swapped by `ThemedImage` with CSS only (no JS, no flash).
 - **Faces are always live `DotFace` grids, never images.** On hover of the face or its `.group` card, the dots ripple out from the centre, the eyes blink and the face lifts 4px with a −4° tilt (`.yy-face` in `globals.css`). This is mouse-only (`hover: hover`) and fully still under reduced motion. Pass `hover={false}` where a face must stay still.
 - **Faces carry meaning, not decoration.** `EmptyState` takes a `mood`: Sleepy for empty lists, Sad for errors and not-found, Cheering for "You're in", Wink for checked in, Waiting for the waitlist, Thinking for loading. Keep the existing words beside the face. Organiser surfaces (org page, event schedule) don't show faces.
-- **404:** a dot-grid page with a small companion that follows the pointer (or taps on touch) and settles when idle. It is decorative (`aria-hidden`) and still under reduced motion.
+- **404** (`components/feedback/NotFoundExperience.tsx`): the whole page fits one screen (checked down to 1280×720 and 390×844); no search box, no overline, no face above the heading. A small companion follows the pointer (or taps on touch) and settles when idle; it is decorative (`aria-hidden`). Heading "This page isn't on the programme" (`text-h1`), the requested path in mono, then a ticket that tilts with the pointer and a stub stamped "No match" (danger outline, −14°, spring in). Drag the stub right or press "Tear off the stub": it resists and tilts while pulled, then peels at the perforation and drops away, leaving jagged edges on both pieces (`.yy-ripped-right` / `.yy-ripped-left`, an SVG-mask of 7×10px teeth, ≥ 640px; `.yy-ticket-shadow` drop-shadow because box-shadow ignores masks). The departing stub leaves layout so the ticket doesn't jump. Actions: Go back (primary) + Discover events. Reduced motion: no tilt, no drag, instant stamp.
 
 ---
 
@@ -271,6 +275,8 @@ Rules: destructive actions are never `primary`; destructive confirmations end wi
 - **Switch:** for instant settings (Let waitlisted guests in, Print ID cards). Label + description left, switch right, whole row clickable.
 - **Rating 1–5:** five equal buttons with number + word (Poor, Meh, Okay, Good, Loved it); selected = 2px accent border + accent-soft fill.
 - **PIN input:** 8 boxes 44×60, current box 2px ink border; on kiosks pair with a 3×4 keypad (Clear, 0, ⌫).
+- **Option card:** for one choice among a few with consequences (Publishing, badge style, email design). Radix radio item, `rounded-xl` 1px border, icon in a 32px circle, title (`text-label`) + one-line description; checked = ink border with a 0.5px inset ink shadow and the icon circle turns ink. Hover `bg-subtle`.
+- **Colour picker** (`components/ui/color-picker.tsx`): never the browser's `<input type="color">`. A "Custom" chip sits after the preset swatches (§2.5) and opens a popover: saturation/brightness area (drag or arrow keys), hue slider, hex box, the system eyedropper where the browser has one (Chromium), a live Register button and link sample using the same contrast rules as the event page, and "Use the default colour".
 
 ### 4.4 Tabs & navigation
 
@@ -328,6 +334,9 @@ States: Open · Full ("Join the waitlist", warning) · Approval required ("Reque
 
 Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl` + `shadow-ticket`: accent header (org name 13px, event title Bricolage 800 28px) · 2-col detail grid (DATE, TIME, VENUE, GUEST with overline labels) · perforation (dashed line + two half-circle notches in page bg) · QR on **white plate always** (also in dark mode) + "Show this at the door. It only holds a private ticket link." Actions: Add to calendar (primary), Save ticket (secondary), "Can't make it? Cancel registration" (quiet).
 
+- **Venue:** for in-person events with a valid http(s) map link (`safeHttpUrl`), VENUE is a link to the map in a new tab, with an external icon and an sr-only "(opens in a new tab)". Online events and events without a map link show plain text.
+- **Live tear-away** (`components/ticket/LiveTicket.tsx`): while the ticket is open it listens for its check-in (SSE, polling fallback, 15s re-check). When the desk confirms, the QR stub rips along the perforation and falls away (peels left, hinged top-right, then drops: 0.9s, `x −36`, `y 380`, `rotate −26°`), both edges get jagged teeth (`.yy-ripped-bottom` on the main part, `.yy-ripped-top` on the stub, 10×7px SVG-mask teeth, paired with `.yy-ticket-shadow`), and a "You're checked in" panel takes the stub's place: `bg-success-bg`, dashed `border-line-strong`, `rounded-xl`, a 64px success-solid check that springs in from −25°, Bricolage 800 26px heading, "at {time}" and "Enjoy the event" (0.4s rise, 0.45s delay). Phones vibrate (`[35, 60, 70]`), a polite live region announces it, and "Cancel registration" disappears. Reloads after check-in render the torn state and never show the QR again. Reduced motion: no rip; the stub fades (120ms), the main part closes into a whole card and the panel crossfades in.
+
 ### 4.12 Check-in
 
 - **Station (kiosk, tablet, no site chrome):** header with event, "Station 1", count "3 / 5 checked in", Online/Offline badge, Lock station. Left: camera viewfinder (dark, corner brackets, hint text) + search pill + Find. Right: **full-height result panel**:
@@ -337,6 +346,10 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
   - Below: RECENT list.
 - **PIN lock:** left copy ("Enter the station PIN"), right keypad. Open check-in disabled until 8 digits.
 - **Organiser check-in desk (dashboard tab):** progress tile, offline-readiness callout ("Download guest list"), camera + search, switches, recent check-ins table, Door-station card (QR, Copy link, Show PIN, New PIN, Turn off station).
+- **Badge quick print** (`components/checkin/id-card/QuickPrintSheet.tsx`): with "Print ID cards" on, each check-in opens a small sheet showing the attendee's real badge, one big "Print badge" button (Enter prints; becomes "Print again" / "Done" once sent), Skip, and Edit design. Never the full designer mid-queue.
+- **Badge designer** (`IdCardDesigner.tsx`): a full-screen editor with Undo/Redo (⌘Z / ⇧⌘Z) and Close in the header, then three columns at `lg` (`300px | 1fr | 272px`): **settings** on the left (Style, paper, heading, badge label and footer toggles, "Show on the badge" switches, shrink long names to one line down to 60%, answer order, export/import design); the **badge to scale** in the middle on `bg-subtle` (preview with Short name / Long name / the attendee, grid and guides toggle, snap size; click to select, drag or arrow keys, Shift for bigger steps; guides never print); and an **inspector** for the selected item on the right. Below `lg` it stacks preview first. Print a test card without an attendee.
+- **Badge templates** are black and white only and the **name is always the largest text**: **Classic** (thin inset frame, hairline under the heading), **Bold** (white heading on a solid black top band, name in capitals; prints with exact colour adjust), **Minimal** (no lines, lots of space). Layouts stack so nothing overlaps, and preview and print share the same decoration and line heights.
+- **Paper presets** (`lib/idCardPrint.ts`): A6 (105×148 mm, sheet paper), 4×6 in (label printer), 3×4 in (lanyard pouch), 4×3 in (landscape pouch) and ID card CR80 (85.6×54 mm), each in either orientation. Type and margins scale relative to A6.
 
 ### 4.13 App shell (dashboard)
 
@@ -346,8 +359,9 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
   - Bottom: "View public page ↗" and an account card that opens a menu: Account settings, Light/Dark mode, Sign out.
   - Active item: canvas fill with a border, 600 weight, `aria-current="page"`.
   - Below `md`: sidebar collapses to a top bar + menu sheet.
-- **Super-admin chrome:** no sidebar. A light sticky top bar (canvas, bottom border): Yuyu lockup · "Super admin" label · "Back to dashboard" + account menu on the right, and a second row of pill links to each section (Overview, Activity, Monitoring, Operations, Email, Audit log, Organisations, Events, Users, Auth, Security, Settings, Invites, Storage) that scrolls sideways on phones. Each page opens with the standard title + one-line description; panels are `rounded-2xl` bordered canvas cards.
-- **Event/series header:** ← All events · date block + title (h1 32px) + status chip + "Public · Tomorrow, 9:30 AM" · actions (View page ↗ secondary, Open check-in primary) · underline tabs: Overview, Guests, Page & programme, Registration form, Invites, Check-in, Feedback, Settings.
+- **Super-admin chrome** (`components/super-admin/SuperAdminTopBar.tsx`): no sidebar. A light sticky top bar (`bg-canvas/95` + backdrop blur, bottom border, 56px row, max 1200px): Yuyu lockup · hairline divider · "Super admin" label · "Back to dashboard" ("Dashboard" on phones) + account menu (Light/Dark mode, Sign out) on the right. A second row holds pill links to each section (Overview, Activity, Monitoring, Operations, Email, Audit log, Organisations, Events, Users, Auth, Security, Settings, Invites, Storage); active = `bg-muted` + 600 weight + `aria-current`; the row scrolls sideways on phones.
+- **Super-admin pages stay restrained:** the standard title + one-line description, then `AdminPanel` cards (`rounded-2xl` bordered canvas, `CardHeader`), `MetricRows` for label/value facts, small ink `Sparkline`/`Histogram` charts and capped tables. Overview leads with a "Needs attention" panel whose items link to details. No colour moments, faces or accents; read-only views never show secrets, tokens, answers or message bodies.
+- **Event/series header:** ← All events · date block + title (h1 32px) + status chip + "Public · Tomorrow, 9:30 AM" · actions (View page ↗ secondary, Open check-in primary) · underline tabs: Overview, Guests, Event page, Emails, Check-in, Feedback, Analytics, Settings. Registration form lives under Event page and Invites under Guests. See §5.4 for the tab patterns.
 - Page title pattern: optional greeting/kicker (muted) + h1 + one-line description.
 - Settings pages: left label column (title + helper) / right field column rows separated by dividers; Save/Discard bottom-right.
 
@@ -361,9 +375,19 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
 
 ### 4.15 Dialogs, toasts, menus
 
-- Dialog: `r-2xl`, `shadow-float`, max 480px, title (h3) + body + actions right-aligned (secondary then primary/danger). Destructive dialogs require typing the name for org deletion.
+- Dialog: `r-2xl`, `shadow-float`, max 480px, title (h3) + body + actions right-aligned (secondary then primary/danger). Destructive dialogs require typing the name for org deletion. Overlay `rgba(17,17,19,.48)`; opens in place (§2.10).
+- **Review-before-send dialog** (irreversible bulk actions such as email broadcasts): title "Send to {n} people?", a bordered `dl` summary (To · audience, Subject), and a checkbox "I've checked the preview and want to email {n} people" that must be ticked before the primary button enables. Confirming starts a 5s undo window (§5.4) rather than acting immediately.
 - Toast: bottom-center (mobile) / bottom-left (desktop), ink bg, white text, 4s, optional Undo action.
 - Menu (⋯): `r-lg`, `shadow-float`, items 40px, danger items last in danger fg.
+
+### 4.16 Cover photo editor
+
+- **Picker** (`components/event/CoverImagePicker.tsx`): an empty cover is a 16:7 dashed drop zone ("Drop an image, paste one, or choose a file"); a set cover shows a wide 16:7 preview with Replace, Edit and Remove. Drag-over shows "Drop to replace the cover"; paste works anywhere on the page.
+- **Editor** (`components/media/PhotoEditor.tsx`, reusable): a large dialog with a dark `#111113` stage on the left and tools on the right. The stage always covers the frame (drag, pinch, wheel or keyboard; zoom slider with − / +), with guides for the other crops (Event page 16:7, Cards 2.5:1, Social share 1.91:1). Tools are tabs: **Crop** (rotate left/right, flip, Straighten slider) and **Adjust** (Brightness, Contrast, Saturation, Reset adjustments, plus looks: Original, Vivid, Warm, Cool, Mono, Soft). Placement previews show the card and social-share result. Output shapes: Event page banner 16:7 (1680×735, default), Wide 16:9, Square. Exports WebP with a JPEG fallback. Cancelling with changes asks first.
+
+### 4.17 Account card
+
+`AccountCard` (`components/account/AccountCard.tsx`) is the one card for account pages: `rounded-2xl`, 1px border (`border-danger-border` for `tone="danger"`), padding 20/24, title `text-h4` + one-line muted description on the left, optional actions on the right (stacking on phones), body 20px below. One topic per card; no nested cards.
 
 ---
 
@@ -373,14 +397,15 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
 
 | Area | Screens |
 |---|---|
-| Yuyu's own pages | Home, About, Features, Privacy, Terms |
+| Yuyu's own pages | Home, About (building note, who makes Yuyu), Features, Privacy, Terms |
 | Discover & orgs | Discover (search + filters), Organisation public page (list/calendar), Embeddable event card (520×300) |
-| Attending | Event page, Programme, Session, Speaker, Series date (RSVP), Live schedule, Feedback & certificate, Ticket, Station PIN, Station scanning |
-| Auth & account | Sign in / Create account, Set new password, Verify email, Join organisation, Co-organiser invite, Account profile, Account security |
+| Attending | Event page, Programme, Session, Speaker, Series date (RSVP), Live schedule, Feedback & certificate, Ticket (with live tear-away), Station PIN, Station scanning |
+| Auth & account | Sign in / Create account, Set new password, Verify email, Join organisation, Co-organiser invite, Account: Profile, Registrations, Organisations, Security (§5.5) |
 | Workspace | Workspace home, Organisation events, Create organisation, Members, Organisation settings, API access |
-| Event management | Event overview, Check-in desk, Programme editor, Series manage |
-| Brand & system states | Dot sign kit, app icons, social card, email header, error / empty / loading states, 404 |
-| Not yet designed — follow this system | Create event / series flow, Event settings, Guests list, Registration form builder, Page content editor, Feedback builder/results, Certificate designer, Analytics, Invites, ID card print, Super-admin |
+| Event management | Event overview (short link), Event page tab with Publishing, cover photo editor and colour picker, Registration form builder, Emails (designs, review, undo), Check-in desk, Badge quick print + badge designer, Feedback results, Certificate designer, Analytics, Programme editor, Series manage (§5.4) |
+| Operators | Super-admin top bar and pages: Overview, Activity, Monitoring, Operations, Email, Audit log, Organisations, Events, Users (+ per-user support), Auth, Security, Settings, Invites, Storage |
+| Brand & system states | Dot sign kit, app icons, social card, email header, error / empty states, loading screens (`DotLoader`), 404 (ticket tear) |
+| Not yet designed — follow this system | Create event / series flow, Guests list, Page content editor, Feedback form builder, Invites |
 
 ### 5.2 Event page layout
 
@@ -412,6 +437,37 @@ Built in `app/dashboard/page.tsx` from `lib/dashboardHome.ts`; every number come
 - **Series** (`#series`) with the recurrence in words and the next date; **Team** with member initials, a role breakdown and Invite (owners).
 - **Roles:** members see no management links, check-in or pending-approval counts; rows are not links for them.
 - **New organisation:** with no events and no series, a four-step checklist (profile, first event, team, public page) replaces the page.
+
+### 5.4 Event dashboard tabs
+
+- **Overview:** adds a **Short link** control for owners/admins (Create → copy `/aB3x9Kq`; Regenerate confirms that the old link stops working).
+- **Publishing** (`components/event/PublishingSection.tsx`, the "Publishing" card on the Event page tab): three plain questions instead of a grid of switches.
+  1. *Who can see this event?* option cards Draft / Live / Offline.
+  2. *Who can find it?* option cards Everyone / People with the link / Invited people only, then an "Approve each sign-up" switch row whose description explains the current effect. Shows "Takes effect when the event is live." while not live.
+  3. *Sign-ups:* one bordered list of rows: Limit the number of spots (switch + number), **Close sign-ups** as one segmented control (At the end / Before start / Set time) with a single follow-up field, so only one cutoff exists, and Show how many are going.
+
+  A **live summary line** sits on top (`role="status"`): a status dot + bold headline + detail, e.g. "**Live.** Listed publicly, anyone can sign up · 120 spots · closes 2 hours before." on `bg-success-bg`; Draft and Offline use `bg-subtle` with a warning or muted dot.
+- **Event page:** the accent row is the preset swatches + Custom colour picker (§4.3); the cover uses the photo editor (§4.16). No phone preview; "Open public page" sits at the top of the column. **Registration form** lists the fixed Name/Email rows, then questions; "Add question" opens the answer-type picker at the end of the list, scrolls it into view clear of the sticky bar and focuses the first type. A sticky live preview sits on the right at `lg` (Hide/Show preview).
+- **Emails:** numbered steps: a "Pick a starting point" template row, then audience and message cards on the left and, on the right at `lg`, the design picker and preview (desktop / mobile width), then send history. **Design picker** (`components/broadcasts/DesignPicker.tsx`): a 3-column radio grid of small drawn thumbnails (Classic, Minimal, Accent band, Photo header, Letter) using the option-card checked style plus an ink check badge top-right; Photo header says "Add a cover to use a photo" when there is none. Designs change only the frame. Send opens the review dialog (§4.15); confirming turns the **send bar** into "Sending to {n} people in **5**…" with Undo. Nothing reaches the server until the countdown ends; the reviewed content is snapshotted; leaving the page cancels.
+- **Analytics funnel** ("From sign-up to thank-you"): one row per step (Responded, Going, Checked in, Feedback): label + one-line plain hint · a rounded bar sized as a share of everyone who responded (ink, accent, success, marigold) · the number (Bricolage 800) with "{n}% of {previous}" (never over 100%) or "after the event". Caption: "Each bar is measured against everyone who responded."
+- **Feedback results:** rating rows are label · dots · count; the label column fits the longest label (numbers right-aligned, words such as "Excellent" left-aligned, capped at 16ch and truncated with a `title`).
+- **Certificate designer** (`components/feedback/CertificateBuilder.tsx`): upload the background artwork, then a canvas with an "Add layers" toolbar (text, image for logos, signatures and seals; up to 20 layers) beside a 340px column holding the **Layers** panel and the **inspector** for the selected layer. Text layers take merge tags (Attendee name, event, date, organisation, issue date). A warning callout appears when no layer includes the attendee name. Sample values + "Generate exact preview" render the real output.
+
+### 5.5 Account area
+
+`/account` (layout `components/account/AccountSettingsLayout.tsx`): a **header card** (`rounded-2xl` bordered canvas) with avatar, "Account" kicker, name as `text-h1`, email, chips (Email verified, Two-step on / off) and "Member since". Below it, underline tabs **Profile · Registrations · Organisations · Security** (`accountTabs.ts`; add a tab there). Each tab is a column of `AccountCard`s (§4.17):
+
+- **Profile:** name and photo, email status with resend, appearance (Light / Dark / System).
+- **Registrations:** upcoming and past tickets (View ticket, Event page, Cancel), certificates, Download my data.
+- **Organisations:** memberships and roles, co-organiser roles, pending invites, Leave (blocked for a sole owner).
+- **Security:** password, two-step, sign-in methods, recent security activity, and Sign out everywhere in a danger card.
+
+### 5.6 About page
+
+- **Building note** (`components/landing/about/BuildingNote.tsx`): the hero holds a sealed envelope (hover lifts it 6px, tilts −1° and lifts the flap 16°). Opening it: the envelope travels to the centre (shared `layoutId`, spring 140/22) over a `rgba(17,17,19,.6)` blurred backdrop → the dot-sign wax seal is pressed and cracks, its halves falling under gravity → the flap swings back (spring 85/12) showing a lining of marigold dots → the folded letter slides out as the envelope gives a little → the envelope drops away → the letter unfolds its top then bottom third (spring 100/13, overlapping) and settles into the full note. About four seconds; "Skip to the letter" is always there. Closing (button, Escape or outside click) reverses it: the letter shrinks into the sheet, folds bottom then top, flies onto the envelope, which is already back on the page, and tucks in with a gentle settle. Focus returns to the envelope.
+- **Materials stay paper in both themes:** letter `#FBF7EF` with ink `#2B2620`, paper back `#F1EADB`, kraft envelope gradients (`#F1E4CA → #E2CDA6`), a red wax seal. The letter is serif (17–18px / 1.7, italic title 30–36px), max 640px, with a 34px `DotMark` and an Ember (`#C2410C`) rule beside the list. Never re-tint these for dark mode.
+- **Reduced motion** skips straight to the letter (120ms fades) and closes instantly.
+- **Who makes Yuyu** (`MakerSection.tsx`): two equal cards in a 2-column grid: the maker (peach tint, `rounded-[24px]`, a 64px Happy `DotFace`, "The maker", name, role, a short first-person note, link) and "Hosted on" IdliStack (`bg-subtle` + border, its logo at 48px tall, never stretched). Names in the heading link out with an sr-only "(opens in a new tab)".
 
 ---
 
@@ -464,6 +520,7 @@ Show the timezone abbreviation once per page/section, not on every row. Never sh
 - Event accents keep their fill colour; text uses `--yy-accent-text` (lighter). Tints are re-mixed against `#111113`.
 - Status: dark bg + light fg (see §2.4). Solid success/danger panels stay solid.
 - QR codes always on a white plate.
+- Physical materials stay themselves: the About letter and envelope stay paper, badges stay black on white, and the cover photo editor stage is always dark `#111113`.
 - Shadows → `rgba(0,0,0,.5)`; rely more on borders.
 - Cover images: no automatic dimming.
 - The dot sign swaps its base dot to `#F4F4F5` and soft dots to `#2A2A2E`. Marigold stays the same.
@@ -489,7 +546,7 @@ In the event layout (server component) compute accent tokens with a small pure h
 
 ### 9.3 Shared components
 
-Most of these now exist in `components/ui`, `components/chrome` and `components/brand`. Reuse them before adding new ones: `Button`, `Field` (label + input + helper + error), `SearchField`, `PasswordField`, `Chip`, `StatusChip`, `DateBlock`, `Avatar` (initials fallback), `OrgLogo`, `EventCard`, `EventRow`, `StatTile`, `Callout`, `EmptyState`, `DangerZone`, `SectionNav`, `ScheduleList`, `ProgrammeGrid`, `RegistrationCard`, `StickyRegisterBar`, `Ticket`, `PinInput`, `RatingInput`, `CheckinResult`, `AppShell` (Sidebar + OrgSwitcher), `EventHeader`, `SiteHeader`, `EventContextHeader`, `SiteFooter`, `ConfirmDialog`, `Toast`.
+Most of these now exist in `components/ui`, `components/chrome` and `components/brand`. Reuse them before adding new ones: `Button`, `Field` (label + input + helper + error), `SearchField`, `PasswordField`, `Chip`, `StatusChip`, `DateBlock`, `Avatar` (initials fallback), `OrgLogo`, `EventCard`, `EventRow`, `StatTile`, `Callout`, `EmptyState`, `DangerZone`, `SectionNav`, `ScheduleList`, `ProgrammeGrid`, `RegistrationCard`, `StickyRegisterBar`, `Ticket`, `PinInput`, `RatingInput`, `CheckinResult`, `AppShell` (Sidebar + OrgSwitcher), `EventHeader`, `SiteHeader`, `EventContextHeader`, `SiteFooter`, `ConfirmDialog`, `Toast`, `Dropdown` (`components/ui/select.tsx`), `ColorPicker`, `AvatarImage`, `DotLoader` / `PageLoader`, `PhotoEditor` (`components/media`), `AccountCard`, `AdminPanel` / `MetricRows` (`components/super-admin`).
 
 ### 9.4 Do / Don't
 
@@ -499,4 +556,4 @@ Most of these now exist in `components/ui`, `components/chrome` and `components/
 
 ---
 
-*Version 1.1 · 14 Oct 2026 · Direction A+ (chosen after comparing Commons, Signal and Marquee). 1.1: dot-sign rebrand, Tailwind/Radix implementation notes, open-source links, motion and dark-mode details.*
+*Version 1.2 · 15 Oct 2026 · Direction A+ (chosen after comparing Commons, Signal and Marquee). 1.1: dot-sign rebrand, Tailwind/Radix implementation notes, open-source links, motion and dark-mode details. 1.2: Dropdown, colour picker and photo editor; Publishing, Emails, Analytics, badge printing and certificate designer; live ticket tear; account area; super-admin chrome; About building note; 404 and loading screens; motion principles.*

@@ -9,7 +9,7 @@
 - Optional Google OAuth.
 - Password-reset requests delivered through the transactional outbox.
 - Authenticator-app MFA for credential accounts, including recovery codes.
-- Account profile image/name management, password management, “revoke all sessions,” and MFA management at `/account` and `/account/security`.
+- Account pages at `/account`, `/account/registrations`, `/account/organisations`, and `/account/security`. The personal data export (`GET /api/exports/account`) returns only the signed-in user's own allow-listed data as JSON, is limited to five downloads per hour, and is audited as `ACCOUNT_DATA_EXPORTED`. Leaving an organisation removes only your own membership, is refused for the sole owner, and is audited as `ORGANISATION_MEMBER_LEFT`.
 - JWT session-version invalidation after sensitive account operations.
 
 Google OAuth users rely on the Google account's MFA policy; the application TOTP prompt applies to password authentication.
@@ -27,8 +27,11 @@ Google OAuth users rely on the Google account's MFA policy; the application TOTP
 
 - Draft, published, and hidden event states.
 - A single event publication state controls both public website visibility and RSVP availability.
+- The event's **Publishing** section asks three questions: who can see it (Draft, Live, Offline), who can find it (everyone, people with the link, or invited people, plus an *Approve each sign-up* switch), and sign-ups (spots, a single close-sign-ups rule, and whether to show the count), with a live summary line.
 - Title, description, tags, timezone, dates, location, online status, capacity, and cover image.
-- Public, hidden-link, approval-required, and invite-only privacy modes; approval-required events can also be listed publicly (organisation page, Discover, search).
+- Cover photo editor: 16:7 event banner by default (16:9 and square also available), drag/pinch/wheel/keyboard positioning that always covers the frame, rotate, straighten, flip, brightness/contrast/saturation and preset looks, guides, and card/social-share previews. The edited image is exported as WebP (JPEG fallback) and still passes the normal server-side upload pipeline.
+- Event page accent colour from presets or a custom picker (saturation/brightness area, hue slider, hex input, the system eyedropper where supported, and a live contrast-checked sample).
+- Public, hidden-link, approval-required, and invite-only privacy modes; approval-required events can also be listed publicly (organisation page, Discover, search) through `Event.listedPublicly`. Every listing uses the shared `listedEventAudienceWhere` rule, and sign-up approval still applies.
 - Optional display of confirmed registration counts.
 - Parallel programme tracks for rooms, stages, and streams; live delays cascade only within the affected track, while same-track time overlaps remain visible as organiser warnings.
 - Event cloning, publishing, slug changes, and deletion.
@@ -47,6 +50,7 @@ Google OAuth users rely on the Google account's MFA policy; the application TOTP
 
 - Guest registration by name/email and registration for signed-in users.
 - Custom registration questions: text, textarea, email, phone, select, multiselect, radio, checkbox, number, and date.
+- Per-question help text, placeholders, and settings: length, number and date limits, maximum selections, an "Other" answer, and "show only if" logic based on an earlier choice or yes/no question. Question keys are generated from the question text and never shown. The server enforces every setting and drops answers to questions hidden by logic.
 - Required-field and option validation on the server.
 - Duplicate RSVP prevention per event or instance.
 - Capacity-aware confirmation and waitlisting.
@@ -55,14 +59,15 @@ Google OAuth users rely on the Google account's MFA policy; the application TOTP
 - Confirmation and lifecycle emails are queued through a durable outbox.
 - Confirmed RSVP emails include an `.ics` calendar invitation with the event or occurrence time and location.
 - Event dashboard invitations are queued through the same durable outbox and link invitees to the event registration page.
-- Organisation admins can email selected groups of existing registrations from the event's **Emails** tab: choose any combination of confirmed, waitlisted, pending-approval, and rejected registrations, optionally narrowed to people who did or did not check in. Thirteen starter templates (reminders, know-before-you-go logistics, agenda updates, speaker announcements, schedule or venue changes, cancellation, waitlist and approval updates, on-the-day notes, thank-you, missed-you, and slides/resources) prefill the subject, a rich-text message, and a suggested audience. The editor supports headings, bold/italic, lists, quotes, links, call-to-action buttons, and placeholders for `{{name}}`, `{{event}}`, `{{eventDate}}`, `{{location}}`, `{{eventUrl}}`, `{{ticketLink}}`, `{{feedbackUrl}}`, `{{scheduleUrl}}`, and `{{organisation}}`. Message HTML is reduced to a small sanitised subset on the server, a plain-text alternative is generated automatically, and the dashboard preview is rendered by the server with the real email template at desktop and mobile widths. Five visual designs (Classic, Minimal, Accent band in the event colour, Photo header with the event cover, and Letter) frame the same content; the choice is stored with each broadcast and used for the preview, tests and delivery. Organisers can send themselves a test, review the recipient count and subject in a confirmation step that must be ticked before sending, undo within five seconds, and reuse any previously sent email with its design. Each recipient is a separate outbox message rendered at delivery time, one per email address; ticket links are only inserted for confirmed registrations, and a registration that leaves the audience before delivery is skipped. Sends are rate limited and audited without recipient data.
+- Organisation admins can email selected groups of existing registrations from the event's **Emails** tab: choose any combination of confirmed, waitlisted, pending-approval, and rejected registrations, optionally narrowed to people who did or did not check in. Thirteen starter templates (reminders, know-before-you-go logistics, agenda updates, speaker announcements, schedule or venue changes, cancellation, waitlist and approval updates, on-the-day notes, thank-you, missed-you, and slides/resources) prefill the subject, a rich-text message, and a suggested audience. The editor supports headings, bold/italic, lists, quotes, links, call-to-action buttons, and placeholders for `{{name}}`, `{{event}}`, `{{eventDate}}`, `{{location}}`, `{{eventUrl}}`, `{{ticketLink}}`, `{{feedbackUrl}}`, `{{scheduleUrl}}`, and `{{organisation}}`. Message HTML is reduced to a small sanitised subset on the server, a plain-text alternative is generated automatically, and the dashboard preview is rendered by the server with the real email template at desktop and mobile widths. Five visual designs (Classic, Minimal, Accent band in the event colour, Photo header with the event cover, and Letter) frame the same content; the choice is stored with each broadcast and used for the preview, tests and delivery. Organisers can send themselves a test, review the recipient count and subject in a confirmation step that must be ticked before sending, undo within five seconds, and reuse any previously sent email with its design. Each recipient is a separate outbox message rendered at delivery time, one per email address; ticket links are only inserted for confirmed registrations, and a registration that leaves the audience before delivery is skipped. Sends are rate limited and audited without recipient data. Test sends link `{{ticketLink}}` to the organiser's own ticket when they are confirmed for the event, and otherwise to the event page. Sent emails build image and site links from `NEXT_PUBLIC_BASE_URL`; without it, the photo header falls back to the colour band and site-relative images are left out (the dashboard preview works either way).
 
 ## Tickets and check-in
 
 - Opaque ticket/check-in tokens with QR and manual entry flows.
-- Printable/downloadable attendee ticket.
+- Printable/downloadable attendee ticket. For in-person events with a valid http(s) map link, the venue on the ticket opens the map in a new tab.
+- Live ticket: when the attendee is checked in (scan, manual, offline replay, or station), an open ticket page tears off its QR stub and shows the check-in time, without a reload. Reloading a checked-in ticket shows the torn state and no QR.
 - Organiser attendee lookup, direct check-in, and check-in undo.
-- In-venue attendee badge printing after a QR, manual, or lookup check-in. With badge printing on, each check-in opens a quick print sheet showing that attendee's real badge with one Print button (Enter prints), Skip, and Edit design. The badge designer offers three high-contrast templates; badge-stock presets (A6, 4 × 6 in, 3 × 4 in, 4 × 3 in, CR80 ID card) in portrait or landscape plus custom sizes, with layouts and type that scale to the stock; card text with optional label and footer; email and organisation logo toggles; registration answers chosen from the sign-up form, reordered, and relabelled; long names that shrink to stay on one line; drag, arrow-key nudging and a properties panel for each item; undo/redo; previews with short and long sample names; a test-card print with sample data; and export/import of the design file to set up another desk. Every card includes the attendee's scannable check-in QR, generated locally. Designs are kept in the browser per event.
+- In-venue attendee badge printing after a QR, manual, or lookup check-in. With badge printing on, each check-in opens a quick print sheet showing that attendee's real badge with one Print button (Enter prints), Skip, and Edit design. The badge designer offers three high-contrast templates (Classic, Bold, Minimal), with the name always the largest text; badge-stock presets (A6, 4 × 6 in, 3 × 4 in, 4 × 3 in, CR80 ID card) in portrait or landscape plus custom sizes, with layouts and type that scale to the stock; card text with optional label and footer; email and organisation logo toggles; registration answers chosen from the sign-up form, reordered, and relabelled; long names that shrink to stay on one line; drag, arrow-key nudging and a properties panel for each item; undo/redo; previews with short and long sample names; a test-card print with sample data; and export/import of the design file to set up another desk. Every card includes the attendee's scannable check-in QR, generated locally. Designs are kept in the browser per event.
 - Offline roster storage in the browser and later synchronization.
 - Immutable check-in event history for online and offline actions.
 
@@ -78,16 +83,21 @@ Only eligible confirmed attendees receive a scannable ticket by default. Organis
 - Certificate layouts are snapshotted when feedback is submitted; subsequent layout edits affect new submissions only. Without custom artwork, the standard certificate is used.
 - Feedback links are shared manually; opening a form does not automatically email attendees.
 
+## Event analytics
+
+- The event dashboard's analytics include a registration funnel. Each step has a plain-language hint, a bar sized as a share of everyone who responded, and a percentage of the previous step, never over 100%.
+
 ## Discovery and public pages
 
-- Landing page, organisation pages, event pages, and recurring-instance pages.
+- Landing, About, and Features pages, organisation pages, event pages, and recurring-instance pages.
+- Privacy policy (`/privacy`) and terms of use (`/terms`) describing what the product actually does: guest registrations and custom questions, roles and API access, third-party services (Plausible, Google Maps, Gravatar), cookies and offline rosters, organiser emails, retention windows, the free-events-only rule, organiser duties, check-in stations, and certificates. Deployments should review them against their own jurisdiction and providers.
 - Public-event discovery with paginated, database-bounded search.
 - Search by event title, tags, and organisation name.
 - Public sitemap and crawler controls; ticket and administrative paths are not intended for indexing.
 
 ## Administration and operations
 
-- Instance-wide super-admin area restricted by `SUPER_ADMIN_EMAIL`.
+- Instance-wide super-admin area restricted by `SUPER_ADMIN_EMAIL`, with its own top bar instead of the dashboard sidebar. Every super-admin page checks super-admin access and the MFA step-up itself.
 - Super-admin control to disable new password and Google account creation while preserving existing-user sign-in.
 - Super-admin instance settings for SMTP delivery, Google SSO, and display-only backup posture; instance-managed service secrets are encrypted at rest and never displayed after saving.
 - Read-only super-admin insights: 30-day activity and growth (signups, organisations, events, registrations, check-ins, feedback, broadcasts), email outbox health by message kind and recent broadcasts (subject and audience only), security posture (MFA adoption, owners/admins without MFA, unverified accounts, sign-in methods, sensitive audit actions, machine API clients with credential lifecycle but never secrets), storage breakdowns, and per-user and per-organisation support pages. Tokens, password and credential hashes, registration answers, storage keys, and message bodies are never shown.
