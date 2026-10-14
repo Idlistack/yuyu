@@ -21,7 +21,6 @@ This page contains only work that is not currently implemented. Current behavior
 
 ## Product expansion
 
-- Paid tickets, taxes, refunds, discounts, and payment-provider reconciliation.
 - Scheduled reminders, delivery preferences, and unsubscribe management for attendee communications.
 - Calendar feeds and external calendar synchronization.
 - Cross-event and organisation-level analytics with privacy-preserving aggregation.

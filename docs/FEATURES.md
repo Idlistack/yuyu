@@ -90,7 +90,7 @@ Only eligible confirmed attendees receive a scannable ticket by default. Organis
 ## Discovery and public pages
 
 - Landing, About, and Features pages, organisation pages, event pages, and recurring-instance pages.
-- Privacy policy (`/privacy`) and terms of use (`/terms`) describing what the product actually does: guest registrations and custom questions, roles and API access, third-party services (Plausible, Google Maps, Gravatar), cookies and offline rosters, organiser emails, retention windows, the free-events-only rule, organiser duties, check-in stations, and certificates. Deployments should review them against their own jurisdiction and providers.
+- Privacy policy (`/privacy`) and terms of use (`/terms`) describing what the product actually does: guest registrations and custom questions, roles and API access, third-party services (Google Maps, Gravatar), cookies and offline rosters, organiser emails, retention windows, the free-events-only rule, organiser duties, check-in stations, and certificates. Deployments should review them against their own jurisdiction and providers.
 - Public-event discovery with paginated, database-bounded search.
 - Search by event title, tags, and organisation name.
 - Public sitemap and crawler controls; ticket and administrative paths are not intended for indexing.

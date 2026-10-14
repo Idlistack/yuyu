@@ -54,7 +54,6 @@ const sections: LegalSection[] = [
     title: "Service providers and third parties",
     body: [
       "The operator uses providers to run this instance, such as a hosting provider, file storage, a database, a cache used for rate limiting, an email provider and backups. These providers handle information only to provide their service.",
-      "Analytics. This instance uses Plausible Analytics, hosted at analytics.idliapps.com, to count page visits. It receives the page address without query strings, and does not use cookies or track you across sites. Ticket, invitation, password-reset and email-verification pages are never sent.",
       "Google. If you sign in with Google, Google shares your basic profile with us. Event pages with a venue show an embedded Google Map, and confirmation emails include an “Add to Google Calendar” link. When these load or are used, Google receives your IP address and the venue or event details under its own privacy policy.",
       "Gravatar. Your account page may show your Gravatar picture. To do this, your browser sends Gravatar a one-way hash of your email address.",
       "We may also share information where the law requires it, or to protect the safety and rights of people using the service.",
