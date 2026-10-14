@@ -6,6 +6,7 @@ This directory is the source of truth for the current product, its operation, an
 
 | Document | Purpose |
 | --- | --- |
+| [Design system](DESIGN.md) | V1 visual design brief: tokens, typography, components, page patterns, and voice (redesign in progress on `v1-design-overhaul`) |
 | [Features](FEATURES.md) | Current user-facing and administrative capabilities |
 | [Architecture](ARCHITECTURE.md) | System boundaries, request flows, data model, and background work |
 | [Local development](DEVELOPMENT.md) | Installation, database setup, and everyday commands |

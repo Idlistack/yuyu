@@ -351,6 +351,7 @@ export function EventBroadcastPanel(props: {
         title="Send this email?"
         message={`“${preview.subject || subject}” will be queued for ${recipientCount ?? 0} ${recipientCount === 1 ? "person" : "people"} (${audienceText}). This cannot be recalled once delivery starts.`}
         confirmLabel="Send email"
+        destructive={false}
         loading={pending}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {

@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
+import "@fontsource-variable/bricolage-grotesque/opsz.css";
+import "@fontsource-variable/figtree/wght.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
 import "./globals.css";
+import "./styles/legacy.css";
 import { Providers } from "@/components/providers";
 import { AppBarNav } from "@/components/nav/AppBarNav";
 import { AppFooter } from "@/components/nav/AppFooter";
@@ -29,10 +34,11 @@ export default async function RootLayout({
   await connection();
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   const savedColorMode = (await cookies()).get(COLOR_MODE_COOKIE)?.value;
-  const initialColorMode = isColorMode(savedColorMode) ? savedColorMode : "light";
+  // No saved choice: omit the attribute so the tokens follow the operating system.
+  const initialColorMode = isColorMode(savedColorMode) ? savedColorMode : null;
 
   return (
-    <html lang="en" data-color-mode={initialColorMode}>
+    <html lang="en" data-color-mode={initialColorMode ?? undefined} suppressHydrationWarning>
       <body style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
         <AppRouterCacheProvider options={{ key: "mui" }}>
           <Providers initialColorMode={initialColorMode}>
