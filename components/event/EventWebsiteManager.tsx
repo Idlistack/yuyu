@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/choice";
 import { Callout, Chip, type ChipTone } from "@/components/ui/display";
 import { Field, Input, Dropdown, Textarea } from "@/components/ui/field";
 import { ACCENT_PRESETS, DEFAULT_EVENT_ACCENT, normalizeAccentHex } from "@/lib/theme/accent";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { cn } from "@/lib/cn";
 import {
   deleteWebsiteContent,
@@ -458,6 +459,7 @@ export function EventWebsiteManager(props: Props) {
 
   const accent = parseAccentInput(accentColor);
   const accentPreview = accent.valid && accent.value ? accent.value : accent.valid ? DEFAULT_EVENT_ACCENT : normalizeAccentHex(baseline.accentColor);
+  const customAccent = accent.valid && Boolean(accent.value) && !ACCENT_PRESETS.some((preset) => preset.hex === accent.value);
 
   const onDraftChange = useCallback(
     (kind: ContentKind, dirty: boolean) =>
@@ -641,29 +643,33 @@ export function EventWebsiteManager(props: Props) {
                   </button>
                 );
               })}
+              <ColorPicker
+                value={accent.valid ? accent.value : ""}
+                defaultColor={DEFAULT_EVENT_ACCENT}
+                onChange={(hex) => {
+                  setAccentColor(hex);
+                  touch();
+                }}
+                trigger={
+                  <button
+                    type="button"
+                    aria-label={customAccent ? `Custom colour ${accentPreview}, change` : "Choose a custom colour"}
+                    className={cn(
+                      "inline-flex min-h-10 items-center gap-2 rounded-full bg-canvas pl-2 pr-3.5 text-sm font-semibold text-ink transition-colors hover:bg-subtle",
+                      customAccent ? "border-2 border-ink" : "border border-line-strong",
+                    )}
+                  >
+                    <span
+                      aria-hidden
+                      className="size-6 rounded-full"
+                      style={{ background: customAccent ? accentPreview : "conic-gradient(#f43f5e, #f59e0b, #22c55e, #06b6d4, #6366f1, #d946ef, #f43f5e)" }}
+                    />
+                    {customAccent ? <span className="font-mono">{accentPreview}</span> : "Custom"}
+                  </button>
+                }
+              />
             </div>
-            <div className="flex items-start gap-2.5">
-              <span aria-hidden className="mt-[26px] size-11 shrink-0 rounded-full border border-line" style={{ backgroundColor: accentPreview }} />
-              <Field
-                label="Custom hex colour"
-                className="min-w-0 max-w-55 flex-1"
-                helperText={accent.valid ? "Leave empty for the default." : undefined}
-                error={accent.valid ? undefined : "Use a hex colour such as #C2410C."}
-              >
-                <Input
-                  name="accentColor"
-                  value={accentColor}
-                  onChange={(event) => {
-                    setAccentColor(event.target.value);
-                    touch();
-                  }}
-                  placeholder={DEFAULT_EVENT_ACCENT}
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="font-mono"
-                />
-              </Field>
-            </div>
+            {accent.valid ? null : <p className="text-caption text-danger-fg">The saved colour isn&apos;t a valid hex colour. Pick a preset or a custom colour.</p>}
           </section>
 
           <section aria-labelledby="event-page-sections-title" className="flex flex-col gap-3 rounded-2xl border border-line bg-canvas p-5">
