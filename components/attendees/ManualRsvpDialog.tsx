@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import type { RegistrationFieldType } from "@prisma/client";
+import { useRef, useState, useTransition } from "react";
 import { UserPlus } from "lucide-react";
-import { AttendeeAnswerField } from "@/components/attendees/AttendeeAnswerField";
+import { RegistrationQuestions, focusQuestion, useRegistrationAnswers } from "@/components/rsvp/QuestionField";
+import { identityErrors } from "@/components/rsvp/registrationAnswers";
+import type { RegistrationFieldDefinition } from "@/components/rsvp/registrationTypes";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
@@ -11,14 +12,8 @@ import { Field, Input } from "@/components/ui/field";
 import { addManualRsvp } from "@/app/actions/rsvp-admin";
 import { useToast } from "@/components/feedback/ToastProvider";
 
-export type ManualRsvpField = {
-  id: string;
-  key: string;
-  label: string;
-  type: RegistrationFieldType;
-  required: boolean;
-  options: string[];
-};
+/** A registration question as the organiser's add/edit attendee dialogs render it (help text, limits and logic included). */
+export type ManualRsvpField = RegistrationFieldDefinition & { id: string };
 
 export function ManualRsvpDialog(props: {
   organisationSlug: string;
@@ -33,25 +28,31 @@ export function ManualRsvpDialog(props: {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [answers, setAnswers] = useState<Record<string, unknown>>({});
-
-  const setAnswer = (key: string, value: unknown) => {
-    setAnswers((current) => ({ ...current, [key]: value }));
-  };
+  const [identity, setIdentity] = useState<{ name?: string; email?: string }>({});
+  const questions = useRegistrationAnswers(fields);
+  const formRef = useRef<HTMLFormElement>(null);
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next && !pending) onClose(); }}>
       <DialogContent size="md">
-      <form className="flex min-h-0 flex-col" onSubmit={(event) => {
+      <form ref={formRef} noValidate className="flex min-h-0 flex-col" onSubmit={(event) => {
         event.preventDefault();
         setError(null);
+        const who = identityErrors({ name, email, requireName: true, requireEmail: true });
+        const questionErrors = questions.validate();
+        setIdentity(who);
+        const first = who.name ? "__name" : who.email ? "__email" : fields.find((field) => questionErrors[field.key])?.key;
+        if (first) {
+          focusQuestion(formRef.current, first);
+          return;
+        }
         startTransition(async () => {
           const result = await addManualRsvp({
             organisationSlug,
             eventId,
             name,
             guestEmail: email,
-            answers,
+            answers: questions.payload(),
           });
           if (!result.ok) {
             setError(result.error);
@@ -66,13 +67,17 @@ export function ManualRsvpDialog(props: {
         <DialogHeader title="Add attendee" description="Add a guest RSVP and send their ticket confirmation. Capacity and event registration rules still apply." />
         <DialogBody className="flex flex-col gap-4">
           {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
-          <Field label="Name" required>
-            <Input value={name} onChange={(event) => setName(event.target.value)} autoFocus />
-          </Field>
-          <Field label="Email" required>
-            <Input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-          </Field>
-          {fields.map((field) => <AttendeeAnswerField key={field.key} field={field} value={answers[field.key]} onChange={(value) => setAnswer(field.key, value)} />)}
+          <div data-question-key="__name">
+            <Field label="Name" required error={identity.name}>
+              <Input value={name} onChange={(event) => { setName(event.target.value); setIdentity((current) => ({ ...current, name: undefined })); }} autoFocus />
+            </Field>
+          </div>
+          <div data-question-key="__email">
+            <Field label="Email" required error={identity.email}>
+              <Input type="email" autoComplete="email" value={email} onChange={(event) => { setEmail(event.target.value); setIdentity((current) => ({ ...current, email: undefined })); }} />
+            </Field>
+          </div>
+          <RegistrationQuestions controller={questions} className="gap-4" />
         </DialogBody>
         <DialogFooter>
           <Button variant="secondary" onClick={onClose} disabled={pending}>Cancel</Button>

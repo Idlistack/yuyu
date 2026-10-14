@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Pencil } from "lucide-react";
-import { AttendeeAnswerField } from "@/components/attendees/AttendeeAnswerField";
+import { RegistrationQuestions, focusQuestion, useRegistrationAnswers } from "@/components/rsvp/QuestionField";
+import { identityErrors } from "@/components/rsvp/registrationAnswers";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
@@ -59,21 +60,31 @@ export function EditRsvpDialog(props: {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(attendee.guestName ?? "");
   const [email, setEmail] = useState(attendee.guestEmail ?? "");
-  const [answers, setAnswers] = useState(() =>
-    initialAnswers(attendee, fields),
-  );
-  const setAnswer = (key: string, value: unknown) =>
-    setAnswers((current) => ({ ...current, [key]: value }));
+  const [identity, setIdentity] = useState<{ name?: string; email?: string }>({});
+  // Saved answers, including "Other" text and answers to questions now hidden by logic
+  // (those are dropped on save, matching the server).
+  const questions = useRegistrationAnswers(fields, initialAnswers(attendee, fields));
+  const formRef = useRef<HTMLFormElement>(null);
 
   const canTransfer = !attendee.user;
   return (
     <Dialog open onOpenChange={(next) => { if (!next && !pending) onClose(); }}>
       <DialogContent size="md">
       <form
+        ref={formRef}
+        noValidate
         className="flex min-h-0 flex-col"
         onSubmit={(event) => {
           event.preventDefault();
           setError(null);
+          const who = attendee.user ? {} : identityErrors({ name, email, requireName: true, requireEmail: true });
+          const questionErrors = questions.validate();
+          setIdentity(who);
+          const first = who.name ? "__name" : who.email ? "__email" : fields.find((field) => questionErrors[field.key])?.key;
+          if (first) {
+            focusQuestion(formRef.current, first);
+            return;
+          }
           startTransition(async () => {
             const result = await updateRsvpRegistration({
               organisationSlug,
@@ -81,7 +92,7 @@ export function EditRsvpDialog(props: {
               eventInstanceId,
               rsvpId: attendee.id,
               ...(attendee.user ? {} : { name, guestEmail: email }),
-              answers,
+              answers: questions.payload(),
             });
             if (!result.ok) {
               setError(result.error);
@@ -111,15 +122,19 @@ export function EditRsvpDialog(props: {
             </div>
           ) : (
             <>
-              <Field label="Name" required>
-                <Input value={name} onChange={(event) => setName(event.target.value)} autoFocus />
-              </Field>
-              <Field label="Email" required>
-                <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-              </Field>
+              <div data-question-key="__name">
+                <Field label="Name" required error={identity.name}>
+                  <Input value={name} onChange={(event) => { setName(event.target.value); setIdentity((current) => ({ ...current, name: undefined })); }} autoFocus />
+                </Field>
+              </div>
+              <div data-question-key="__email">
+                <Field label="Email" required error={identity.email}>
+                  <Input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setIdentity((current) => ({ ...current, email: undefined })); }} />
+                </Field>
+              </div>
             </>
           )}
-          {fields.map((field) => <AttendeeAnswerField key={field.key} field={field} value={answers[field.key]} onChange={(value) => setAnswer(field.key, value)} />)}
+          <RegistrationQuestions controller={questions} className="gap-4" />
         </DialogBody>
         <DialogFooter>
           <Button variant="secondary" onClick={onClose} disabled={pending}>Cancel</Button>
