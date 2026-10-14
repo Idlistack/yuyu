@@ -71,12 +71,15 @@ export function BuildingNote({ className }: { className?: string }) {
   const reading = open && (Boolean(reduceMotion) || phase === "reading");
   const trigger = useRef<HTMLButtonElement>(null);
   const [target, setTarget] = useState<DOMRect | null>(null);
-  // The envelope "lands" back on the page after the letter is folded away.
+  // While the folded letter flies home, the envelope is already back on the page
+  // and the backdrop fades; when the letter tucks in, the envelope dips gently.
+  const [flying, setFlying] = useState(false);
   const [returned, setReturned] = useState(0);
 
   const finishClosing = () => {
     setOpen(false);
     setPhase("closed");
+    setFlying(false);
     setReturned((count) => count + 1);
   };
 
@@ -88,6 +91,7 @@ export function BuildingNote({ className }: { className?: string }) {
       setPhase("closed");
       return;
     }
+    setFlying(false);
     setTarget(trigger.current?.getBoundingClientRect() ?? null);
     setPhase("closing");
   };
@@ -120,16 +124,21 @@ export function BuildingNote({ className }: { className?: string }) {
         >
           <span className="block w-full" style={{ aspectRatio: ENVELOPE_RATIO }}>
             {/* While it is open the envelope lives in the dialog; this keeps its place on the page. */}
-            {open && !reduceMotion ? null : (
+            {open && !reduceMotion && !flying ? null : (
               <motion.span
-                key={returned}
-                layoutId={reduceMotion ? undefined : LAYOUT_ID}
+                layoutId={reduceMotion || flying ? undefined : LAYOUT_ID}
                 className="block size-full"
-                initial={returned && !reduceMotion ? { y: -14, scale: 0.97, rotate: -2 } : false}
-                animate={{ y: 0, scale: 1, rotate: 0 }}
-                transition={{ layout: { type: "spring", stiffness: 140, damping: 22 }, default: { type: "spring", stiffness: 260, damping: 16 } }}
+                transition={{ layout: { type: "spring", stiffness: 140, damping: 22 } }}
               >
-                <ClosedEnvelope />
+                <motion.span
+                  key={returned}
+                  className="block size-full"
+                  initial={false}
+                  animate={returned && !reduceMotion ? { y: [0, 5, 0] } : { y: 0 }}
+                  transition={{ duration: 0.5, ease: [0.3, 0, 0.3, 1] }}
+                >
+                  <ClosedEnvelope />
+                </motion.span>
               </motion.span>
             )}
           </span>
@@ -143,8 +152,8 @@ export function BuildingNote({ className }: { className?: string }) {
               <motion.div
                 className="fixed inset-0 z-50 bg-[rgba(17,17,19,0.6)] backdrop-blur-[3px]"
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { duration: 0.5 } }}
-                exit={{ opacity: 0, transition: { duration: 0.25 } }}
+                animate={{ opacity: flying ? 0 : 1, transition: { duration: flying ? 0.6 : 0.5, ease: "easeInOut" } }}
+                exit={{ opacity: 0, transition: { duration: 0.2 } }}
               />
             </DialogPrimitive.Overlay>
             <DialogPrimitive.Content
@@ -165,13 +174,18 @@ export function BuildingNote({ className }: { className?: string }) {
                 </button>
               </DialogPrimitive.Close>
 
-              <AnimatePresence mode="popLayout">
+              {/* Each stage is its own full-screen, centred layer, so stages cross-fade in place. */}
+              <AnimatePresence>
                 {phase === "closing" ? (
-                  <ClosingScene key="closing" target={target} onDone={finishClosing} />
+                  <motion.div key="closing" className="absolute inset-0 grid place-items-center">
+                    <ClosingScene target={target} onFly={() => setFlying(true)} onDone={finishClosing} />
+                  </motion.div>
                 ) : reading ? (
-                  <ReadingLetter key="letter" reduceMotion={Boolean(reduceMotion)} />
+                  <motion.div key="letter" className="absolute inset-0 grid place-items-center" exit={{ opacity: 1, transition: { duration: 0.34 } }}>
+                    <ReadingLetter reduceMotion={Boolean(reduceMotion)} />
+                  </motion.div>
                 ) : (
-                  <motion.div key="scene" exit={{ opacity: 0, scale: 1.03, transition: { duration: 0.35, ease: "easeOut" } }} className="relative">
+                  <motion.div key="scene" className="absolute inset-0 grid place-items-center" exit={{ opacity: 0, scale: 1.03, transition: { duration: 0.35, ease: "easeOut" } }}>
                     <OpeningScene onDone={() => setPhase("reading")} />
                     <button
                       type="button"
@@ -279,50 +293,60 @@ function OpeningScene({ onDone }: { onDone: () => void }) {
   const height = width / ENVELOPE_RATIO;
   const panel = Math.round(height * 0.56);
   const started = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   const play = useCallback(async () => {
     if (started.current) return;
     started.current = true;
+    // Closing mid-opening unmounts the scene; stop quietly instead of animating detached parts.
+    const step = (selector: string, keyframes: Record<string, unknown>, options: Record<string, unknown>): Promise<unknown> =>
+      alive.current && scope.current ? Promise.resolve(animate(selector, keyframes as never, options as never)) : Promise.resolve();
     const spring = (stiffness: number, damping: number, mass = 1) => ({ type: "spring" as const, stiffness, damping, mass });
     const envelope = "[data-env]";
 
     // A breath after arriving, then press the seal.
     await wait(60);
-    await animate("[data-seal]", { scale: [1, 0.9, 1.05], rotate: [0, -5, 2] }, { duration: 0.3, ease: "easeInOut" });
+    await step("[data-seal]", { scale: [1, 0.9, 1.05], rotate: [0, -5, 2] }, { duration: 0.3, ease: "easeInOut" });
 
     // Crack: the halves tumble away under gravity, at slightly different speeds.
-    animate("[data-seal-left]", { x: -60, y: height * 1.5, rotate: -110, opacity: [1, 1, 0] }, { duration: 0.85, ease: [0.45, 0, 0.85, 0.35] });
-    animate("[data-seal-right]", { x: 74, y: height * 1.6, rotate: 135, opacity: [1, 1, 0] }, { duration: 0.9, ease: [0.45, 0, 0.85, 0.35] });
-    animate("[data-label]", { opacity: 0 }, { duration: 0.3 });
+    step("[data-seal-left]", { x: -60, y: height * 1.5, rotate: -110, opacity: [1, 1, 0] }, { duration: 0.85, ease: [0.45, 0, 0.85, 0.35] });
+    step("[data-seal-right]", { x: 74, y: height * 1.6, rotate: 135, opacity: [1, 1, 0] }, { duration: 0.9, ease: [0.45, 0, 0.85, 0.35] });
+    step("[data-label]", { opacity: 0 }, { duration: 0.3 });
     await wait(70);
 
     // The flap swings back on a soft spring; its face darkens as it turns edge-on.
-    animate("[data-flap]", { rotateX: -180 }, spring(85, 12));
-    animate("[data-flap-shade]", { opacity: [0, 0.4, 0.08] }, { duration: 0.65, ease: "easeInOut" });
+    step("[data-flap]", { rotateX: -180 }, spring(85, 12));
+    step("[data-flap-shade]", { opacity: [0, 0.4, 0.08] }, { duration: 0.65, ease: "easeInOut" });
     await wait(270);
-    animate("[data-flap-wrap]", { zIndex: 0 }, { duration: 0 });
+    step("[data-flap-wrap]", { zIndex: 0 }, { duration: 0 });
     await wait(130);
 
     // The letter slides out; the envelope gives a little as it is pulled.
-    animate(envelope, { y: [0, 7, 0], rotate: [-1.5, -0.4, -1.2] }, { duration: 0.65, ease: "easeInOut" });
-    await animate("[data-sheet]", { y: -height * 0.66, rotate: [-1.5, 1.4] }, spring(95, 15));
+    step(envelope, { y: [0, 7, 0], rotate: [-1.5, -0.4, -1.2] }, { duration: 0.65, ease: "easeInOut" });
+    await step("[data-sheet]", { y: -height * 0.66, rotate: [-1.5, 1.4] }, spring(95, 15));
 
     // Lifted clear: the letter comes forward while the envelope drops away.
-    animate("[data-sheet]", { zIndex: 20 }, { duration: 0 });
-    animate(envelope, { y: "120vh", rotate: 16, x: 30 }, { duration: 0.95, ease: [0.5, 0, 0.9, 0.5] });
+    step("[data-sheet]", { zIndex: 20 }, { duration: 0 });
+    step(envelope, { y: "120vh", rotate: 16, x: 30 }, { duration: 0.95, ease: [0.5, 0, 0.9, 0.5] });
     const centre = height / 2 - panel / 2 - height * 0.08;
-    await animate("[data-sheet]", { y: centre, scale: 1.12, rotate: -0.6 }, spring(105, 16));
+    await step("[data-sheet]", { y: centre, scale: 1.12, rotate: -0.6 }, spring(105, 16));
 
     // Unfold: the top third swings up, then the bottom third down, overlapping.
-    animate("[data-top]", { rotateX: 0 }, spring(100, 13));
-    animate("[data-top-shade]", { opacity: 0 }, { duration: 0.5, ease: "easeOut" });
+    step("[data-top]", { rotateX: 0 }, spring(100, 13));
+    step("[data-top-shade]", { opacity: 0 }, { duration: 0.5, ease: "easeOut" });
     await wait(200);
-    animate("[data-bottom]", { rotateX: 0 }, spring(100, 13));
-    animate("[data-sheet]", { rotate: 0 }, spring(90, 14));
-    await animate("[data-bottom-shade]", { opacity: 0 }, { duration: 0.5, ease: "easeOut" });
+    step("[data-bottom]", { rotateX: 0 }, spring(100, 13));
+    step("[data-sheet]", { rotate: 0 }, spring(90, 14));
+    await step("[data-bottom-shade]", { opacity: 0 }, { duration: 0.5, ease: "easeOut" });
     await wait(220);
-    onDone();
-  }, [animate, height, onDone, panel]);
+    if (alive.current) onDone();
+  }, [animate, height, onDone, panel, scope]);
 
   // Start once the envelope has arrived from the page, or shortly after if it didn't travel.
   useEffect(() => {
@@ -403,38 +427,51 @@ function SheetPanels({ panel, open = false }: { panel: number; open?: boolean })
 }
 
 /**
- * Closing: the letter becomes the open sheet again, folds its bottom third up
- * and its top third down, then flies back into the envelope on the page.
+ * Closing: the letter shrinks into the open sheet, folds its bottom third up
+ * and its top third down, then flies back and tucks into the envelope, which
+ * is already waiting on the page as the backdrop fades.
  */
-function ClosingScene({ target, onDone }: { target: DOMRect | null; onDone: () => void }) {
+function ClosingScene({ target, onFly, onDone }: { target: DOMRect | null; onFly: () => void; onDone: () => void }) {
   const [scope, animate] = useAnimate();
   const [width] = useState(() => (typeof window === "undefined" ? 420 : Math.min(window.innerWidth * 0.86, 420)));
   const panel = Math.round((width / ENVELOPE_RATIO) * 0.56);
-  const done = useRef(onDone);
+  const callbacks = useRef({ onFly, onDone });
   useLayoutEffect(() => {
-    done.current = onDone;
+    callbacks.current = { onFly, onDone };
   });
 
   useEffect(() => {
-    let cancelled = false;
-    const fold = { duration: 0.42, ease: [0.45, 0, 0.25, 1] as const };
+    // Development runs effects twice (mount, cleanup, mount) and the cleanup
+    // stops this scope's animations, so each run checks it is still current
+    // and the second run starts the sequence cleanly from the beginning.
+    let current = true;
+    const ease = [0.45, 0, 0.25, 1] as const;
     void (async () => {
-      await animate(scope.current, { opacity: [0, 1], scale: [1.18, 1.12] }, { duration: 0.22, ease: "easeOut" });
-      animate("[data-bottom-shade]", { opacity: 0.28 }, fold);
-      await animate("[data-bottom]", { rotateX: 178 }, fold);
-      animate("[data-top-shade]", { opacity: 0.28 }, fold);
-      await animate("[data-top]", { rotateX: -178 }, fold);
-      if (cancelled || !scope.current) return;
-      // Fly back to the envelope's spot on the page, shrinking into it.
-      const here = (scope.current as HTMLElement).getBoundingClientRect();
+      const sheet = scope.current as HTMLElement;
+      // Cross-fade in from the shrinking letter at the same spot.
+      await animate(sheet, { opacity: [0, 1], scale: [1.32, 1.12], x: 0, y: 0, rotate: 0 }, { duration: 0.34, ease: [0.2, 0.8, 0.2, 1] });
+      if (!current) return;
+      animate("[data-bottom-shade]", { opacity: [0, 0.28] }, { duration: 0.4, ease });
+      await animate("[data-bottom]", { rotateX: [0, 178] }, { duration: 0.4, ease });
+      if (!current) return;
+      animate("[data-top-shade]", { opacity: [0, 0.28] }, { duration: 0.4, ease });
+      await animate("[data-top]", { rotateX: [0, -178] }, { duration: 0.4, ease });
+      if (!current || !sheet.isConnected) return;
+
+      // Home: the envelope reappears on the page and the backdrop fades while the letter flies over.
+      callbacks.current.onFly();
+      const here = sheet.getBoundingClientRect();
       const toX = target ? target.left + target.width / 2 - (here.left + here.width / 2) : 0;
-      const toY = target ? target.top + target.height * 0.45 - (here.top + here.height / 2) : 120;
-      const scale = target ? Math.max(0.3, ((target.width * 0.86) / here.width) * 1.12) : 0.6;
-      await animate(scope.current, { x: toX, y: toY, scale, rotate: [0, -6, -2], opacity: [1, 1, 0] }, { duration: 0.62, ease: [0.5, 0, 0.2, 1] });
-      if (!cancelled) done.current();
+      const toY = target ? target.top + target.height * 0.42 - (here.top + here.height / 2) : 140;
+      const scale = target ? Math.max(0.3, ((target.width * 0.8) / here.width) * 1.12) : 0.6;
+      await animate(sheet, { x: toX, y: toY, scale, rotate: -1.5 }, { duration: 0.7, ease: [0.4, 0, 0.2, 1] });
+      if (!current) return;
+      // Tuck in: a small slide down into the pocket as it fades.
+      await animate(sheet, { y: toY + 10, opacity: 0, scale: scale * 0.97 }, { duration: 0.22, ease: "easeIn" });
+      if (current) callbacks.current.onDone();
     })();
     return () => {
-      cancelled = true;
+      current = false;
     };
   }, [animate, scope, target]);
 
@@ -508,7 +545,7 @@ function ReadingLetter({ reduceMotion }: { reduceMotion: boolean }) {
       variants={reduceMotion ? quiet : settle}
       initial="hidden"
       animate="shown"
-      exit={{ opacity: 0, y: 8, transition: { duration: 0.2 } }}
+      exit={{ opacity: 0, scale: 0.68, transition: { duration: 0.34, ease: [0.4, 0, 0.2, 1] } }}
       className="relative mx-4 max-h-[calc(100dvh-32px)] w-full max-w-[640px] overflow-y-auto rounded-[6px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.55)]"
       style={{ background: PAPER, color: INK }}
     >
