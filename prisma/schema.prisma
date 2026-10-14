@@ -724,6 +724,13 @@ model EventRegistrationField {
   sortOrder Int                   @default(0)
   /// For SELECT / MULTI_SELECT / RADIO (array of strings)
   options   Json?
+  /// Short guidance shown under the question.
+  helpText    String @default("")
+  /// Example shown inside empty text inputs.
+  placeholder String @default("")
+  /// Validation and logic, shape in lib/registrationFields.ts (FieldSettings):
+  /// length/range/date limits, max selections, "Other" option, show-only-if.
+  settings    Json?
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
 

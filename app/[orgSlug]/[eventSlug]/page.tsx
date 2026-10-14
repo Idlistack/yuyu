@@ -12,6 +12,7 @@ import { EventWebsiteShell } from "@/components/event/EventWebsiteShell";
 import { effectiveEventProgram } from "@/lib/eventProgram";
 import { plainTextToSafeHtml, sanitizeRichText } from "@/lib/richText";
 import { isRegistrationClosed } from "@/lib/registrationCutoff";
+import { toFieldDefinition } from "@/lib/registrationFields";
 
 type Props = { params: Promise<{ orgSlug: string; eventSlug: string }> };
 
@@ -205,17 +206,7 @@ export default async function EventPage({ params }: Props) {
         description: resource.description,
         href: resource.externalUrl!,
       }))}
-      registrationFields={(form?.fields ?? []).map((field) => ({
-        key: field.key,
-        label: field.label,
-        type: field.type,
-        required: field.required,
-        options: Array.isArray(field.options)
-          ? field.options.filter(
-              (value): value is string => typeof value === "string",
-            )
-          : [],
-      }))}
+      registrationFields={(form?.fields ?? []).map(toFieldDefinition)}
       confirmedCount={event.showRegistrationCount ? confirmed : null}
       registrationOpen={
         event.status === "PUBLISHED" &&

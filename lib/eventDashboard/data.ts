@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import type { RegistrationFieldType } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { toFieldDefinition, type FieldSettings } from "@/lib/registrationFields";
 
 /*
  * Data loaders shared by several event-dashboard panels. Wrapped in React
@@ -29,19 +30,11 @@ export const loadRsvpStatusCounts = cache(async (eventId: string): Promise<RsvpS
   };
 });
 
-export type RegistrationFieldRow = { id: string; key: string; label: string; type: RegistrationFieldType; required: boolean; sortOrder: number; options: string[] };
+export type RegistrationFieldRow = { id: string; key: string; label: string; type: RegistrationFieldType; required: boolean; sortOrder: number; options: string[]; helpText: string; placeholder: string; settings: FieldSettings };
 
 export const loadRegistrationFields = cache(async (eventId: string): Promise<RegistrationFieldRow[]> => {
   const form = await prisma.eventRegistrationForm.findUnique({ where: { eventId }, include: { fields: { orderBy: { sortOrder: "asc" } } } });
-  return (form?.fields ?? []).map((field) => ({
-    id: field.id,
-    key: field.key,
-    label: field.label,
-    type: field.type,
-    required: field.required,
-    sortOrder: field.sortOrder,
-    options: Array.isArray(field.options) ? field.options.filter((value): value is string => typeof value === "string") : [],
-  }));
+  return (form?.fields ?? []).map((field) => ({ id: field.id, sortOrder: field.sortOrder, ...toFieldDefinition(field) }));
 });
 
 export const MAX_BROWSER_ATTENDEES = 250;
