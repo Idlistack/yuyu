@@ -123,11 +123,11 @@ export function NotFoundExperience() {
   const shortPath = pathname.length > 38 ? `${pathname.slice(0, 36)}…` : pathname;
 
   const content = (
-    <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[1160px] flex-col items-center gap-12 px-4 pb-28 pt-8 sm:px-6 sm:pt-10 lg:pb-[140px] lg:pt-14 xl:px-0">
+    <div style={accentStyle(null)} className="yy-accent-scope mx-auto flex w-full max-w-[1160px] flex-col items-center gap-6 px-4 pb-20 pt-6 sm:px-6 sm:pt-8 lg:gap-7 lg:pb-16 lg:pt-10 xl:px-0">
       <NotFoundPet />
-      <div className="flex flex-col items-center gap-5 text-center">
-        <h1 className="max-w-[760px] text-display-m text-ink">This page isn’t on the programme</h1>
-        <p className="max-w-[560px] text-body-l text-ink-secondary">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <h1 className="max-w-[760px] text-h1 text-ink">This page isn’t on the programme</h1>
+        <p className="max-w-[620px] text-body-ui text-ink-secondary sm:text-[17px]">
           We scanned the ticket for <span className="font-mono text-[0.92em] text-ink">{shortPath}</span> and couldn’t find a match. It may have moved, expired, or never existed.
         </p>
       </div>
@@ -143,11 +143,11 @@ export function NotFoundExperience() {
         >
           {/* Main part */}
           <div className="relative min-w-0 flex-1 overflow-hidden rounded-t-[20px] border border-line bg-canvas shadow-float sm:rounded-l-[20px] sm:rounded-tr-none sm:border-r-0">
-            <div className="bg-accent px-6 py-5 text-on-accent">
+            <div className="bg-accent px-5 py-3.5 text-on-accent">
               <p className="text-label opacity-90">Yuyu · Lost &amp; found</p>
-              <p className="font-display text-[28px] font-extrabold leading-tight tracking-[-0.02em] sm:text-[32px]">Page not found</p>
+              <p className="font-display text-[24px] font-extrabold leading-tight tracking-[-0.02em] sm:text-[26px]">Page not found</p>
             </div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-4 p-6">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-5 py-4">
               <div className="col-span-2">
                 <TicketField label="Requested" value={pathname} mono />
               </div>
@@ -168,7 +168,7 @@ export function NotFoundExperience() {
           </motion.div>
 
           {/* Stub (drag right, or use the button, to tear it off) */}
-          <div className="relative sm:w-[208px]">
+          <div className="relative sm:w-[176px]">
             <AnimatePresence initial={false}>
               {torn ? (
                 <motion.div
@@ -196,9 +196,9 @@ export function NotFoundExperience() {
                   onDragEnd={onStubDragEnd}
                   style={{ x: stubX, rotate: stubRotate, transformOrigin: "0% 100%" }}
                   exit={reduceMotion ? { opacity: 0 } : { x: 220, y: 140, rotate: 38, opacity: 0, transition: { duration: 0.55, ease: [0.4, 0, 0.6, 1] } }}
-                  className="relative flex h-full cursor-grab touch-pan-y flex-col items-center justify-center gap-3 overflow-hidden rounded-b-[20px] border border-line bg-canvas px-5 py-5 shadow-float active:cursor-grabbing sm:rounded-r-[20px] sm:rounded-bl-none sm:border-l-0"
+                  className="relative flex h-full cursor-grab touch-pan-y flex-col items-center justify-center gap-2 overflow-hidden rounded-b-[20px] border border-line bg-canvas px-5 py-5 shadow-float active:cursor-grabbing sm:rounded-r-[20px] sm:rounded-bl-none sm:border-l-0"
                 >
-                  <div className="relative w-[132px] rounded-[10px] border border-line bg-white p-2">
+                  <div className="relative w-[104px] rounded-[10px] border border-line bg-white p-2">
                     <svg viewBox={`0 0 ${QR_SIZE} ${QR_SIZE}`} className="block w-full text-[#18181B]" shapeRendering="crispEdges" aria-hidden>
                       {qr.map(([x, y]) => (
                         <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="currentColor" />
@@ -214,7 +214,7 @@ export function NotFoundExperience() {
                       />
                     ) : null}
                     <motion.span
-                      className="absolute left-1/2 top-1/2 whitespace-nowrap rounded-md border-[3px] border-danger-solid px-2 py-0.5 font-display text-[17px] font-extrabold uppercase tracking-[0.06em] text-danger-solid"
+                      className="absolute left-1/2 top-1/2 whitespace-nowrap rounded-md border-[3px] border-danger-solid px-2 py-0.5 font-display text-[14px] font-extrabold uppercase tracking-[0.06em] text-danger-solid"
                       initial={reduceMotion ? { x: "-50%", y: "-50%", rotate: -14, opacity: 1, scale: 1 } : { x: "-50%", y: "-50%", rotate: -30, opacity: 0, scale: 2.4 }}
                       animate={{ x: "-50%", y: "-50%", rotate: -14, opacity: 1, scale: 1 }}
                       transition={{ delay: reduceMotion ? 0 : 1.7, type: "spring", stiffness: 520, damping: 18 }}
@@ -229,8 +229,8 @@ export function NotFoundExperience() {
           </div>
         </motion.div>
         {!torn ? (
-          <div className="mt-3 flex justify-center">
-            <button type="button" onClick={() => setTorn(true)} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-line-strong bg-canvas px-4 text-label text-ink-secondary transition-colors hover:bg-subtle hover:text-ink">
+          <div className="mt-2.5 flex justify-center">
+            <button type="button" onClick={() => setTorn(true)} className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line-strong bg-canvas px-4 text-label text-ink-secondary transition-colors hover:bg-subtle hover:text-ink">
               <Scissors aria-hidden className="size-4" />
               Tear off the stub
             </button>
@@ -239,15 +239,15 @@ export function NotFoundExperience() {
       </div>
 
       {/* Ways forward */}
-      <div className="flex w-full max-w-[560px] flex-col items-center gap-5">
-        <form onSubmit={search} role="search" className="flex w-full gap-2">
+      <div className="flex w-full max-w-[560px] flex-col items-center gap-3 lg:max-w-[880px] lg:flex-row lg:justify-center">
+        <form onSubmit={search} role="search" className="flex w-full gap-2 lg:w-[420px]">
           <label htmlFor="not-found-search" className="sr-only">Search events</label>
           <SearchInput id="not-found-search" placeholder="Looking for an event?" value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} />
           <Button type="submit" variant="secondary" startIcon={<Search />}>Search</Button>
         </form>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button onClick={goBackOrHome} variant="primary" size="lg" startIcon={<ArrowLeft />}>Go back</Button>
-          <Button asChild variant="secondary" size="lg">
+        <div className="flex shrink-0 flex-wrap justify-center gap-2">
+          <Button onClick={goBackOrHome} variant="primary" startIcon={<ArrowLeft />}>Go back</Button>
+          <Button asChild variant="secondary">
             <Link href="/discover">
               <Compass aria-hidden className="size-[18px]" />
               Discover events
