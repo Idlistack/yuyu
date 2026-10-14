@@ -1,7 +1,8 @@
 import { ThemedImage } from "@/components/ui/themed-image";
 import { LegalToc } from "./LegalToc";
 
-export type LegalSection = { id: string; title: string; body: string };
+/** One paragraph, or several in order. */
+export type LegalSection = { id: string; title: string; body: string | string[] };
 
 // The title block's bottom rule runs edge to edge (Figma 126:3275) while the page
 // sits in the 1160px column; a border-image outset paints it without adding scroll.
@@ -27,7 +28,9 @@ export function LegalPage({ title, updated, notice, sections }: { current?: "pri
           {sections.map((section) => (
             <section key={section.id} id={section.id} aria-labelledby={`${section.id}-title`} className="flex scroll-mt-[100px] flex-col gap-3">
               <h2 id={`${section.id}-title`} className="text-h3 text-ink">{section.title}</h2>
-              <p className="text-body text-ink-secondary">{section.body}</p>
+              {(Array.isArray(section.body) ? section.body : [section.body]).map((paragraph) => (
+                <p key={paragraph} className="text-body text-ink-secondary">{paragraph}</p>
+              ))}
             </section>
           ))}
         </div>
