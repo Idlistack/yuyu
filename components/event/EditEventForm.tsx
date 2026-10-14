@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { EventPrivacyType, EventStatus } from "@prisma/client";
 import type { EventClientDto } from "@/lib/eventDto";
@@ -8,7 +8,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SwitchRow } from "@/components/ui/choice";
-import { Callout, Card, Chip, SettingsRow } from "@/components/ui/display";
+import { Callout, Chip } from "@/components/ui/display";
 import { Field, Input, NativeSelect } from "@/components/ui/field";
 import { updateEvent, uploadEventCoverImage } from "@/app/actions/event";
 import { uploadEventPageLogo } from "@/app/actions/media";
@@ -18,6 +18,7 @@ import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
 import { zonedDatetimeLocalValue, zonedInputToIso } from "@/lib/timeZone";
+import { UnsavedChangesBar } from "@/components/event-dashboard/event-page/UnsavedChangesBar";
 
 const timezones = [
   "UTC",
@@ -34,6 +35,20 @@ const timezones = [
 function zonedInputValue(value: Date | string, timeZone: string) {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? "" : zonedDatetimeLocalValue(date, timeZone);
+}
+
+/** One titled card of the details form. */
+function FormCard({ title, description, children }: { title: ReactNode; description: string; children: ReactNode }) {
+  const titleId = useId();
+  return (
+    <section aria-labelledby={titleId} className="flex flex-col gap-5 rounded-2xl border border-line bg-canvas p-5 sm:p-6">
+      <div>
+        <h2 id={titleId} className="flex flex-wrap items-center gap-2 text-h4 text-ink">{title}</h2>
+        <p className="mt-0.5 text-body-ui text-ink-muted">{description}</p>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export function EditEventForm(props: {
@@ -78,6 +93,27 @@ export function EditEventForm(props: {
   const [privacyType, setPrivacyType] = useState<EventPrivacyType>(
     event.privacyType,
   );
+  // Remounts the form (uncontrolled fields, pickers, rich text) when changes are discarded.
+  const [formKey, setFormKey] = useState(0);
+
+  function discard() {
+    setCoverPreviewUrl(event.coverImageUrl ?? "");
+    setCoverImageFile(null);
+    setPageLogoPreviewUrl(page?.logoUrl ?? "");
+    setPageLogoFile(null);
+    setIsOnlinePreview(event.isOnline);
+    setMapLinkPreviewUrl(event.mapLinkUrl ?? "");
+    setTagsPreview(Array.isArray(event.tags) ? (event.tags ?? []) : []);
+    setShowRegistrationCountPreview(event.showRegistrationCount ?? true);
+    setTimezone(event.timezone);
+    setStart(zonedInputValue(event.startDateTime, event.timezone));
+    setEnd(zonedInputValue(event.endDateTime, event.timezone));
+    setStatus(event.status);
+    setPrivacyType(event.privacyType);
+    setError(null);
+    setDirty(false);
+    setFormKey((key) => key + 1);
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -181,7 +217,7 @@ export function EditEventForm(props: {
 
   return (
     <div className="flex flex-col gap-5">
-      <Card padding="sm" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section aria-label="Public URL" className="flex flex-col gap-3 rounded-2xl border border-line bg-subtle p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-caption text-ink-muted">Public URL</p>
           <Link href={`/${organisationSlug}/${event.slug}`} className="block truncate text-[15px] font-semibold text-ink underline underline-offset-4">
@@ -194,176 +230,172 @@ export function EditEventForm(props: {
             <ArrowUpRight aria-hidden className="size-4" />
           </Link>
         </Button>
-      </Card>
-      <form onSubmit={onSubmit} onChangeCapture={() => setDirty(true)} className="flex flex-col gap-5">
+      </section>
+      <form key={formKey} aria-label="Event details" onSubmit={onSubmit} onChangeCapture={() => setDirty(true)} onInputCapture={() => setDirty(true)} className="flex flex-col gap-5">
         {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
 
-        <Card padding="none" className="px-5 sm:px-6">
-          <SettingsRow
-            title={<span className="flex items-center gap-2">Basics<Chip size="sm" tone={event.status === EventStatus.DRAFT ? "neutral" : "success"}>{event.status === EventStatus.DRAFT ? "Draft" : "Published"}</Chip></span>}
-            description="Update the public-facing title and introduction."
-          >
-            <div className="flex flex-col gap-5">
-              <Field label="Title" required>
-                <Input name="title" defaultValue={event.title} />
-              </Field>
-              <Field label="Tagline" helperText="A short line beneath the event title.">
-                <Input name="pageTagline" defaultValue={page?.tagline ?? ""} />
-              </Field>
-              <ImageUploadPicker
-                initialUrl={page?.logoUrl}
-                label="Event page logo"
-                placeholder="Your event page logo will appear here."
-                disabled={pending}
-                onChange={(file, previewUrl) => {
-                  setPageLogoFile(file);
-                  setPageLogoPreviewUrl(previewUrl);
+        <FormCard
+          title={<>Basics<Chip size="sm" tone={event.status === EventStatus.DRAFT ? "neutral" : "success"}>{event.status === EventStatus.DRAFT ? "Draft" : "Published"}</Chip></>}
+          description="Update the public-facing title and introduction."
+        >
+          <Field label="Title" required>
+            <Input name="title" defaultValue={event.title} />
+          </Field>
+          <Field label="Tagline" helperText="A short line beneath the event title.">
+            <Input name="pageTagline" defaultValue={page?.tagline ?? ""} />
+          </Field>
+          <ImageUploadPicker
+            initialUrl={page?.logoUrl}
+            label="Event page logo"
+            placeholder="Your event page logo will appear here."
+            disabled={pending}
+            onChange={(file, previewUrl) => {
+              setPageLogoFile(file);
+              setPageLogoPreviewUrl(previewUrl);
+              setDirty(true);
+            }}
+          />
+          <RichTextEditor
+            name="pageAboutHtml"
+            label="About the event"
+            defaultValue={page?.aboutHtml ?? ""}
+            helperText="Required. Use the toolbar to format text—no HTML needed."
+            minHeight={140}
+          />
+          <div className="flex flex-col gap-2">
+            <Field label="Tags" helperText="Comma-separated (eg: workshop, meetup, ai). Used in global search.">
+              <Input
+                name="tags"
+                defaultValue={tagsPreview.join(", ")}
+                onChange={(e) => {
+                  const parts = e.currentTarget.value
+                    .split(/[,\n]/g)
+                    .map((s) => s.trim().toLowerCase())
+                    .map((s) => s.replace(/\s+/g, " "))
+                    .filter(Boolean)
+                    .slice(0, 12);
+                  setTagsPreview(Array.from(new Set(parts)));
                 }}
               />
-              <RichTextEditor
-                name="pageAboutHtml"
-                label="About the event"
-                defaultValue={page?.aboutHtml ?? ""}
-                helperText="Required. Use the toolbar to format text—no HTML needed."
-                minHeight={140}
+            </Field>
+            {tagsPreview.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {tagsPreview.slice(0, 12).map((t) => (
+                  <Chip key={t} size="sm" tone="outline">{t}</Chip>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </FormCard>
+
+        <FormCard title="Cover image" description="Add a visual to make your event page stand out.">
+          <CoverImagePicker
+            initialUrl={event.coverImageUrl}
+            disabled={pending}
+            onChange={(file, previewUrl) => {
+              setCoverImageFile(file);
+              setCoverPreviewUrl(previewUrl);
+              setDirty(true);
+            }}
+          />
+        </FormCard>
+
+        <FormCard title="Schedule" description="Set the date, time, and timezone for guests.">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="Start" required>
+              <Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+            </Field>
+            <Field label="End" required>
+              <Input type="datetime-local" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />
+            </Field>
+            <Field label="Timezone" required>
+              <NativeSelect name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+                {timezones.map((tz) => (
+                  <option key={tz} value={tz}>{tz}</option>
+                ))}
+              </NativeSelect>
+            </Field>
+          </div>
+        </FormCard>
+
+        <FormCard title="Location" description="Choose whether this is online and what guests should see.">
+          <SwitchRow
+            name="isOnline"
+            label="Online event"
+            description="Guests will see “Online event”."
+            checked={isOnlinePreview}
+            onCheckedChange={(checked) => {
+              setIsOnlinePreview(checked);
+              setDirty(true);
+            }}
+            className="rounded-xl border border-line p-3.5"
+          />
+          <Field
+            label={isOnlinePreview ? "Online meeting link" : "Location"}
+            required
+            helperText={isOnlinePreview ? "Enter a valid HTTP(S) meeting URL." : "Eg: Samagatha Foundation, Bengaluru"}
+          >
+            <Input name="location" type={isOnlinePreview ? "url" : "text"} defaultValue={event.location} />
+          </Field>
+          <div className="flex flex-col gap-1.5">
+            <Field
+              label="Map link"
+              optional
+              helperText={isOnlinePreview ? "Available only for physical events." : "Paste a Google Maps link so guests can open directions."}
+            >
+              <Input name="mapLinkUrl" type="url" defaultValue={event.mapLinkUrl ?? ""} disabled={isOnlinePreview} onChange={(e) => setMapLinkPreviewUrl(e.target.value)} />
+            </Field>
+            {!isOnlinePreview && mapLinkPreviewUrl.trim() ? <p className="text-caption text-ink-muted">Tip: Use a share link so it opens cleanly on mobile.</p> : null}
+          </div>
+        </FormCard>
+
+        <FormCard title="Publishing" description="Control visibility, audience, and RSVP limits.">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Status" helperText="Published events make the website public and open registration.">
+              <NativeSelect name="status" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)}>
+                <option value={EventStatus.DRAFT}>Draft</option>
+                <option value={EventStatus.PUBLISHED}>Published</option>
+                <option value={EventStatus.HIDDEN}>Hidden</option>
+              </NativeSelect>
+            </Field>
+            <Field label="Audience" helperText="Applies when the event is published.">
+              <NativeSelect name="privacyType" value={privacyType} onChange={(e) => setPrivacyType(e.target.value as EventPrivacyType)}>
+                <option value={EventPrivacyType.PUBLIC}>Public (discoverable)</option>
+                <option value={EventPrivacyType.HIDDEN_LINK}>Hidden link (not listed)</option>
+                <option value={EventPrivacyType.APPROVAL_REQUIRED}>Approval required</option>
+                <option value={EventPrivacyType.INVITE_ONLY}>Invite only</option>
+              </NativeSelect>
+            </Field>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="Capacity" optional helperText="Leave empty for unlimited RSVPs.">
+              <Input name="capacity" type="number" min={1} defaultValue={event.capacity ?? ""} />
+            </Field>
+            <Field label="Registration closes at" helperText="Use this or a lead time, not both.">
+              <Input
+                name="registrationClosesAt"
+                type="datetime-local"
+                defaultValue={event.registrationClosesAt ? zonedDatetimeLocalValue(new Date(event.registrationClosesAt), event.timezone) : ""}
               />
-              <div className="flex flex-col gap-2">
-                <Field label="Tags" helperText="Comma-separated (eg: workshop, meetup, ai). Used in global search.">
-                  <Input
-                    name="tags"
-                    defaultValue={tagsPreview.join(", ")}
-                    onChange={(e) => {
-                      const parts = e.currentTarget.value
-                        .split(/[,\n]/g)
-                        .map((s) => s.trim().toLowerCase())
-                        .map((s) => s.replace(/\s+/g, " "))
-                        .filter(Boolean)
-                        .slice(0, 12);
-                      setTagsPreview(Array.from(new Set(parts)));
-                    }}
-                  />
-                </Field>
-                {tagsPreview.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {tagsPreview.slice(0, 12).map((t) => (
-                      <Chip key={t} size="sm" tone="outline">{t}</Chip>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </SettingsRow>
+            </Field>
+            <Field label="Close before start (minutes)" helperText="Relative cutoff; updates when the start time changes.">
+              <Input name="registrationLeadMinutes" type="number" min={0} defaultValue={event.registrationLeadMinutes ?? ""} />
+            </Field>
+          </div>
+          <SwitchRow
+            name="showRegistrationCount"
+            label="Show registration count on public page"
+            description="Displays confirmed and total responses to guests."
+            checked={showRegistrationCountPreview}
+            onCheckedChange={(checked) => {
+              setShowRegistrationCountPreview(checked);
+              setDirty(true);
+            }}
+            className="rounded-xl border border-line p-3.5"
+          />
+        </FormCard>
 
-          <SettingsRow title="Cover image" description="Add a visual to make your event page stand out.">
-            <CoverImagePicker
-              initialUrl={event.coverImageUrl}
-              disabled={pending}
-              onChange={(file, previewUrl) => {
-                setCoverImageFile(file);
-                setCoverPreviewUrl(previewUrl);
-              }}
-            />
-          </SettingsRow>
-
-          <SettingsRow title="Schedule" description="Set the date, time, and timezone for guests.">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Start" required>
-                <Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
-              </Field>
-              <Field label="End" required>
-                <Input type="datetime-local" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />
-              </Field>
-              <Field label="Timezone" required>
-                <NativeSelect name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
-                  {timezones.map((tz) => (
-                    <option key={tz} value={tz}>{tz}</option>
-                  ))}
-                </NativeSelect>
-              </Field>
-            </div>
-          </SettingsRow>
-
-          <SettingsRow title="Location" description="Choose whether this is online and what guests should see.">
-            <div className="flex flex-col gap-5">
-              <SwitchRow
-                name="isOnline"
-                label="Online event"
-                description="Guests will see “Online event”."
-                checked={isOnlinePreview}
-                onCheckedChange={setIsOnlinePreview}
-                className="rounded-lg border border-line p-3.5"
-              />
-              <Field
-                label={isOnlinePreview ? "Online meeting link" : "Location"}
-                required
-                helperText={isOnlinePreview ? "Enter a valid HTTP(S) meeting URL." : "Eg: Samagatha Foundation, Bengaluru"}
-              >
-                <Input name="location" type={isOnlinePreview ? "url" : "text"} defaultValue={event.location} />
-              </Field>
-              <div className="flex flex-col gap-1.5">
-                <Field
-                  label="Map link"
-                  optional
-                  helperText={isOnlinePreview ? "Available only for physical events." : "Paste a Google Maps link so guests can open directions."}
-                >
-                  <Input name="mapLinkUrl" type="url" defaultValue={event.mapLinkUrl ?? ""} disabled={isOnlinePreview} onChange={(e) => setMapLinkPreviewUrl(e.target.value)} />
-                </Field>
-                {!isOnlinePreview && mapLinkPreviewUrl.trim() ? <p className="text-caption text-ink-muted">Tip: Use a share link so it opens cleanly on mobile.</p> : null}
-              </div>
-            </div>
-          </SettingsRow>
-
-          <SettingsRow title="Publishing" description="Control visibility, audience, and RSVP limits.">
-            <div className="flex flex-col gap-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Status" helperText="Published events make the website public and open registration.">
-                  <NativeSelect name="status" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)}>
-                    <option value={EventStatus.DRAFT}>Draft</option>
-                    <option value={EventStatus.PUBLISHED}>Published</option>
-                    <option value={EventStatus.HIDDEN}>Hidden</option>
-                  </NativeSelect>
-                </Field>
-                <Field label="Audience" helperText="Applies when the event is published.">
-                  <NativeSelect name="privacyType" value={privacyType} onChange={(e) => setPrivacyType(e.target.value as EventPrivacyType)}>
-                    <option value={EventPrivacyType.PUBLIC}>Public (discoverable)</option>
-                    <option value={EventPrivacyType.HIDDEN_LINK}>Hidden link (not listed)</option>
-                    <option value={EventPrivacyType.APPROVAL_REQUIRED}>Approval required</option>
-                    <option value={EventPrivacyType.INVITE_ONLY}>Invite only</option>
-                  </NativeSelect>
-                </Field>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <Field label="Capacity" optional helperText="Leave empty for unlimited RSVPs.">
-                  <Input name="capacity" type="number" min={1} defaultValue={event.capacity ?? ""} />
-                </Field>
-                <Field label="Registration closes at" helperText="Use this or a lead time, not both.">
-                  <Input
-                    name="registrationClosesAt"
-                    type="datetime-local"
-                    defaultValue={event.registrationClosesAt ? zonedDatetimeLocalValue(new Date(event.registrationClosesAt), event.timezone) : ""}
-                  />
-                </Field>
-                <Field label="Close before start (minutes)" helperText="Relative cutoff; updates when the start time changes.">
-                  <Input name="registrationLeadMinutes" type="number" min={0} defaultValue={event.registrationLeadMinutes ?? ""} />
-                </Field>
-              </div>
-              <SwitchRow
-                name="showRegistrationCount"
-                label="Show registration count on public page"
-                description="Displays confirmed and total responses to guests."
-                checked={showRegistrationCountPreview}
-                onCheckedChange={setShowRegistrationCountPreview}
-                className="rounded-lg border border-line p-3.5"
-              />
-            </div>
-          </SettingsRow>
-        </Card>
-
-        <div className="sticky bottom-0 z-10 -mx-1 flex justify-end border-t border-line bg-canvas/95 px-1 py-3 backdrop-blur-md">
-          <Button type="submit" variant="primary" loading={pending}>
-            Save changes
-          </Button>
-        </div>
+        <UnsavedChangesBar visible={dirty} pending={pending} onDiscard={discard} />
       </form>
     </div>
   );

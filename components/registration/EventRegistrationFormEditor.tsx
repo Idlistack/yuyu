@@ -6,7 +6,8 @@ import { RegistrationFieldType as RegistrationFieldTypeEnum } from "@prisma/clie
 import { ArrowDown, ArrowUp, Eye, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
 import { CheckboxField, Radio, RadioGroup } from "@/components/ui/choice";
-import { Chip, EmptyState, SectionHeading } from "@/components/ui/display";
+import { Chip, EmptyState } from "@/components/ui/display";
+import { fieldTypeLabel } from "@/components/event-dashboard/event-page/summary";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
 
@@ -235,33 +236,20 @@ export function EventRegistrationFormEditor(props: {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <SectionHeading
-        title="Registration Form Editor"
-        description="Add custom input fields to collect guest information. Name and Email are always collected."
-        action={
-          <Button variant="primary" startIcon={<Plus />} onClick={openCreate} disabled={pending}>
-            Add Custom Field
-          </Button>
-        }
-      />
-
-      {/* ── TWO COLUMN BUILDER / PREVIEW LAYOUT ── */}
-      <div className="grid gap-8 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        {/* Left Column: Visual Builder Cards */}
-        <section aria-labelledby="form-structure-title" className="flex flex-col gap-4">
-          <h3 id="form-structure-title" className="text-title text-ink">Form Structure</h3>
-
-          {/* Default Fields Panel */}
-          <div className="rounded-lg border border-line bg-subtle p-4">
-            <p className="mb-2 text-overline text-ink-muted">Standard Fields (Always Collected)</p>
-            <ul className="divide-y divide-line">
+    <div className="flex flex-col gap-5">
+      <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <section aria-labelledby="standard-fields-title" className="flex flex-col gap-3 rounded-2xl border border-line bg-subtle p-5">
+            <div>
+              <h2 id="standard-fields-title" className="text-h4 text-ink">Standard fields</h2>
+              <p className="mt-0.5 text-body-ui text-ink-muted">Name and Email are always collected.</p>
+            </div>
+            <ul className="flex flex-col gap-2">
               {[
                 { name: "Name", description: "Collected from all registered attendees." },
                 { name: "Email", description: "Used for sending ticket confirmation and QR codes." },
               ].map((item) => (
-                <li key={item.name} className="flex items-center gap-3 py-2.5">
-                  <GripVertical aria-hidden className="size-4 text-ink-disabled" />
+                <li key={item.name} className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-3.5 py-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-label text-ink">{item.name}</p>
                     <p className="text-caption text-ink-muted">{item.description}</p>
@@ -270,43 +258,55 @@ export function EventRegistrationFormEditor(props: {
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
 
-          {/* Custom Fields List */}
-          {fields.length === 0 ? (
-            <EmptyState mood="sleepy">No custom fields configured. Click &quot;Add Custom Field&quot; to capture dietary needs, phone numbers, or sizes.</EmptyState>
-          ) : (
-            <ul className="flex flex-col gap-2.5">
-              {fields.map((f, idx) => (
-                <li key={f.id} className="flex flex-col gap-3 rounded-lg border border-line bg-canvas p-4 transition-colors hover:border-line-strong sm:flex-row sm:items-center">
-                  <GripVertical aria-hidden className="hidden size-4 text-ink-muted sm:block" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="text-label text-ink [overflow-wrap:anywhere]">{f.label}</p>
-                      {f.required ? <Chip size="sm" tone="warning">Required</Chip> : null}
+          <section aria-labelledby="custom-fields-title" className="flex flex-col gap-3 rounded-2xl border border-line bg-canvas p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 id="custom-fields-title" className="text-h4 text-ink">Custom fields</h2>
+                <p className="mt-0.5 text-body-ui text-ink-muted">Add custom input fields to collect guest information.</p>
+              </div>
+              <Button variant="primary" size="sm" startIcon={<Plus />} onClick={openCreate} disabled={pending} className="shrink-0">
+                Add field
+              </Button>
+            </div>
+
+            {fields.length === 0 ? (
+              <EmptyState mood="sleepy">No custom fields configured. Use &quot;Add field&quot; to capture dietary needs, phone numbers, or sizes.</EmptyState>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {fields.map((f, idx) => (
+                  <li key={f.id} className="flex items-center gap-2 rounded-xl border border-line bg-canvas py-2 pl-2.5 pr-1.5 transition-colors hover:border-line-strong sm:gap-3 sm:pl-3.5">
+                    <GripVertical aria-hidden className="size-4 shrink-0 text-ink-disabled" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="text-label text-ink wrap-anywhere">{f.label}</p>
+                        <Chip size="sm" tone="neutral">{fieldTypeLabel(f.type)}</Chip>
+                        {f.required ? <Chip size="sm" tone="warning">Required</Chip> : null}
+                      </div>
+                      <p className="mt-0.5 truncate font-mono text-xs text-ink-muted">key: {f.key}</p>
+                      {needsOptions(f.type) ? <p className="mt-0.5 text-caption text-ink-muted wrap-anywhere">Options: {f.options.join(", ")}</p> : null}
                     </div>
-                    <p className="mt-0.5 font-mono text-xs text-ink-muted">key: {f.key} · type: {f.type.toLowerCase()}</p>
-                    {needsOptions(f.type) ? <p className="mt-1 text-caption text-ink-muted [overflow-wrap:anywhere]">Options: {f.options.join(", ")}</p> : null}
-                  </div>
-                  <div className="flex items-center gap-0.5 self-end sm:self-auto">
-                    <IconButton label="Move up" size="sm" disabled={pending || idx === 0} onClick={() => move(f.id, -1)}><ArrowUp /></IconButton>
-                    <IconButton label="Move down" size="sm" disabled={pending || idx === fields.length - 1} onClick={() => move(f.id, 1)}><ArrowDown /></IconButton>
-                    <IconButton label="Edit" size="sm" disabled={pending} onClick={() => openEdit(f)}><Pencil /></IconButton>
-                    <IconButton label="Delete" size="sm" variant="danger" disabled={pending} onClick={() => setDeleteConfirmField(f)}><Trash2 /></IconButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                    <div className="grid shrink-0 grid-cols-2 sm:flex sm:items-center sm:gap-0.5">
+                      <IconButton label={`Move ${f.label} up`} size="sm" disabled={pending || idx === 0} onClick={() => move(f.id, -1)}><ArrowUp /></IconButton>
+                      <IconButton label={`Move ${f.label} down`} size="sm" disabled={pending || idx === fields.length - 1} onClick={() => move(f.id, 1)}><ArrowDown /></IconButton>
+                      <IconButton label={`Edit ${f.label}`} size="sm" disabled={pending} onClick={() => openEdit(f)}><Pencil /></IconButton>
+                      <IconButton label={`Delete ${f.label}`} size="sm" variant="danger" disabled={pending} onClick={() => setDeleteConfirmField(f)}><Trash2 /></IconButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
 
-        {/* Right Column: Live Interactive Preview */}
-        <section aria-labelledby="form-preview-title" className="flex flex-col gap-4 md:sticky md:top-6 md:self-start">
-          <h3 id="form-preview-title" className="flex items-center gap-2 text-title text-ink">
-            <Eye aria-hidden className="size-5 text-ink-muted" />
-            Live Form Preview
-          </h3>
-          <div className="rounded-xl border border-line bg-canvas p-6 shadow-raised">
+        {/* Live, interactive preview of the guest-facing form; nothing here is submitted. */}
+        <aside aria-labelledby="form-preview-title" className="flex min-w-0 flex-col gap-2.5 lg:sticky lg:top-6">
+          <span id="form-preview-title" className="flex items-center gap-1.5 text-overline text-ink-muted">
+            <Eye aria-hidden className="size-4" />
+            Live form preview
+          </span>
+          <div className="rounded-2xl border border-line bg-canvas p-5 shadow-raised">
             <p className="text-h4 text-ink">Register for Event</p>
             <p className="mb-5 mt-1 text-caption text-ink-muted">Fill out the form below to secure your spot.</p>
             <div className="flex flex-col gap-4">
@@ -358,7 +358,8 @@ export function EventRegistrationFormEditor(props: {
               <Button variant="primary" fullWidth className="mt-1">Submit RSVP</Button>
             </div>
           </div>
-        </section>
+          <span className="text-center text-caption text-ink-muted">Updates as you edit fields. Guests see this form when they register.</span>
+        </aside>
       </div>
 
       {/* ── CREATE / EDIT DIALOG (presets at top) ── */}

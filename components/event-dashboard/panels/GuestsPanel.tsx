@@ -20,7 +20,7 @@ export async function GuestsPanel({ ctx }: { ctx: EventDashboardContext }) {
           value: "people",
           label: "People",
           content: permissions.canManageRegistrations ? (
-            <GuestsPeople organisationSlug={organisation.slug} eventId={event.id} eventTitle={event.title} attendees={attendees.attendees} truncated={attendees.truncated} registrationFields={fields} />
+            <GuestsPeople organisationSlug={organisation.slug} eventId={event.id} eventTitle={event.title} timeZone={event.timezone} now={ctx.now.toISOString()} attendees={attendees.attendees} truncated={attendees.truncated} registrationFields={fields} />
           ) : (
             <NoPermission>You do not have permission to view or manage attendee registrations.</NoPermission>
           ),
@@ -29,7 +29,11 @@ export async function GuestsPanel({ ctx }: { ctx: EventDashboardContext }) {
           value: "invites",
           label: "Invites",
           count: permissions.canManageInvitations ? invites.length : undefined,
-          content: <EventInvitePanel organisationSlug={organisation.slug} eventId={event.id} eventHasEnded={event.endDateTime <= ctx.now} invites={invites} />,
+          content: permissions.canManageInvitations ? (
+            <EventInvitePanel organisationSlug={organisation.slug} eventId={event.id} eventHasEnded={event.endDateTime <= ctx.now} invites={invites} timeZone={event.timezone} now={ctx.now.toISOString()} />
+          ) : (
+            <NoPermission>You do not have permission to manage invitations for this event.</NoPermission>
+          ),
         },
       ]}
     />

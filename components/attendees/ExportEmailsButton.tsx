@@ -11,8 +11,10 @@ import {
 export function ExportEmailsButton(props: {
   eventTitle: string;
   attendees: AttendeeEmailExportRow[];
+  size?: "sm" | "md";
+  title?: string;
 }) {
-  const { eventTitle, attendees } = props;
+  const { eventTitle, attendees, size = "sm", title } = props;
 
   function handleExport() {
     const csv = buildAttendeeEmailCsv(attendees);
@@ -30,7 +32,7 @@ export function ExportEmailsButton(props: {
   const hasEmail = attendees.some((attendee) => Boolean(attendee.user?.email ?? attendee.guestEmail));
 
   return (
-    <Button variant="secondary" size="sm" startIcon={<AtSign />} onClick={handleExport} disabled={!hasEmail}>
+    <Button variant="secondary" size={size} title={title} startIcon={<AtSign />} onClick={handleExport} disabled={!hasEmail}>
       Export emails
     </Button>
   );

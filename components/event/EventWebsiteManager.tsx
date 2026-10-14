@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
-import { ArrowUpRight, ChevronDown, ChevronUp, Plus, Upload } from "lucide-react";
+import { useCallback, useEffect, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowUpRight, ChevronDown, ChevronUp, GripVertical, Plus, Upload } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
-import { CheckboxField } from "@/components/ui/choice";
-import { Callout, Card, Chip, type ChipTone } from "@/components/ui/display";
+import { Switch } from "@/components/ui/choice";
+import { Callout, Chip, type ChipTone } from "@/components/ui/display";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
 import { ACCENT_PRESETS, DEFAULT_EVENT_ACCENT, normalizeAccentHex } from "@/lib/theme/accent";
 import { cn } from "@/lib/cn";
-import { useRouter } from "next/navigation";
 import {
   deleteWebsiteContent,
   saveEventPage,
@@ -22,30 +23,22 @@ import {
 } from "@/app/actions/event-website";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
+import { useEventTabs } from "@/components/event-dashboard/EventDashboardTabs";
+import { PhonePreview, type PreviewSection } from "@/components/event-dashboard/event-page/PhonePreview";
+import { UnsavedChangesBar } from "@/components/event-dashboard/event-page/UnsavedChangesBar";
+import {
+  countPageChanges,
+  normalizeSections,
+  parseAccentInput,
+  registerLabelFor,
+  sectionLabel,
+  sectionNote,
+  type PageSection,
+  type PageSettings,
+} from "@/components/event-dashboard/event-page/summary";
 
-const sectionTypes = [
-  "HERO",
-  "ABOUT",
-  "HIGHLIGHTS",
-  "SCHEDULE",
-  "SPEAKERS",
-  "SPONSORS",
-  "VENUE",
-  "FAQ",
-  "RESOURCES",
-] as const;
-const sectionLabels: Record<(typeof sectionTypes)[number], string> = {
-  HERO: "Hero",
-  ABOUT: "About",
-  HIGHLIGHTS: "Highlights",
-  SCHEDULE: "Programme",
-  SPEAKERS: "Speakers",
-  SPONSORS: "Sponsors",
-  VENUE: "Venue",
-  FAQ: "FAQ",
-  RESOURCES: "Resources",
-};
 type ContentKind = "highlight" | "speaker" | "sponsor" | "resource" | "faq";
 type ContentRow = {
   id: string;
@@ -54,8 +47,23 @@ type ContentRow = {
   visibility: string;
   values: Record<string, string | number | null>;
 };
-type Section = { type: string; isVisible: boolean; sortOrder: number };
 type SaveAction = (input: unknown) => Promise<{ ok: boolean; error?: string }>;
+
+/** Read-only facts for the section notes and the live phone preview (computed on the server). */
+export type EventPagePreviewData = {
+  title: string;
+  dateLine: string;
+  privacyType: string;
+  location: string;
+  isOnline: boolean;
+  aboutExcerpt: string;
+  sessionCount: number;
+  /** First few published sessions: start time + title. */
+  sessionLines: Array<{ lead: string; text: string }>;
+  /** Link to the schedule workspace, only when the viewer may manage it. */
+  scheduleHref: string | null;
+};
+
 type Props = {
   organisationSlug: string;
   eventId: string;
@@ -65,14 +73,26 @@ type Props = {
     logoUrl: string | null;
     accentColor: string | null;
     aboutHtml: string;
-    sections: Section[];
+    sections: PageSection[];
   } | null;
   highlights: ContentRow[];
   speakers: ContentRow[];
   sponsors: ContentRow[];
   resources: ContentRow[];
   faqs: ContentRow[];
+  preview?: EventPagePreviewData;
+  /** Rendered first in the editor column (e.g. the programme card). */
+  programme?: ReactNode;
 };
+
+const CONTENT_FOR_SECTION: Partial<Record<string, ContentKind>> = {
+  HIGHLIGHTS: "highlight",
+  SPEAKERS: "speaker",
+  SPONSORS: "sponsor",
+  FAQ: "faq",
+  RESOURCES: "resource",
+};
+const collectionId = (kind: ContentKind) => `event-page-${kind}s`;
 
 function contentInput(
   kind: ContentKind,
@@ -143,9 +163,11 @@ function ContentCollection({
   action,
   target,
   pending,
+  openAddRequest,
   onSave,
   onDelete,
   onError,
+  onDraftChange,
 }: {
   title: string;
   kind: ContentKind;
@@ -153,9 +175,12 @@ function ContentCollection({
   action: SaveAction;
   target: { organisationSlug: string; eventId: string };
   pending: boolean;
+  /** Bumped by the sections list to open the "Add" form. */
+  openAddRequest: number;
   onSave: (action: SaveAction, input: unknown) => void;
   onDelete: (row: ContentRow) => void;
   onError: (message: string) => void;
+  onDraftChange: (kind: ContentKind, dirty: boolean) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -163,14 +188,34 @@ function ContentCollection({
   const [formVisibility, setFormVisibility] = useState("PUBLISHED");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [handledAddRequest, setHandledAddRequest] = useState(openAddRequest);
   const itemName = title === "FAQs" ? "FAQ" : title.slice(0, -1);
   const supportsRichText = kind === "faq" || kind === "speaker";
+  const headingId = `${collectionId(kind)}-title`;
+
+  useEffect(() => {
+    onDraftChange(kind, draftDirty);
+  }, [draftDirty, kind, onDraftChange]);
+
   const openNewItemForm = () => {
     setNewItemFormKey((key) => key + 1);
     setPhotoFile(null);
     setFormVisibility("PUBLISHED");
     setEditing(null);
+    setDraftDirty(false);
     setAdding(true);
+  };
+  // The sections list asked to add an item: open the form once per request (adjust during render).
+  if (openAddRequest !== handledAddRequest) {
+    setHandledAddRequest(openAddRequest);
+    if (!adding) openNewItemForm();
+  }
+  const closeForms = () => {
+    setPhotoFile(null);
+    setAdding(false);
+    setEditing(null);
+    setDraftDirty(false);
   };
   const submit = async (
     event: FormEvent<HTMLFormElement>,
@@ -209,14 +254,13 @@ function ContentCollection({
       action,
       contentInput(kind, target, values, row?.id, new FormData(formElement)),
     );
-    setAdding(false);
-    setEditing(null);
+    closeForms();
   };
-  const clearPhotoDraft = () => setPhotoFile(null);
+  const markDraft = () => setDraftDirty(true);
   const photoPicker =
     kind === "speaker" || kind === "sponsor" ? (
       <div className="flex flex-wrap items-center gap-2.5">
-        <label className={cn("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-line-strong bg-canvas px-3.5 text-sm font-semibold text-ink transition-colors hover:bg-subtle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--yy-focus)]", (pending || uploadingPhoto) && "pointer-events-none opacity-50")}>
+        <label className={cn("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-line-strong bg-canvas px-3.5 text-sm font-semibold text-ink transition-colors hover:bg-subtle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-(--yy-focus)", (pending || uploadingPhoto) && "pointer-events-none opacity-50")}>
           <Upload aria-hidden className="size-4" />
           Choose {kind === "speaker" ? "speaker photo" : "sponsor logo"}
           <input
@@ -227,7 +271,7 @@ function ContentCollection({
             onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
           />
         </label>
-        <span className="text-caption text-ink-muted">
+        <span className="text-caption text-ink-muted wrap-anywhere">
           {photoFile ? photoFile.name : "JPEG, PNG, or WebP · up to 5 MB"}
         </span>
       </div>
@@ -295,11 +339,11 @@ function ContentCollection({
     </>
   );
   return (
-    <Card as="section" aria-label={title}>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-title text-ink">{title}</h3>
-          <p className="text-sm text-ink-muted">{rows.length} added</p>
+    <section id={collectionId(kind)} aria-labelledby={headingId} tabIndex={-1} className="scroll-mt-24 rounded-2xl border border-line bg-canvas p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--yy-focus)">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 id={headingId} className="text-title text-ink">{title}</h3>
+          <p className="text-caption text-ink-muted">{rows.length === 0 ? "Nothing added yet" : `${rows.length} added`}</p>
         </div>
         <Button
           size="sm"
@@ -307,12 +351,8 @@ function ContentCollection({
           startIcon={adding ? undefined : <Plus />}
           aria-expanded={adding}
           onClick={() => {
-            if (adding) {
-              clearPhotoDraft();
-              setAdding(false);
-            } else {
-              openNewItemForm();
-            }
+            if (adding) closeForms();
+            else openNewItemForm();
           }}
         >
           {adding ? "Close" : `Add ${itemName}`}
@@ -320,34 +360,29 @@ function ContentCollection({
       </div>
       <form
         key={newItemFormKey}
-        data-event-page-form="true"
+        aria-label={`New ${itemName}`}
         hidden={!adding}
+        onInputCapture={markDraft}
+        onChangeCapture={markDraft}
         onSubmit={(event) => void submit(event)}
-        className="mt-4 flex flex-col gap-4 rounded-lg border border-line bg-subtle p-4"
+        className="mt-4 flex flex-col gap-4 rounded-xl border border-line bg-subtle p-4"
       >
         {itemForm()}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="submit" variant="primary" disabled={pending || uploadingPhoto}>
             Add {itemName}
           </Button>
-          <Button
-            variant="quiet"
-            onClick={() => {
-              setPhotoFile(null);
-              setAdding(false);
-            }}
-            disabled={uploadingPhoto}
-          >
+          <Button variant="quiet" onClick={closeForms} disabled={uploadingPhoto}>
             Cancel
           </Button>
         </div>
       </form>
       {rows.length ? (
-        <ul className="mt-3 divide-y divide-line border-t border-line">
+        <ul className="mt-3 flex flex-col gap-2">
           {rows.map((row) => (
-            <li key={row.id} className="py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
+            <li key={row.id} className="rounded-xl border border-line px-3.5 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <span className="truncate text-[15px] font-semibold text-ink">{row.title}</span>
                   <Chip size="sm" tone={visibilityTones[row.visibility] ?? "neutral"}>{visibilityLabels[row.visibility] ?? row.visibility.toLowerCase()}</Chip>
                 </div>
@@ -356,40 +391,37 @@ function ContentCollection({
                     size="sm"
                     variant="quiet"
                     aria-expanded={editing === row.id}
+                    aria-label={`Edit ${row.title}`}
                     onClick={() => {
                       const nextEditing = editing === row.id ? null : row.id;
                       setEditing(nextEditing);
                       setAdding(false);
-                      clearPhotoDraft();
+                      setPhotoFile(null);
+                      setDraftDirty(false);
                       if (nextEditing) setFormVisibility(row.visibility);
                     }}
                   >
                     Edit
                   </Button>
-                  <Button size="sm" variant="dangerQuiet" onClick={() => onDelete(row)} disabled={pending}>
+                  <Button size="sm" variant="dangerQuiet" aria-label={`Remove ${row.title}`} onClick={() => onDelete(row)} disabled={pending}>
                     Remove
                   </Button>
                 </div>
               </div>
               <form
-                data-event-page-form="true"
+                aria-label={`Edit ${row.title}`}
                 hidden={editing !== row.id}
+                onInputCapture={markDraft}
+                onChangeCapture={markDraft}
                 onSubmit={(event) => void submit(event, row)}
-                className="mt-3 flex flex-col gap-4 rounded-lg border border-line bg-subtle p-4"
+                className="mt-3 flex flex-col gap-4 rounded-xl border border-line bg-subtle p-4"
               >
                 {itemForm(row)}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button type="submit" variant="primary" disabled={pending || uploadingPhoto}>
                     Save changes
                   </Button>
-                  <Button
-                    variant="quiet"
-                    onClick={() => {
-                      clearPhotoDraft();
-                      setEditing(null);
-                    }}
-                    disabled={pending || uploadingPhoto}
-                  >
+                  <Button variant="quiet" onClick={closeForms} disabled={pending || uploadingPhoto}>
                     Cancel
                   </Button>
                 </div>
@@ -397,15 +429,22 @@ function ContentCollection({
             </li>
           ))}
         </ul>
-      ) : (
-        <p className="mt-3 text-body-ui text-ink-muted">Nothing has been added yet.</p>
-      )}
-    </Card>
+      ) : null}
+    </section>
   );
+}
+
+function publishedTitles(rows: ContentRow[]) {
+  const published = rows.filter((row) => row.visibility === "PUBLISHED").map((row) => row.title);
+  const lines = published.slice(0, 3).map((text) => ({ text }));
+  if (published.length > 3) lines.push({ text: `+${published.length - 3} more` });
+  return lines;
 }
 
 export function EventWebsiteManager(props: Props) {
   const router = useRouter();
+  const { openTab } = useEventTabs();
+  const { showToast } = useToast();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -413,119 +452,194 @@ export function EventWebsiteManager(props: Props) {
     kind: ContentKind;
     row: ContentRow;
   } | null>(null);
-  const [dirty, setDirty] = useState(false);
-  useUnsavedChangesGuard(dirty && !pending);
-  useEffect(() => {
-    const markPageDirty = (event: Event) => {
-      const node = event.target;
-      if (!(node instanceof HTMLElement)) return;
-      const form = node.closest("form");
-      if (form?.dataset.eventPageForm === "true") {
-        setDirty(true);
-        setSaved(false);
-      }
-    };
-    document.addEventListener("input", markPageDirty, true);
-    document.addEventListener("change", markPageDirty, true);
-    return () => {
-      document.removeEventListener("input", markPageDirty, true);
-      document.removeEventListener("change", markPageDirty, true);
-    };
-  }, []);
-  const [sections, setSections] = useState<Section[]>(() =>
-    sectionTypes.map(
-      (type, sortOrder) =>
-        props.page?.sections.find((section) => section.type === type) ?? {
-          type,
-          isVisible: true,
-          sortOrder,
-        },
-    ),
+  const [baseline, setBaseline] = useState<PageSettings>(() => ({
+    accentColor: props.page?.accentColor ?? "",
+    sections: normalizeSections(props.page?.sections),
+  }));
+  const [accentColor, setAccentColor] = useState(baseline.accentColor);
+  const [sections, setSections] = useState<readonly PageSection[]>(baseline.sections);
+  const [contentDrafts, setContentDrafts] = useState<ReadonlySet<ContentKind>>(() => new Set());
+  const [addRequests, setAddRequests] = useState<Record<ContentKind, number>>({ highlight: 0, speaker: 0, sponsor: 0, resource: 0, faq: 0 });
+
+  const changeCount = countPageChanges(baseline, { accentColor, sections });
+  const pageDirty = changeCount > 0;
+  useUnsavedChangesGuard((pageDirty || contentDrafts.size > 0) && !pending);
+
+  const accent = parseAccentInput(accentColor);
+  const accentPreview = accent.valid && accent.value ? accent.value : accent.valid ? DEFAULT_EVENT_ACCENT : normalizeAccentHex(baseline.accentColor);
+
+  const onDraftChange = useCallback(
+    (kind: ContentKind, dirty: boolean) =>
+      setContentDrafts((current) => {
+        if (current.has(kind) === dirty) return current;
+        const next = new Set(current);
+        if (dirty) next.add(kind);
+        else next.delete(kind);
+        return next;
+      }),
+    [],
   );
+
   const target = {
     organisationSlug: props.organisationSlug,
     eventId: props.eventId,
   };
-  const save = (action: SaveAction, input: unknown, clearDirty = false) =>
+  // `announce` also toasts the outcome, for saves started from the floating bar far below the callouts.
+  const save = (action: SaveAction, input: unknown, onSuccess?: () => void, announce = false) =>
     startTransition(async () => {
       const result = await action(input);
       if (!result.ok) {
         setSaved(false);
         setError(result.error || "Could not save your changes.");
+        if (announce) showToast(result.error || "Could not save your changes.", "error");
       } else {
+        if (announce) showToast("Event page saved", "success");
         setError("");
         setSaved(true);
-        if (clearDirty) setDirty(false);
+        onSuccess?.();
         router.refresh();
       }
     });
+  const touch = () => setSaved(false);
   const moveSection = (index: number, direction: -1 | 1) => {
-    setDirty(true);
-    setSaved(false);
+    touch();
     setSections((current) => {
       const nextIndex = index + direction;
       if (nextIndex < 0 || nextIndex >= current.length) return current;
       const next = [...current];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      [next[index], next[nextIndex]] = [next[nextIndex]!, next[index]!];
       return next.map((section, sortOrder) => ({ ...section, sortOrder }));
     });
   };
-  const savePage = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
+  const savePage = () => {
+    if (!accent.valid) {
+      setError("Use a hex colour such as #C2410C, or choose a preset.");
+      showToast("Use a hex colour such as #C2410C, or choose a preset.", "error");
+      return;
+    }
+    const draft = { accentColor: accent.value, sections };
     save(
       saveEventPage,
       {
         ...target,
         tagline: props.page?.tagline ?? "",
         logoUrl: props.page?.logoUrl ?? "",
-        accentColor: String(form.get("accentColor") ?? ""),
+        accentColor: accent.value,
         aboutHtml: props.page?.aboutHtml ?? "",
         sections,
+      },
+      () => {
+        setBaseline(draft);
+        setAccentColor(draft.accentColor);
       },
       true,
     );
   };
+  const discard = () => {
+    setAccentColor(baseline.accentColor);
+    setSections(baseline.sections);
+    setError("");
+  };
   const remove = (kind: ContentKind) => (row: ContentRow) =>
     setDeleteTarget({ kind, row });
-  const [accentColor, setAccentColor] = useState(props.page?.accentColor ?? "");
-  const accentPreview = normalizeAccentHex(accentColor);
+
+  const preview = props.preview;
+  const noteData = {
+    highlights: props.highlights,
+    speakers: props.speakers,
+    sponsors: props.sponsors,
+    resources: props.resources,
+    faqs: props.faqs,
+    sessionCount: preview?.sessionCount ?? 0,
+    location: preview?.location ?? "",
+    isOnline: preview?.isOnline ?? false,
+  };
+  const rowsFor: Record<ContentKind, ContentRow[]> = {
+    highlight: props.highlights,
+    speaker: props.speakers,
+    sponsor: props.sponsors,
+    resource: props.resources,
+    faq: props.faqs,
+  };
+
+  const goToCollection = (kind: ContentKind, add: boolean) => {
+    if (add) setAddRequests((current) => ({ ...current, [kind]: current[kind] + 1 }));
+    const node = document.getElementById(collectionId(kind));
+    if (!node) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    node.focus({ preventScroll: true });
+  };
+
+  const sectionAction = (type: string, label: string): ReactNode => {
+    const kind = CONTENT_FOR_SECTION[type];
+    const linkClass = "inline-flex min-h-9 items-center whitespace-nowrap rounded-full px-1.5 text-sm font-semibold text-ink underline-offset-4 hover:underline";
+    if (kind) {
+      const empty = rowsFor[kind].length === 0;
+      return (
+        <button type="button" className={linkClass} onClick={() => goToCollection(kind, empty)}>
+          {empty ? "Add" : "Edit"}
+          <span className="sr-only"> {label}</span>
+        </button>
+      );
+    }
+    if (type === "ABOUT" || type === "VENUE") {
+      return (
+        <button type="button" className={linkClass} onClick={() => openTab("page", "details")}>
+          Edit in Details
+          <span className="sr-only"> ({label})</span>
+        </button>
+      );
+    }
+    if (type === "SCHEDULE" && preview?.scheduleHref) {
+      return (
+        <Link href={preview.scheduleHref} className={linkClass}>
+          Open schedule
+        </Link>
+      );
+    }
+    return null;
+  };
+
+  const previewSections: PreviewSection[] = sections
+    .filter((section) => section.isVisible && section.type !== "HERO")
+    .map((section): PreviewSection | null => {
+      const label = sectionLabel(section.type);
+      const kind = CONTENT_FOR_SECTION[section.type];
+      let lines: PreviewSection["lines"] = [];
+      if (kind) lines = publishedTitles(rowsFor[kind]);
+      else if (section.type === "ABOUT") lines = [{ text: preview?.aboutExcerpt || "About this event" }];
+      else if (section.type === "SCHEDULE") lines = preview?.sessionLines ?? [];
+      else if (section.type === "VENUE") lines = preview && !preview.isOnline && preview.location.trim() ? [{ text: preview.location }] : [];
+      // The public page skips sections with nothing to show, so the preview does too.
+      return lines.length ? { type: section.type, label, lines } : null;
+    })
+    .filter((section): section is PreviewSection => section !== null);
+
+  const collections: Array<{ title: string; kind: ContentKind; action: SaveAction }> = [
+    { title: "Highlights", kind: "highlight", action: saveHighlight },
+    { title: "Speakers", kind: "speaker", action: saveSpeaker },
+    { title: "Sponsors", kind: "sponsor", action: saveSponsor },
+    { title: "Resources", kind: "resource", action: saveResource },
+    { title: "FAQs", kind: "faq", action: saveFaq },
+  ];
+
   return (
     <div className="flex flex-col gap-5">
-      {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
-      {saved ? <Callout tone="success" role="status">Changes saved.</Callout> : null}
-      <Card>
-        <form data-event-page-form="true" onSubmit={savePage} className="flex flex-col gap-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
+          {saved ? <Callout tone="success" role="status">Changes saved.</Callout> : null}
+          {props.programme}
+
+          <section aria-labelledby="event-page-colour-title" className="flex flex-col gap-3 rounded-2xl border border-line bg-canvas p-5">
             <div>
-              <h2 className="text-title text-ink">Event page</h2>
-              <p className="mt-1 max-w-[560px] text-body-ui text-ink-muted">
-                Choose what visitors see, arrange the sections, and preview the
-                result. Edit the event introduction in Details.
-              </p>
+              <h2 id="event-page-colour-title" className="text-h4 text-ink">Colour</h2>
+              <p className="mt-0.5 text-body-ui text-ink-muted">The accent for the hero band, buttons and links on the event page.</p>
             </div>
-            <div className="flex shrink-0 gap-2">
-              <Button asChild variant="secondary">
-                <a href={`/${props.organisationSlug}/${props.eventSlug}`} target="_blank" rel="noopener noreferrer">
-                  Preview
-                  <ArrowUpRight aria-hidden className="size-4" />
-                </a>
-              </Button>
-              <Button type="submit" variant="primary" loading={pending} loadingLabel="Saving…">
-                Save all changes
-              </Button>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-end gap-2.5">
-              <Field label="Accent colour" className="flex-1">
-                <Input name="accentColor" value={accentColor} onChange={(event) => setAccentColor(event.target.value)} placeholder={DEFAULT_EVENT_ACCENT} className="font-mono" />
-              </Field>
-              <span aria-hidden className="size-[50px] shrink-0 rounded-md border border-line" style={{ backgroundColor: accentPreview }} />
-            </div>
-            <div role="group" aria-label="Accent presets" className="flex flex-wrap gap-2">
+            <div role="group" aria-label="Accent presets" className="flex flex-wrap items-center gap-2">
               {ACCENT_PRESETS.map((preset) => {
-                const selected = accentPreview === preset.hex;
+                const selected = accent.valid && accentPreview === preset.hex;
                 return (
                   <button
                     key={preset.hex}
@@ -533,112 +647,129 @@ export function EventWebsiteManager(props: Props) {
                     aria-pressed={selected}
                     onClick={() => {
                       setAccentColor(preset.hex);
-                      setDirty(true);
-                      setSaved(false);
+                      touch();
                     }}
-                    className={cn("inline-flex min-h-9 items-center gap-2 rounded-full border bg-canvas px-3 text-sm font-semibold text-ink transition-colors hover:bg-subtle", selected ? "border-[1.5px] border-primary" : "border-line-strong")}
+                    className={cn(
+                      "inline-flex min-h-10 items-center gap-2 rounded-full bg-canvas pl-2 pr-3.5 text-sm font-semibold text-ink transition-colors hover:bg-subtle",
+                      selected ? "border-2 border-ink" : "border border-line-strong",
+                    )}
                   >
-                    <span aria-hidden className="size-4 rounded-full" style={{ backgroundColor: preset.hex }} />
+                    <span aria-hidden className="size-6 rounded-full" style={{ backgroundColor: preset.hex }} />
                     {preset.name}
                   </button>
                 );
               })}
             </div>
-          </div>
-          <div className="border-t border-line pt-5">
-            <h3 className="text-title text-ink">Page sections</h3>
-            <p className="mt-1 text-body-ui text-ink-muted">
-              Turn sections on or off, then arrange them in the order guests
-              should see.
-            </p>
-            <ol className="mt-3 divide-y divide-line rounded-lg border border-line">
-              {sections.map((section, index) => (
-                <li key={section.type} className="flex items-center justify-between gap-2 px-3.5 py-2">
-                  <CheckboxField
-                    label={sectionLabels[section.type as keyof typeof sectionLabels] ?? section.type}
-                    checked={section.isVisible}
-                    onCheckedChange={(checked) => {
-                      const isVisible = checked === true;
-                      setDirty(true);
-                      setSaved(false);
-                      setSections((current) =>
-                        current.map((item) =>
-                          item.type === section.type
-                            ? { ...item, isVisible }
-                            : item,
-                        ),
-                      );
-                    }}
-                  />
-                  <div className="flex gap-0.5">
-                    <IconButton label={`Move ${section.type} up`} size="sm" disabled={index === 0} onClick={() => moveSection(index, -1)}>
-                      <ChevronUp />
-                    </IconButton>
-                    <IconButton label={`Move ${section.type} down`} size="sm" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)}>
-                      <ChevronDown />
-                    </IconButton>
-                  </div>
-                </li>
-              ))}
+            <div className="flex items-start gap-2.5">
+              <span aria-hidden className="mt-[26px] size-11 shrink-0 rounded-full border border-line" style={{ backgroundColor: accentPreview }} />
+              <Field
+                label="Custom hex colour"
+                className="min-w-0 max-w-55 flex-1"
+                helperText={accent.valid ? "Leave empty for the default." : undefined}
+                error={accent.valid ? undefined : "Use a hex colour such as #C2410C."}
+              >
+                <Input
+                  name="accentColor"
+                  value={accentColor}
+                  onChange={(event) => {
+                    setAccentColor(event.target.value);
+                    touch();
+                  }}
+                  placeholder={DEFAULT_EVENT_ACCENT}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="font-mono"
+                />
+              </Field>
+            </div>
+          </section>
+
+          <section aria-labelledby="event-page-sections-title" className="flex flex-col gap-3 rounded-2xl border border-line bg-canvas p-5">
+            <div>
+              <h2 id="event-page-sections-title" className="text-h4 text-ink">Sections</h2>
+              <p className="mt-0.5 text-body-ui text-ink-muted">Reorder with the arrows. Turn off anything you don&apos;t need. Open a section to edit what&apos;s in it.</p>
+            </div>
+            <ol className="flex flex-col gap-2">
+              {sections.map((section, index) => {
+                const label = sectionLabel(section.type);
+                return (
+                  <li
+                    key={section.type}
+                    className={cn("flex items-center gap-2 rounded-xl border border-line py-2 pl-2.5 pr-2 sm:gap-3 sm:pl-3.5", section.isVisible ? "bg-canvas" : "bg-subtle")}
+                  >
+                    <GripVertical aria-hidden className="size-4 shrink-0 text-ink-disabled" />
+                    <div className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className={cn("font-bold", section.isVisible ? "text-ink" : "text-ink-muted")}>{label}</span>
+                        <span className="truncate text-caption text-ink-muted">{sectionNote(section.type, noteData)}</span>
+                      </div>
+                      <div className="-ml-1.5 sm:ml-0">{sectionAction(section.type, label)}</div>
+                    </div>
+                    <Switch
+                      checked={section.isVisible}
+                      aria-label={`Show ${label} on the event page`}
+                      onCheckedChange={(checked) => {
+                        touch();
+                        setSections((current) => current.map((item) => (item.type === section.type ? { ...item, isVisible: checked } : item)));
+                      }}
+                    />
+                    <div className="flex shrink-0 flex-col sm:flex-row sm:gap-0.5">
+                      <IconButton label={`Move ${label} up`} size="sm" disabled={index === 0} onClick={() => moveSection(index, -1)}>
+                        <ChevronUp />
+                      </IconButton>
+                      <IconButton label={`Move ${label} down`} size="sm" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)}>
+                        <ChevronDown />
+                      </IconButton>
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
+          </section>
+
+          <div className="mt-2">
+            <h2 className="text-h4 text-ink">Section content</h2>
+            <p className="mt-0.5 text-body-ui text-ink-muted">Each item is saved on its own. Drafts and hidden items stay off the public page.</p>
           </div>
-        </form>
-      </Card>
-      <ContentCollection
-        title="Highlights"
-        kind="highlight"
-        rows={props.highlights}
-        action={saveHighlight}
-        target={target}
-        pending={pending}
-        onSave={(action, input) => save(action, input, true)}
-        onDelete={remove("highlight")}
-        onError={setError}
-      />
-      <ContentCollection
-        title="Speakers"
-        kind="speaker"
-        rows={props.speakers}
-        action={saveSpeaker}
-        target={target}
-        pending={pending}
-        onSave={(action, input) => save(action, input, true)}
-        onDelete={remove("speaker")}
-        onError={setError}
-      />
-      <ContentCollection
-        title="Sponsors"
-        kind="sponsor"
-        rows={props.sponsors}
-        action={saveSponsor}
-        target={target}
-        pending={pending}
-        onSave={(action, input) => save(action, input, true)}
-        onDelete={remove("sponsor")}
-        onError={setError}
-      />
-      <ContentCollection
-        title="Resources"
-        kind="resource"
-        rows={props.resources}
-        action={saveResource}
-        target={target}
-        pending={pending}
-        onSave={(action, input) => save(action, input, true)}
-        onDelete={remove("resource")}
-        onError={setError}
-      />
-      <ContentCollection
-        title="FAQs"
-        kind="faq"
-        rows={props.faqs}
-        action={saveFaq}
-        target={target}
-        pending={pending}
-        onSave={(action, input) => save(action, input, true)}
-        onDelete={remove("faq")}
-        onError={setError}
-      />
+          {collections.map((collection) => (
+            <ContentCollection
+              key={collection.kind}
+              title={collection.title}
+              kind={collection.kind}
+              rows={rowsFor[collection.kind]}
+              action={collection.action}
+              target={target}
+              pending={pending}
+              openAddRequest={addRequests[collection.kind]}
+              onSave={(action, input) => save(action, input)}
+              onDelete={remove(collection.kind)}
+              onError={setError}
+              onDraftChange={onDraftChange}
+            />
+          ))}
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-6">
+          <PhonePreview
+            accent={accentPreview}
+            title={preview?.title ?? ""}
+            dateLine={preview?.dateLine ?? ""}
+            venueLine={preview ? (preview.isOnline ? "Online" : preview.location) : ""}
+            registerLabel={registerLabelFor(preview?.privacyType ?? "PUBLIC")}
+            sections={previewSections}
+          />
+          <Button asChild variant="secondary" size="sm" className="self-center">
+            <a href={`/${props.organisationSlug}/${props.eventSlug}`} target="_blank" rel="noopener noreferrer">
+              Open public page
+              <ArrowUpRight aria-hidden className="size-4" />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          </Button>
+        </div>
+      </div>
+
+      <UnsavedChangesBar visible={pageDirty} count={changeCount} pending={pending} onDiscard={discard} onSave={savePage} />
+
       <ConfirmationDialog
         open={Boolean(deleteTarget)}
         title="Remove event-page content?"

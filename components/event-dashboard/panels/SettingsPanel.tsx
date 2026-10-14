@@ -9,7 +9,7 @@ export async function SettingsPanel({ ctx }: { ctx: EventDashboardContext }) {
   const [collaborators, pending] = permissions.canManageCollaborators
     ? await Promise.all([
         prisma.eventCollaborator.findMany({ where: { eventId: event.id }, include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: "asc" } }),
-        prisma.eventCollaboratorInvite.findMany({ where: { eventId: event.id, usedAt: null, expiresAt: { gt: ctx.now } }, select: { id: true, email: true, expiresAt: true }, orderBy: { createdAt: "desc" } }),
+        prisma.eventCollaboratorInvite.findMany({ where: { eventId: event.id, usedAt: null, expiresAt: { gt: ctx.now } }, select: { id: true, email: true, expiresAt: true, permissions: true }, orderBy: { createdAt: "desc" } }),
       ])
     : [[], []];
   return (
@@ -17,9 +17,11 @@ export async function SettingsPanel({ ctx }: { ctx: EventDashboardContext }) {
       {permissions.canManageCollaborators ? (
         <CollaboratorInvitePanel
           organisationSlug={organisation.slug}
+          organisationName={organisation.name}
           eventId={event.id}
+          now={ctx.now.toISOString()}
           collaborators={collaborators.map((c) => ({ id: c.id, name: c.user.name, email: c.user.email, permissions: c.permissions }))}
-          pendingInvites={pending.map((invite) => ({ id: invite.id, email: invite.email, expiresAt: invite.expiresAt.toISOString() }))}
+          pendingInvites={pending.map((invite) => ({ id: invite.id, email: invite.email, expiresAt: invite.expiresAt.toISOString(), permissions: invite.permissions }))}
         />
       ) : null}
       <EventManageMore organisationSlug={organisation.slug} event={toEventClientDto(event)} />
