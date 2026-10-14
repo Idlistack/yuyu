@@ -9,7 +9,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import { CheckboxField, Switch } from "@/components/ui/choice";
 import { Callout, Chip, EmptyState } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
-import { Field as FormField, Input, NativeSelect } from "@/components/ui/field";
+import { Field as FormField, Input, Dropdown } from "@/components/ui/field";
 import { applyFeedbackTemplate, deleteFeedbackField, saveFeedbackField, saveFeedbackSettings } from "@/app/actions/feedback-form";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
@@ -295,9 +295,9 @@ export function FeedbackFormEditor(props: {
               <Input value={label} onChange={(event) => setLabel(event.target.value)} autoFocus />
             </FormField>
             <FormField label="Answer type">
-              <NativeSelect value={type} onChange={(event) => setType(event.target.value as RegistrationFieldType)}>
+              <Dropdown value={type} onChange={(event) => setType(event.target.value as RegistrationFieldType)}>
                 {Object.values(FieldType).filter((item) => item !== "EMAIL" && item !== "PHONE" && item !== "DATE").map((item) => <option key={item} value={item}>{FIELD_TYPE_LABELS[item] ?? item}</option>)}
-              </NativeSelect>
+              </Dropdown>
             </FormField>
             {["SELECT", "MULTI_SELECT", "RADIO"].includes(type) ? (
               <FormField label="Options (comma separated)" helperText={type === "MULTI_SELECT" ? undefined : "For a rating scale, use numbers such as 1, 2, 3, 4, 5."}>

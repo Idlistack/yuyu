@@ -9,10 +9,9 @@ import {
   type InputHTMLAttributes,
   type ReactElement,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
-import { AlertCircle, ChevronDown, Eye, EyeOff, Lock, Search, X } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Lock, Search, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { controlClasses } from "./styles";
 
@@ -72,17 +71,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   return <textarea ref={ref} rows={rows} className={cn(controlClasses, "min-h-24 resize-y", className)} {...props} />;
 });
 
-/** Native select styled like the other controls; native keeps mobile pickers and form posts working. */
-export const NativeSelect = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function NativeSelect({ className, children, ...props }, ref) {
-  return (
-    <div className="relative">
-      <select ref={ref} className={cn(controlClasses, "appearance-none pr-10", className)} {...props}>
-        {children}
-      </select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 size-[18px] -translate-y-1/2 text-ink-muted" />
-    </div>
-  );
-});
+/** Every dropdown in the app uses the custom `Dropdown`, never the browser's own picker. */
+export { Dropdown } from "./select";
 
 /** Grey prefix segment joined to the input, e.g. `yuyu.idliapps.com/`. */
 export const PrefixInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { prefix: string }>(function PrefixInput(

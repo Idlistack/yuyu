@@ -10,7 +10,7 @@ import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/display";
-import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
+import { Field, Input, Dropdown, Textarea } from "@/components/ui/field";
 
 const timezones = [
   "UTC",
@@ -97,30 +97,30 @@ export function EditSeriesForm(props: {
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Timezone" required>
-          <NativeSelect name="timezone" defaultValue={series.timezone}>
+          <Dropdown name="timezone" defaultValue={series.timezone}>
             {timezones.map((tz) => (
               <option key={tz} value={tz}>
                 {tz}
               </option>
             ))}
-          </NativeSelect>
+          </Dropdown>
         </Field>
         <Field label="Capacity per occurrence" optional>
           <Input name="capacity" type="number" min={1} inputMode="numeric" defaultValue={series.capacity ?? ""} />
         </Field>
         <Field label="Status">
-          <NativeSelect name="status" defaultValue={series.status}>
+          <Dropdown name="status" defaultValue={series.status}>
             <option value={EventStatus.DRAFT}>Draft</option>
             <option value={EventStatus.PUBLISHED}>Published</option>
-          </NativeSelect>
+          </Dropdown>
         </Field>
         <Field label="Audience">
-          <NativeSelect name="privacyType" defaultValue={series.privacyType}>
+          <Dropdown name="privacyType" defaultValue={series.privacyType}>
             <option value={EventPrivacyType.PUBLIC}>Public</option>
             <option value={EventPrivacyType.HIDDEN_LINK}>Hidden link</option>
             <option value={EventPrivacyType.APPROVAL_REQUIRED}>Approval required</option>
             <option value={EventPrivacyType.INVITE_ONLY}>Invite only</option>
-          </NativeSelect>
+          </Dropdown>
         </Field>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">

@@ -7,7 +7,7 @@ import { Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
-import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
+import { Field, Input, Dropdown, Textarea } from "@/components/ui/field";
 import { createEventSeries } from "@/app/actions/series";
 
 const timezones = [
@@ -105,13 +105,13 @@ export function CreateSeriesDialog(props: {
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Timezone" required>
-                  <NativeSelect name="timezone" defaultValue="UTC">
+                  <Dropdown name="timezone" defaultValue="UTC">
                     {timezones.map((tz) => (
                       <option key={tz} value={tz}>
                         {tz}
                       </option>
                     ))}
-                  </NativeSelect>
+                  </Dropdown>
                 </Field>
                 <Field label="Capacity per occurrence" optional>
                   <Input name="capacity" type="number" min={1} inputMode="numeric" />
@@ -120,18 +120,18 @@ export function CreateSeriesDialog(props: {
               {canPublish ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Status">
-                    <NativeSelect name="status" defaultValue={EventStatus.DRAFT}>
+                    <Dropdown name="status" defaultValue={EventStatus.DRAFT}>
                       <option value={EventStatus.DRAFT}>Draft</option>
                       <option value={EventStatus.PUBLISHED}>Published</option>
-                    </NativeSelect>
+                    </Dropdown>
                   </Field>
                   <Field label="Audience">
-                    <NativeSelect name="privacyType" defaultValue={EventPrivacyType.PUBLIC}>
+                    <Dropdown name="privacyType" defaultValue={EventPrivacyType.PUBLIC}>
                       <option value={EventPrivacyType.PUBLIC}>Public</option>
                       <option value={EventPrivacyType.HIDDEN_LINK}>Hidden link</option>
                       <option value={EventPrivacyType.APPROVAL_REQUIRED}>Approval required</option>
                       <option value={EventPrivacyType.INVITE_ONLY}>Invite only</option>
-                    </NativeSelect>
+                    </Dropdown>
                   </Field>
                 </div>
               ) : null}

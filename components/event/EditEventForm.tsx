@@ -9,7 +9,7 @@ import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SwitchRow } from "@/components/ui/choice";
 import { Callout, Chip } from "@/components/ui/display";
-import { Field, Input, NativeSelect } from "@/components/ui/field";
+import { Field, Input, Dropdown } from "@/components/ui/field";
 import { updateEvent, uploadEventCoverImage } from "@/app/actions/event";
 import { uploadEventPageLogo } from "@/app/actions/media";
 import { CoverImagePicker } from "@/components/event/CoverImagePicker";
@@ -309,11 +309,11 @@ export function EditEventForm(props: {
               <Input type="datetime-local" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />
             </Field>
             <Field label="Timezone" required>
-              <NativeSelect name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+              <Dropdown name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)}>
                 {timezones.map((tz) => (
                   <option key={tz} value={tz}>{tz}</option>
                 ))}
-              </NativeSelect>
+              </Dropdown>
             </Field>
           </div>
         </FormCard>
@@ -352,19 +352,19 @@ export function EditEventForm(props: {
         <FormCard title="Publishing" description="Control visibility, audience, and RSVP limits.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Status" helperText="Published events make the website public and open registration.">
-              <NativeSelect name="status" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)}>
+              <Dropdown name="status" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)}>
                 <option value={EventStatus.DRAFT}>Draft</option>
                 <option value={EventStatus.PUBLISHED}>Published</option>
                 <option value={EventStatus.HIDDEN}>Hidden</option>
-              </NativeSelect>
+              </Dropdown>
             </Field>
             <Field label="Audience" helperText="Applies when the event is published.">
-              <NativeSelect name="privacyType" value={privacyType} onChange={(e) => setPrivacyType(e.target.value as EventPrivacyType)}>
+              <Dropdown name="privacyType" value={privacyType} onChange={(e) => setPrivacyType(e.target.value as EventPrivacyType)}>
                 <option value={EventPrivacyType.PUBLIC}>Public (discoverable)</option>
                 <option value={EventPrivacyType.HIDDEN_LINK}>Hidden link (not listed)</option>
                 <option value={EventPrivacyType.APPROVAL_REQUIRED}>Approval required</option>
                 <option value={EventPrivacyType.INVITE_ONLY}>Invite only</option>
-              </NativeSelect>
+              </Dropdown>
             </Field>
           </div>
           <div className="grid gap-4 md:grid-cols-3">

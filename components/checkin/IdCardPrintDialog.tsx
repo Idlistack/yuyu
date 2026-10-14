@@ -7,7 +7,7 @@ import { SegmentedControl, Switch } from "@/components/ui/choice";
 import { Callout, Chip } from "@/components/ui/display";
 import { Description as DialogDescription, Title as DialogTitle } from "@radix-ui/react-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Field, Input, NativeSelect } from "@/components/ui/field";
+import { Field, Input, Dropdown } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/cn";
@@ -584,9 +584,9 @@ export function IdCardPrintDialog(props: {
                 <div className="flex flex-col gap-3 rounded-lg border border-line p-3">
                   <p className="text-label text-ink">Selected component</p>
                   <Field label="Component">
-                    <NativeSelect value={selectedLayoutElement} onChange={(event) => setSelectedLayoutElement(event.target.value as IdCardLayoutElement)}>
+                    <Dropdown value={selectedLayoutElement} onChange={(event) => setSelectedLayoutElement(event.target.value as IdCardLayoutElement)}>
                       {Object.entries(LAYOUT_ELEMENT_LABELS).map(([element, label]) => <option key={element} value={element}>{label}</option>)}
-                    </NativeSelect>
+                    </Dropdown>
                   </Field>
                   {selectedElementIsText ? (
                     <Field label="Text size (pt)"><Input type="number" min={6} max={48} step={0.5} value={settings.elementTextSizes[selectedLayoutElement]} onChange={(event) => updateElementTextSize(selectedLayoutElement, Number(event.target.value))} /></Field>
@@ -631,12 +631,12 @@ export function IdCardPrintDialog(props: {
                   ) : (
                     <div className="flex flex-col gap-2.5">
                       <Field label="Add registration field" helperText={availableFieldOptions.length === 0 ? "All registration fields are already on this card." : "Choose a field to add it to the card."}>
-                        <NativeSelect value="" onChange={(event) => togglePrintField(event.target.value, true)} disabled={availableFieldOptions.length === 0}>
+                        <Dropdown value="" onChange={(event) => togglePrintField(event.target.value, true)} disabled={availableFieldOptions.length === 0}>
                           <option value="" disabled>Select a registration field</option>
                           {availableFieldOptions.map((field) => (
                             <option key={field.key} value={field.key}>{field.label} · {field.detail}</option>
                           ))}
-                        </NativeSelect>
+                        </Dropdown>
                       </Field>
                       {selectedFieldOptions.map((field) => (
                         <div key={field.key} className="flex flex-col gap-2 rounded-lg border border-line p-3">

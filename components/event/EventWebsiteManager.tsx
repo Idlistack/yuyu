@@ -7,7 +7,7 @@ import { ArrowUpRight, ChevronDown, ChevronUp, GripVertical, Plus, Upload } from
 import { Button, IconButton } from "@/components/ui/button";
 import { Switch } from "@/components/ui/choice";
 import { Callout, Chip, type ChipTone } from "@/components/ui/display";
-import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
+import { Field, Input, Dropdown, Textarea } from "@/components/ui/field";
 import { ACCENT_PRESETS, DEFAULT_EVENT_ACCENT, normalizeAccentHex } from "@/lib/theme/accent";
 import { cn } from "@/lib/cn";
 import {
@@ -26,13 +26,11 @@ import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useUnsavedChangesGuard } from "@/components/forms/useUnsavedChangesGuard";
 import { useEventTabs } from "@/components/event-dashboard/EventDashboardTabs";
-import { PhonePreview, type PreviewSection } from "@/components/event-dashboard/event-page/PhonePreview";
 import { UnsavedChangesBar } from "@/components/event-dashboard/event-page/UnsavedChangesBar";
 import {
   countPageChanges,
   normalizeSections,
   parseAccentInput,
-  registerLabelFor,
   sectionLabel,
   sectionNote,
   type PageSection,
@@ -147,11 +145,11 @@ const visibilityLabels: Record<string, string> = { PUBLISHED: "Published", DRAFT
 function VisibilitySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <Field label="Visibility">
-      <NativeSelect name="visibility" value={value} onChange={(event) => onChange(event.target.value)}>
+      <Dropdown name="visibility" value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="PUBLISHED">Published</option>
         <option value="DRAFT">Draft</option>
         <option value="HIDDEN">Hidden</option>
-      </NativeSelect>
+      </Dropdown>
     </Field>
   );
 }
@@ -299,13 +297,13 @@ function ContentCollection({
       ) : null}
       {kind === "sponsor" ? (
         <Field label="Sponsor tier">
-          <NativeSelect name="tier" defaultValue={String(row?.values.tier ?? "PARTNER")}>
+          <Dropdown name="tier" defaultValue={String(row?.values.tier ?? "PARTNER")}>
             <option value="PLATINUM">Platinum</option>
             <option value="GOLD">Gold</option>
             <option value="SILVER">Silver</option>
             <option value="PARTNER">Partner</option>
             <option value="COMMUNITY_PARTNER">Community partner</option>
-          </NativeSelect>
+          </Dropdown>
         </Field>
       ) : null}
     </>
@@ -432,13 +430,6 @@ function ContentCollection({
       ) : null}
     </section>
   );
-}
-
-function publishedTitles(rows: ContentRow[]) {
-  const published = rows.filter((row) => row.visibility === "PUBLISHED").map((row) => row.title);
-  const lines = published.slice(0, 3).map((text) => ({ text }));
-  if (published.length > 3) lines.push({ text: `+${published.length - 3} more` });
-  return lines;
 }
 
 export function EventWebsiteManager(props: Props) {
@@ -601,21 +592,6 @@ export function EventWebsiteManager(props: Props) {
     return null;
   };
 
-  const previewSections: PreviewSection[] = sections
-    .filter((section) => section.isVisible && section.type !== "HERO")
-    .map((section): PreviewSection | null => {
-      const label = sectionLabel(section.type);
-      const kind = CONTENT_FOR_SECTION[section.type];
-      let lines: PreviewSection["lines"] = [];
-      if (kind) lines = publishedTitles(rowsFor[kind]);
-      else if (section.type === "ABOUT") lines = [{ text: preview?.aboutExcerpt || "About this event" }];
-      else if (section.type === "SCHEDULE") lines = preview?.sessionLines ?? [];
-      else if (section.type === "VENUE") lines = preview && !preview.isOnline && preview.location.trim() ? [{ text: preview.location }] : [];
-      // The public page skips sections with nothing to show, so the preview does too.
-      return lines.length ? { type: section.type, label, lines } : null;
-    })
-    .filter((section): section is PreviewSection => section !== null);
-
   const collections: Array<{ title: string; kind: ContentKind; action: SaveAction }> = [
     { title: "Highlights", kind: "highlight", action: saveHighlight },
     { title: "Speakers", kind: "speaker", action: saveSpeaker },
@@ -626,8 +602,14 @@ export function EventWebsiteManager(props: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-5">
+      <div className="flex min-w-0 flex-col gap-5">
+          <Button asChild variant="secondary" size="sm" className="self-end">
+            <a href={`/${props.organisationSlug}/${props.eventSlug}`} target="_blank" rel="noopener noreferrer">
+              Open public page
+              <ArrowUpRight aria-hidden className="size-4" />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          </Button>
           {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
           {saved ? <Callout tone="success" role="status">Changes saved.</Callout> : null}
           {props.programme}
@@ -748,25 +730,6 @@ export function EventWebsiteManager(props: Props) {
             />
           ))}
         </div>
-
-        <div className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-6">
-          <PhonePreview
-            accent={accentPreview}
-            title={preview?.title ?? ""}
-            dateLine={preview?.dateLine ?? ""}
-            venueLine={preview ? (preview.isOnline ? "Online" : preview.location) : ""}
-            registerLabel={registerLabelFor(preview?.privacyType ?? "PUBLIC")}
-            sections={previewSections}
-          />
-          <Button asChild variant="secondary" size="sm" className="self-center">
-            <a href={`/${props.organisationSlug}/${props.eventSlug}`} target="_blank" rel="noopener noreferrer">
-              Open public page
-              <ArrowUpRight aria-hidden className="size-4" />
-              <span className="sr-only">(opens in a new tab)</span>
-            </a>
-          </Button>
-        </div>
-      </div>
 
       <UnsavedChangesBar visible={pageDirty} count={changeCount} pending={pending} onDiscard={discard} onSave={savePage} />
 

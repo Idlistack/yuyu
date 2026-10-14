@@ -8,7 +8,7 @@ import { useToast } from "@/components/feedback/ToastProvider";
 import { ConfirmationDialog } from "@/components/feedback/ConfirmationDialog";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/display";
-import { NativeSelect } from "@/components/ui/field";
+import { Dropdown } from "@/components/ui/field";
 import { ROLE_LABELS } from "@/components/members/memberSummary";
 
 const ROLE_TONES = { OWNER: "ink", ADMIN: "warning", MEMBER: "neutral" } as const satisfies Record<MembershipRole, string>;
@@ -39,7 +39,7 @@ export function MemberRoleActions(props: {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {canEditRoles ? (
-        <NativeSelect
+        <Dropdown
           aria-label={memberName ? `Role for ${memberName}` : "Role"}
           value={role}
           disabled={pending}
@@ -63,7 +63,7 @@ export function MemberRoleActions(props: {
         >
           <option value="ADMIN">Admin</option>
           <option value="MEMBER">Member</option>
-        </NativeSelect>
+        </Dropdown>
       ) : (
         <Chip size="sm" tone={ROLE_TONES[role]}>{ROLE_LABELS[role]}</Chip>
       )}

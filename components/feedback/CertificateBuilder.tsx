@@ -5,7 +5,7 @@ import { Upload } from "lucide-react";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { CheckboxField } from "@/components/ui/choice";
 import { Callout } from "@/components/ui/display";
-import { Field, Input, NativeSelect } from "@/components/ui/field";
+import { Field, Input, Dropdown } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { certificateFonts, defaultNameArea, type CertificateTemplate } from "@/lib/certificateTemplate";
 import { previewCertificate, uploadCertificateBackground } from "@/app/actions/certificate";
@@ -81,9 +81,9 @@ export function CertificateBuilder(props: Props) {
         <fieldset disabled={busyOrDisabled} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Font">
-              <NativeSelect value={value.font} onChange={(e) => change({ font: e.target.value as CertificateTemplate["font"] })}>
+              <Dropdown value={value.font} onChange={(e) => change({ font: e.target.value as CertificateTemplate["font"] })}>
                 {Object.entries(certificateFonts).map(([key, font]) => <option key={key} value={key}>{font.label}</option>)}
-              </NativeSelect>
+              </Dropdown>
             </Field>
             <Field label="Font size" helperText="Relative to a 1000 px image width">
               <Input type="number" value={value.fontSize} onChange={(e) => change({ fontSize: Math.max(12, Math.min(120, Math.round(Number(e.target.value)))) })} />
@@ -92,9 +92,9 @@ export function CertificateBuilder(props: Props) {
               <Input type="color" value={value.color} onChange={(e) => change({ color: e.target.value })} className="h-11 cursor-pointer p-1" />
             </Field>
             <Field label="Alignment">
-              <NativeSelect value={value.align} onChange={(e) => change({ align: e.target.value as CertificateTemplate["align"] })}>
+              <Dropdown value={value.align} onChange={(e) => change({ align: e.target.value as CertificateTemplate["align"] })}>
                 {["left", "center", "right"].map((a) => <option key={a} value={a}>{a}</option>)}
-              </NativeSelect>
+              </Dropdown>
             </Field>
           </div>
           <CheckboxField label="Bold name" checked={value.bold} onCheckedChange={(bold) => change({ bold: bold === true })} />

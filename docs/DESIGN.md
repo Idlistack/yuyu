@@ -261,6 +261,7 @@ Rules: destructive actions are never `primary`; destructive confirmations end wi
 - Search: pill shape, leading search icon, clear (✕) button.
 - Password: inline show/hide icon button inside the same border; strength bar (4 segments) + rule checklist.
 - Textarea resizes vertically; no grey box inside the field (v1 bug).
+- Dropdowns never use the browser's own picker. Use `Dropdown` (`components/ui/select.tsx`, re-exported from `field.tsx`): same API as `<select>` with `<option>` children, rendered as the Yuyu listbox (field-styled trigger, `shadow-float` panel, check on the selected row). A visually hidden native select carries `name`/`value`, so form posts, `FormData` and form-level `onChange` keep working. Use `Select` + `SelectItem` directly for options with descriptions.
 
 ### 4.3 Choice controls
 

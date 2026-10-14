@@ -6,7 +6,7 @@ import type { RegistrationFieldDefinition } from "@/components/rsvp/registration
 import { Button } from "@/components/ui/button";
 import { CheckboxField, FilterChip, RadioCard, RadioGroup } from "@/components/ui/choice";
 import { Callout } from "@/components/ui/display";
-import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
+import { Field, Input, Dropdown, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 
 function OptionalTag({ optional }: { optional: boolean }) {
@@ -71,12 +71,12 @@ function FeedbackQuestion({ field, value, onChange }: { field: RegistrationField
     default:
       return (
         <Field label={field.label} optional={optional} required={field.required}>
-          <NativeSelect value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)}>
+          <Dropdown value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)}>
             <option value="">—</option>
             {field.options.map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
-          </NativeSelect>
+          </Dropdown>
         </Field>
       );
   }

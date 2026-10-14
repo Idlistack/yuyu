@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FilterChip } from "@/components/ui/choice";
 import { Callout, Chip, EmptyState } from "@/components/ui/display";
-import { Field, Input, NativeSelect } from "@/components/ui/field";
+import { Field, Input, Dropdown } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { useRouter } from "next/navigation";
 import { deleteScheduleTrack, deleteWebsiteContent, reorderScheduleTracks, saveScheduleTrack, saveSession, setEventSessionDelay } from "@/app/actions/event-website";
@@ -112,9 +112,9 @@ export function EventProgramScheduleManager({ organisationSlug, eventId, eventSt
           </div>
           <div className="grid gap-3 sm:grid-cols-[7fr_5fr]">
             <Field label="Track" required helperText="Tracks are the room, stage, or stream shown to attendees.">
-              <NativeSelect name="trackId" defaultValue={session?.trackId ?? defaultTrackId}>
+              <Dropdown name="trackId" defaultValue={session?.trackId ?? defaultTrackId}>
                 {sortedTracks.map((track) => <option key={track.id} value={track.id}>{track.name}</option>)}
-              </NativeSelect>
+              </Dropdown>
             </Field>
             <Field label="Type" required helperText="Choose or type your own.">
               <Input name="type" list={typeListId} defaultValue={displayType(session?.type ?? "Talk")} />
@@ -142,11 +142,11 @@ export function EventProgramScheduleManager({ organisationSlug, eventId, eventSt
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Visibility">
-              <NativeSelect name="visibility" defaultValue={session?.visibility ?? "PUBLISHED"}>
+              <Dropdown name="visibility" defaultValue={session?.visibility ?? "PUBLISHED"}>
                 <option value="PUBLISHED">Published</option>
                 <option value="DRAFT">Draft</option>
                 <option value="HIDDEN">Hidden</option>
-              </NativeSelect>
+              </Dropdown>
             </Field>
             <Field label="Display order" helperText="Use when sessions share a start time.">
               <Input name="sortOrder" type="number" min={0} defaultValue={session?.sortOrder ?? trackSessions(defaultTrackId).length} />

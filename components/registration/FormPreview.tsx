@@ -4,7 +4,7 @@ import { useState } from "react";
 import { EyeOff, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CheckboxField, Radio, RadioGroup } from "@/components/ui/choice";
-import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
+import { Field, Input, Dropdown, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { DEFAULT_MAX_LENGTH, settingsForType, visibleFieldKeys } from "@/lib/registrationFields";
 import type { BuilderField } from "./builderModel";
@@ -128,7 +128,7 @@ function PreviewQuestion({ field, value, other, onChange, onOther }: { field: Pr
       return (
         <div className="flex flex-col gap-2">
           <Field label={<RequiredLabel label={label} required={field.required} />} helperText={help}>
-            <NativeSelect value={text} onChange={(event) => onChange(event.target.value)}>
+            <Dropdown value={text} onChange={(event) => onChange(event.target.value)}>
               <option value="" disabled>
                 Choose…
               </option>
@@ -138,7 +138,7 @@ function PreviewQuestion({ field, value, other, onChange, onOther }: { field: Pr
                 </option>
               ))}
               {settings.allowOther ? <option value={OTHER}>Other</option> : null}
-            </NativeSelect>
+            </Dropdown>
           </Field>
           {text === OTHER ? <OtherInput label={label} value={other} onChange={onOther} /> : null}
         </div>

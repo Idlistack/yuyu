@@ -18,7 +18,7 @@ import {
   type AnswerState,
   type OtherAnswer,
 } from "@/components/rsvp/registrationAnswers";
-import { Input, NativeSelect, Textarea } from "@/components/ui/field";
+import { Input, Dropdown, Textarea } from "@/components/ui/field";
 import { CheckboxField, FilterChip, Radio, RadioGroup } from "@/components/ui/choice";
 import { controlClasses } from "@/components/ui/styles";
 import { OTHER_MAX_LENGTH } from "@/lib/registrationFields";
@@ -285,7 +285,7 @@ export function QuestionField({ field, value, other, error, onChange }: Question
         <div className="flex flex-col gap-1.5">
           <label htmlFor={id.control} className="text-label text-ink"><LabelText field={field} /></label>
           {helpNode}
-          <NativeSelect
+          <Dropdown
             id={id.control}
             value={current}
             required={field.required}
@@ -302,7 +302,7 @@ export function QuestionField({ field, value, other, error, onChange }: Question
               <option key={option} value={option}>{option}</option>
             ))}
             {withOther ? <option value={OTHER_CHOICE}>Other</option> : null}
-          </NativeSelect>
+          </Dropdown>
           {otherChosen ? (
             <OtherInput id={id.other} field={field} text={otherAnswer.text} invalid={invalid} onText={(text) => onChange(value, { chosen: true, text })} />
           ) : null}

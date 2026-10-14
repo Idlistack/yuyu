@@ -6,7 +6,7 @@ import { AlertCircle, GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CheckboxField, Switch, SwitchRow } from "@/components/ui/choice";
 import { Callout } from "@/components/ui/display";
-import { Field, Input, NativeSelect } from "@/components/ui/field";
+import { Field, Input, Dropdown } from "@/components/ui/field";
 import { FIELD_TYPES, fieldTypeMeta, triggerChoices } from "@/lib/registrationFields";
 import { ChoicesEditor } from "./ChoicesEditor";
 import { FieldTypeIcon } from "./FieldTypeIcon";
@@ -75,13 +75,13 @@ export const QuestionEditor = forwardRef<HTMLInputElement, Props>(function Quest
           <Input ref={labelRef} value={draft.label} maxLength={MAX_LABEL} placeholder="e.g. Do you have any dietary needs?" onChange={(event) => set({ label: event.target.value })} />
         </Field>
         <Field label="Answer type">
-          <NativeSelect value={draft.type} onChange={(event) => set({ type: event.target.value as RegistrationFieldType })}>
+          <Dropdown value={draft.type} onChange={(event) => set({ type: event.target.value as RegistrationFieldType })}>
             {FIELD_TYPES.map((item) => (
               <option key={item.type} value={item.type}>
                 {item.label}
               </option>
             ))}
-          </NativeSelect>
+          </Dropdown>
         </Field>
       </div>
 
@@ -254,7 +254,7 @@ function ShowIfSection({
           ) : null}
           {candidates.length > 0 ? (
             <Field label="Earlier question">
-              <NativeSelect
+              <Dropdown
                 value={trigger?.key ?? ""}
                 onChange={(event) => onChange({ ...draft, showIf: { fieldKey: event.target.value, values: [] } })}
               >
@@ -268,7 +268,7 @@ function ShowIfSection({
                     {item.label}
                   </option>
                 ))}
-              </NativeSelect>
+              </Dropdown>
             </Field>
           ) : null}
           {trigger ? (

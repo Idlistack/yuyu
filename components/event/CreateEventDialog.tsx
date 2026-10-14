@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { SwitchRow } from "@/components/ui/choice";
 import { Callout } from "@/components/ui/display";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
-import { Field, Input, NativeSelect } from "@/components/ui/field";
+import { Field, Input, Dropdown } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 
 const timezones = [
@@ -266,13 +266,13 @@ export function CreateEventDialog(props: {
                 <input type="hidden" name="startDateTime" value={start ? toDatetimeLocalValue(start) : ""} />
                 <input type="hidden" name="endDateTime" value={end ? toDatetimeLocalValue(end) : ""} />
                 <Field label="Timezone" required>
-                  <NativeSelect name="timezone" defaultValue="Asia/Kolkata">
+                  <Dropdown name="timezone" defaultValue="Asia/Kolkata">
                     {timezones.map((tz) => (
                       <option key={tz} value={tz}>
                         {tz}
                       </option>
                     ))}
-                  </NativeSelect>
+                  </Dropdown>
                 </Field>
               </div>
 

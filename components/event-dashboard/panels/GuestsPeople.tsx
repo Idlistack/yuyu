@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Callout, EmptyState } from "@/components/ui/display";
-import { NativeSelect, SearchInput } from "@/components/ui/field";
+import { Dropdown, SearchInput } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import type { AttendeeRow } from "@/components/attendees/types";
 import { ManualRsvpDialog } from "@/components/attendees/ManualRsvpDialog";
@@ -186,11 +186,11 @@ export function GuestsPeople({
             <div className="flex w-full min-w-0 flex-wrap gap-2 sm:ml-auto sm:w-auto sm:flex-nowrap">
               <div className="min-w-0 flex-1 sm:w-[160px] sm:flex-none">
                 <label htmlFor="guest-kind" className="sr-only">Registration type</label>
-                <NativeSelect id="guest-kind" value={kind} onChange={(event) => resetPage(setKind)(event.target.value as GuestKindFilter)} className="py-2 sm:text-sm">
+                <Dropdown id="guest-kind" value={kind} onChange={(event) => resetPage(setKind)(event.target.value as GuestKindFilter)} className="py-2 sm:text-sm">
                   <option value="all">Everyone</option>
                   <option value="guests">Guests only</option>
                   <option value="users">Signed-in users</option>
-                </NativeSelect>
+                </Dropdown>
               </div>
               <div className="w-full min-w-0 sm:w-[260px]">
                 <label htmlFor="guest-search" className="sr-only">Search guests by name or email</label>
