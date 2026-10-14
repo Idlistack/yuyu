@@ -2,13 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { signOut } from "next-auth/react";
-import Alert from "@mui/material/Alert";
-import Button from "@mui/material/Button";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import { Button } from "@/components/ui/button";
+import { Callout, SettingsRow } from "@/components/ui/display";
+import { Field, PasswordInput } from "@/components/ui/field";
 import { updateAccountPassword } from "@/app/actions/account";
-import { PasswordTextField } from "@/components/forms/PasswordTextField";
 
 export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -23,13 +20,14 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
     confirmPassword.length > 0 && newPassword !== confirmPassword;
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{ p: { xs: 2, sm: 3 }, borderRadius: "16px" }}
+    <SettingsRow
+      title={hasPassword ? "Password" : title}
+      description={hasPassword
+        ? "Changing your password signs you out on every device."
+        : "Add email-and-password sign-in alongside your Google account. You will be signed out after it is set."}
     >
-      <Stack
-        component="form"
-        spacing={2}
+      <form
+        className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           setError(null);
@@ -59,49 +57,22 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
           });
         }}
       >
-        <Stack spacing={0.5}>
-          <Typography variant="h6">{title}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {hasPassword
-              ? "Changing your password signs you out on every device."
-              : "Add email-and-password sign-in alongside your Google account. You will be signed out after it is set."}
-          </Typography>
-        </Stack>
-        {error ? <Alert severity="error">{error}</Alert> : null}
+        {error ? <Callout tone="danger" role="alert">{error}</Callout> : null}
         {hasPassword ? (
-          <PasswordTextField
-            label="Current password"
-            value={currentPassword}
-            onChange={(event) => setCurrentPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-            fullWidth
-          />
+          <Field label="Current password" required>
+            <PasswordInput value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" />
+          </Field>
         ) : null}
-        <PasswordTextField
-          label="New password"
-          value={newPassword}
-          onChange={(event) => setNewPassword(event.target.value)}
-          autoComplete="new-password"
-          helperText="At least 12 characters."
-          error={passwordTooShort}
-          slotProps={{ htmlInput: { minLength: 12, maxLength: 128 } }}
-          required
-          fullWidth
-        />
-        <PasswordTextField
-          label="Confirm new password"
-          value={confirmPassword}
-          onChange={(event) => setConfirmPassword(event.target.value)}
-          autoComplete="new-password"
-          error={passwordsDoNotMatch}
-          helperText={passwordsDoNotMatch ? "Passwords do not match." : " "}
-          required
-          fullWidth
-        />
+        <Field label="New password" required helperText="At least 12 characters." error={passwordTooShort ? "At least 12 characters." : undefined}>
+          <PasswordInput value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" minLength={12} maxLength={128} />
+        </Field>
+        <Field label="Confirm new password" required error={passwordsDoNotMatch ? "Passwords do not match." : undefined}>
+          <PasswordInput value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" />
+        </Field>
         <Button
           type="submit"
-          variant="contained"
+          variant="primary"
+          className="self-start"
           disabled={
             pending ||
             !newPassword ||
@@ -109,11 +80,10 @@ export function AccountPasswordForm({ hasPassword }: { hasPassword: boolean }) {
             passwordTooShort ||
             passwordsDoNotMatch
           }
-          sx={{ alignSelf: "flex-start" }}
         >
-          {pending ? "Saving…" : title}
+          {pending ? "Saving…" : hasPassword ? "Update password" : title}
         </Button>
-      </Stack>
-    </Paper>
+      </form>
+    </SettingsRow>
   );
 }

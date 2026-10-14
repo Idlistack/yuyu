@@ -1,18 +1,16 @@
-import Box from "@mui/material/Box";
-import Skeleton from "@mui/material/Skeleton";
-import Stack from "@mui/material/Stack";
+import { Skeleton } from "@/components/ui/display";
 
 export default function RootLoading() {
   return (
-    <Stack spacing={3} sx={{ py: { xs: 3, sm: 5 } }} aria-label="Loading page">
-      <Box>
-        <Skeleton variant="text" width="min(65%, 420px)" height={54} />
-        <Skeleton variant="text" width="min(85%, 620px)" />
-      </Box>
-      <Skeleton variant="rounded" height={120} />
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-        {[0, 1, 2].map((item) => <Skeleton key={item} variant="rounded" height={180} sx={{ flex: 1 }} />)}
-      </Stack>
-    </Stack>
+    <div className="flex flex-col gap-6 py-6 sm:py-10" aria-label="Loading page" aria-busy="true">
+      <div className="flex flex-col gap-2.5">
+        <Skeleton className="h-11 w-[min(65%,420px)]" />
+        <Skeleton className="h-4 w-[min(85%,620px)]" />
+      </div>
+      <Skeleton className="h-[120px] rounded-lg" />
+      <div className="grid gap-4 md:grid-cols-3">
+        {[0, 1, 2].map((item) => <Skeleton key={item} className="h-[180px] rounded-lg" />)}
+      </div>
+    </div>
   );
 }

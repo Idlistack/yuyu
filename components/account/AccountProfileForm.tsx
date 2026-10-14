@@ -1,17 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Alert from "@mui/material/Alert";
-import Avatar from "@mui/material/Avatar";
-import Button from "@mui/material/Button";
-import Divider from "@mui/material/Divider";
-import IconButton from "@mui/material/IconButton";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
-import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { Info } from "lucide-react";
+import { Button, IconButton } from "@/components/ui/button";
+import { Avatar, Callout, SettingsRow } from "@/components/ui/display";
+import { Field, Input, ReadOnlyValue } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/menu";
 import { updateAccountProfile } from "@/app/actions/account";
 import { uploadAccountProfileImage } from "@/app/actions/media";
 import { ImageUploadPicker } from "@/components/forms/ImageUploadPicker";
@@ -47,12 +41,9 @@ export function AccountProfileForm(props: {
     : image
       ? "Profile image from your sign-in provider."
       : "Uses your Gravatar when available, otherwise your initials.";
-  const initials = name.trim().slice(0, 1).toUpperCase() || "U";
 
   return (
-    <Stack
-      component="form"
-      spacing={2.5}
+    <form
       onSubmit={(event) => {
         event.preventDefault();
         setError(null);
@@ -90,54 +81,21 @@ export function AccountProfileForm(props: {
         });
       }}
     >
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      <Paper
-        variant="outlined"
-        sx={{ p: { xs: 2, sm: 3 }, borderRadius: "16px" }}
-      >
-        <Stack spacing={2.5}>
-          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-            <Avatar
-              src={avatarSource}
-              alt={name}
-              sx={{ width: 72, height: 72, fontSize: 28 }}
-            >
-              {initials}
-            </Avatar>
-            <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                {name || "Your profile"}
-              </Typography>
-              <Stack
-                direction="row"
-                spacing={0.25}
-                sx={{ alignItems: "center" }}
-              >
-                <Typography variant="body2" color="text.secondary" noWrap>
-                  {email ?? "No email address"}
-                </Typography>
-                <Tooltip title={avatarSourceDescription}>
-                  <IconButton
-                    size="small"
-                    aria-label="Profile image source"
-                    sx={{ p: 0.25, color: "text.secondary" }}
-                  >
-                    <InfoOutlinedIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
+      {error ? <Callout tone="danger" role="alert" className="mb-2">{error}</Callout> : null}
+      <SettingsRow title="Photo" description="Remove your uploaded image to use your provider image or Gravatar when available.">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <Avatar name={name || email} src={avatarSource} className="size-[72px] text-2xl" />
+            <div className="min-w-0">
+              <p className="truncate text-[17px] font-bold text-ink">{name || "Your profile"}</p>
+              <div className="flex items-center gap-1">
+                <p className="truncate text-sm text-ink-muted">{email ?? "No email address"}</p>
+                <Tooltip content={avatarSourceDescription}>
+                  <IconButton label="Profile image source" size="sm" className="size-7 [&_svg]:size-4"><Info /></IconButton>
                 </Tooltip>
-              </Stack>
-            </Stack>
-          </Stack>
-          <Divider />
-          <TextField
-            label="Display name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            autoComplete="name"
-            required
-            fullWidth
-            slotProps={{ htmlInput: { maxLength: 120 } }}
-          />
+              </div>
+            </div>
+          </div>
           <ImageUploadPicker
             initialUrl={initialProfileImageUrl}
             label="Profile image"
@@ -149,30 +107,22 @@ export function AccountProfileForm(props: {
               setProfileImageUrl(previewUrl);
             }}
           />
-          <Typography variant="caption" color="text.secondary">
-            Remove your uploaded image to use your provider image or Gravatar
-            when available.
-          </Typography>
-          <TextField
-            label="Email address"
-            value={email ?? ""}
-            fullWidth
-            disabled
-            helperText="Email changes will be available in a future update."
-          />
-          <Typography variant="caption" color="text.secondary">
-            Account created {createdAtLabel}
-          </Typography>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={pending}
-            sx={{ alignSelf: "flex-start" }}
-          >
-            {pending ? "Saving…" : "Save profile"}
-          </Button>
-        </Stack>
-      </Paper>
-    </Stack>
+        </div>
+      </SettingsRow>
+      <SettingsRow title="Display name">
+        <Field label="Display name" hideLabel required>
+          <Input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" maxLength={120} />
+        </Field>
+      </SettingsRow>
+      <SettingsRow title="Email" description="Changing email is coming in a future update.">
+        <ReadOnlyValue value={email ?? ""} />
+      </SettingsRow>
+      <div className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-body-ui text-ink-muted">Member since {createdAtLabel}</p>
+        <Button type="submit" variant="primary" disabled={pending}>
+          {pending ? "Saving…" : "Save changes"}
+        </Button>
+      </div>
+    </form>
   );
 }

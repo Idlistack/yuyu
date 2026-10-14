@@ -1,4 +1,3 @@
-import Stack from "@mui/material/Stack";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/permissions";
@@ -14,9 +13,9 @@ export default async function AccountSecurityPage() {
     select: { mfaEnabledAt: true, passwordHash: true },
   });
   return (
-    <Stack spacing={3}>
-      <AccountPasswordForm hasPassword={Boolean(user.passwordHash)} />
-      <AccountSecurityClient mfaEnabled={Boolean(user.mfaEnabledAt)} />
-    </Stack>
+    <AccountSecurityClient
+      mfaEnabled={Boolean(user.mfaEnabledAt)}
+      passwordSection={<AccountPasswordForm hasPassword={Boolean(user.passwordHash)} />}
+    />
   );
 }

@@ -3,15 +3,12 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, type Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
-import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
-import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
-import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
-import SearchOffOutlinedIcon from "@mui/icons-material/SearchOffOutlined";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Compass, SearchX, Sparkles } from "lucide-react";
+import { chromeFor } from "@/components/chrome/ChromeSwitch";
+import { YuyuWordmark } from "@/components/chrome/SiteHeader";
+import { Button } from "@/components/ui/button";
 
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
@@ -74,35 +71,37 @@ function CursorEyes({ prefersReducedMotion }: { prefersReducedMotion: boolean | 
   }, [prefersReducedMotion]);
 
   return (
-    <Box
-      ref={eyesRef}
-      aria-hidden
-      sx={{ display: { xs: "none", md: "flex" }, justifyContent: "center", gap: 2.5, pt: 0.25, opacity: 0.94 }}
-    >
+    <div ref={eyesRef} aria-hidden className="hidden justify-center gap-5 pt-0.5 opacity-95 md:flex">
       {[0, 1].map((eye) => (
-        <Box key={eye} sx={{ position: "relative", width: { xs: 82, sm: 98 }, height: { xs: 112, sm: 128 } }}>
-          <Box sx={{ position: "absolute", top: 8, left: "50%", width: { xs: 60, sm: 72 }, height: 26, borderTop: "7px solid", borderColor: "text.primary", borderRadius: "50% 50% 0 0", transform: `translateX(-50%) rotate(${eye === 0 ? "-4deg" : "4deg"})` }} />
+        <div key={eye} className="relative h-32 w-[98px]">
+          <div
+            className="absolute left-1/2 top-2 h-[26px] w-[72px] rounded-t-[50%] border-t-[7px] border-ink"
+            style={{ transform: `translateX(-50%) rotate(${eye === 0 ? "-4deg" : "4deg"})` }}
+          />
           <motion.div
             animate={prefersReducedMotion ? undefined : { scaleY: blinking ? 0.07 : 1 }}
             transition={{ duration: 0.09, ease: "easeInOut" }}
             style={{ position: "absolute", insetInline: 0, top: 35, display: "grid", placeItems: "center", transformOrigin: "center" }}
           >
-            <Box sx={{ width: { xs: 76, sm: 90 }, height: { xs: 76, sm: 90 }, display: "grid", placeItems: "center", overflow: "hidden", border: "6px solid", borderColor: "text.primary", borderRadius: "50%", bgcolor: "background.paper", boxShadow: "inset 0 -5px 0 rgba(10,132,255,0.08), 0 8px 18px rgba(0,0,0,0.1)" }}>
+            <div className="grid size-[90px] place-items-center overflow-hidden rounded-full border-[6px] border-ink bg-canvas shadow-raised">
               <motion.div style={{ x: pupilX, y: pupilY }}>
-                <Box sx={{ position: "relative", width: { xs: 28, sm: 33 }, height: { xs: 28, sm: 33 }, borderRadius: "50%", bgcolor: "text.primary", boxShadow: "0 0 0 4px rgba(10,132,255,0.12)" }}>
-                  <Box sx={{ position: "absolute", top: 5, left: 6, width: 7, height: 7, borderRadius: "50%", bgcolor: "background.paper", opacity: 0.92 }} />
-                </Box>
+                <div className="relative size-[33px] rounded-full bg-ink">
+                  <div className="absolute left-1.5 top-[5px] size-[7px] rounded-full bg-canvas opacity-90" />
+                </div>
               </motion.div>
-            </Box>
+            </div>
           </motion.div>
-        </Box>
+        </div>
       ))}
-    </Box>
+    </div>
   );
 }
 
 export function NotFoundExperience() {
   const router = useRouter();
+  const pathname = usePathname() ?? "/";
+  // Routes whose layout renders its own chrome lose it on a root 404, so add a minimal header there.
+  const needsChrome = chromeFor(pathname) === "own";
   const prefersReducedMotion = useReducedMotion();
   const pointerX = useMotionValue(0);
   const pointerY = useMotionValue(0);
@@ -135,89 +134,87 @@ export function NotFoundExperience() {
     router.push("/");
   };
 
-  return (
+  const content = (
     <motion.div
       initial={prefersReducedMotion ? false : "hidden"}
       animate="visible"
       variants={cardVariants}
+      className="px-4"
     >
-      <Paper
-        variant="outlined"
-        sx={{
-          position: "relative",
-          overflow: "hidden",
-          maxWidth: 680,
-          mx: "auto",
-          mt: { xs: 4, sm: 8 },
-          mb: { xs: 1.5, sm: 2 },
-          p: { xs: 3, sm: 6 },
-          textAlign: "center",
-          borderRadius: 5,
-          background: "linear-gradient(145deg, rgba(10,132,255,0.12), transparent 42%, rgba(124,245,182,0.08))",
-        }}
-      >
-        <Box aria-hidden sx={{ position: "absolute", width: 220, height: 220, borderRadius: "50%", right: -110, top: -120, bgcolor: "primary.main", opacity: 0.12, filter: "blur(8px)" }} />
-        <Typography aria-hidden sx={{ position: "absolute", left: "50%", top: { xs: 16, sm: 4 }, transform: "translateX(-50%)", fontSize: { xs: "8rem", sm: "12rem" }, lineHeight: 0.85, fontWeight: 900, letterSpacing: "-0.12em", color: "text.primary", opacity: 0.035, userSelect: "none" }}>
+      <div className="relative mx-auto mb-2 mt-8 max-w-[680px] overflow-hidden rounded-[28px] border border-line bg-gradient-to-br from-tint-lavender via-canvas to-tint-mint px-6 py-10 text-center sm:mt-16 sm:px-12 sm:py-12">
+        <p aria-hidden className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 select-none font-display text-[8rem] font-extrabold leading-[0.85] tracking-[-0.08em] text-ink opacity-[0.04] sm:top-1 sm:text-[12rem]">
           404
-        </Typography>
-        <Stack spacing={2.25} sx={{ position: "relative", alignItems: "center" }}>
+        </p>
+        <div className="relative flex flex-col items-center gap-5">
           <motion.div variants={contentVariants}>
-            <Box
-              aria-hidden
-              onPointerMove={followPointer}
-              onPointerLeave={resetPointer}
-              sx={{ position: "relative", width: 116, height: 116, display: "grid", placeItems: "center", touchAction: "manipulation" }}
-            >
+            <div aria-hidden onPointerMove={followPointer} onPointerLeave={resetPointer} className="relative grid size-[116px] touch-manipulation place-items-center">
               <motion.div
-                style={{ position: "absolute", inset: 4, borderRadius: "50%", border: "1px dashed", borderColor: "var(--mui-palette-primary-main)", opacity: 0.42 }}
+                className="absolute inset-1 rounded-full border border-dashed border-line-strong"
                 animate={prefersReducedMotion ? undefined : { rotate: 360 }}
                 transition={prefersReducedMotion ? undefined : { duration: 16, repeat: Infinity, ease: "linear" }}
               />
               <motion.div
-                style={{ position: "absolute", top: 1, right: 18, color: "#7CF5B6" }}
+                className="absolute right-[18px] top-px text-brand-mint"
                 animate={prefersReducedMotion ? undefined : { y: [0, -5, 0], rotate: [0, 12, 0], opacity: [0.65, 1, 0.65] }}
                 transition={prefersReducedMotion ? undefined : { duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
               >
-                <AutoAwesomeRoundedIcon sx={{ fontSize: 20 }} />
+                <Sparkles className="size-5" />
               </motion.div>
               <motion.div
-                style={{ position: "absolute", bottom: 3, left: 13, color: "#B9AEFF" }}
+                className="absolute bottom-[3px] left-[13px] text-brand-lavender"
                 animate={prefersReducedMotion ? undefined : { y: [0, 4, 0], scale: [0.85, 1.15, 0.85], opacity: [0.55, 1, 0.55] }}
                 transition={prefersReducedMotion ? undefined : { duration: 2.3, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
               >
-                <AutoAwesomeRoundedIcon sx={{ fontSize: 15 }} />
+                <Sparkles className="size-[15px]" />
               </motion.div>
               <motion.div
                 animate={prefersReducedMotion ? undefined : { y: [0, -3, 0] }}
                 transition={prefersReducedMotion ? undefined : { duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
               >
                 <motion.div style={{ x: iconX, y: iconY }}>
-                  <Box sx={{ width: 76, height: 76, display: "grid", placeItems: "center", borderRadius: "28px", bgcolor: "background.paper", border: 1, borderColor: "divider", boxShadow: "0 12px 28px rgba(0,0,0,0.14)" }}>
-                    <SearchOffOutlinedIcon color="primary" sx={{ fontSize: 38 }} />
-                  </Box>
+                  <div className="grid size-[76px] place-items-center rounded-[28px] border border-line bg-canvas shadow-raised">
+                    <SearchX className="size-9 text-ink" />
+                  </div>
                 </motion.div>
               </motion.div>
-            </Box>
+            </div>
           </motion.div>
           <motion.div variants={contentVariants}>
-            <Stack spacing={0.75}>
-              <Typography component="h1" variant="h3" sx={{ fontWeight: 750, letterSpacing: "-0.04em" }}>Page not found</Typography>
-              <Typography color="text.secondary" sx={{ maxWidth: 410, mx: "auto" }}>This corner of Yuyu seems to have wandered off. The page may have moved or expired.</Typography>
-            </Stack>
+            <div className="flex flex-col gap-2">
+              <h1 className="text-display-m text-ink">Page not found</h1>
+              <p className="mx-auto max-w-[410px] text-body-ui text-ink-secondary">This corner of Yuyu seems to have wandered off. The page may have moved or expired.</p>
+            </div>
           </motion.div>
-          <motion.div variants={contentVariants}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ width: { xs: "100%", sm: "auto" } }}>
+          <motion.div variants={contentVariants} className="w-full sm:w-auto">
+            <div className="flex flex-col gap-2.5 sm:flex-row">
               <motion.div whileHover={prefersReducedMotion ? undefined : { y: -2 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}>
-                <Button onClick={goBackOrHome} variant="contained" size="large" startIcon={<ArrowBackOutlinedIcon />} sx={{ minWidth: 150, width: { xs: "100%", sm: "auto" } }}>Go back</Button>
+                <Button onClick={goBackOrHome} variant="primary" size="lg" startIcon={<ArrowLeft />} className="w-full sm:min-w-[150px]">Go back</Button>
               </motion.div>
               <motion.div whileHover={prefersReducedMotion ? undefined : { y: -2 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}>
-                <Button href="/discover" variant="outlined" size="large" startIcon={<ExploreOutlinedIcon />} sx={{ minWidth: 150, width: { xs: "100%", sm: "auto" } }}>Discover events</Button>
+                <Button asChild variant="secondary" size="lg" className="w-full sm:min-w-[150px]">
+                  <Link href="/discover">
+                    <Compass aria-hidden className="size-[18px]" />
+                    Discover events
+                  </Link>
+                </Button>
               </motion.div>
-            </Stack>
+            </div>
           </motion.div>
-        </Stack>
-      </Paper>
+        </div>
+      </div>
       <CursorEyes prefersReducedMotion={prefersReducedMotion} />
     </motion.div>
+  );
+
+  if (!needsChrome) return content;
+  return (
+    <>
+      <header className="px-4 py-5 sm:px-8">
+        <YuyuWordmark />
+      </header>
+      <main id="main-content" tabIndex={-1} className="flex-1 pb-16 focus:outline-none">
+        {content}
+      </main>
+    </>
   );
 }

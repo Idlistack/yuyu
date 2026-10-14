@@ -118,9 +118,9 @@ test("login and crawler controls render", async ({ page }) => {
     window.dispatchEvent(new Event("yuyu:color-mode-change"));
   });
   await expect(page.locator("html")).toHaveAttribute("data-color-mode", "light");
-  await expect(page.getByRole("heading", { name: "Get started now" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Get started now" })).toHaveCSS("color", "rgb(28, 28, 30)");
-  await expect(page.getByRole("tab", { name: "Sign in" })).toHaveCSS("color", "rgb(28, 28, 30)");
+  await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome back." })).toHaveCSS("color", "rgb(24, 24, 27)");
+  await expect(page.getByRole("tab", { name: "Sign in" })).toHaveCSS("color", "rgb(24, 24, 27)");
 
   const robots = await page.request.get("/robots.txt");
   await expect(robots).toBeOK();

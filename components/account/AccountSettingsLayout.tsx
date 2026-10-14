@@ -1,27 +1,26 @@
 "use client";
 
-import Stack from "@mui/material/Stack";
-import Tab from "@mui/material/Tab";
-import Tabs from "@mui/material/Tabs";
-import Typography from "@mui/material/Typography";
 import { usePathname } from "next/navigation";
-import Link from "next/link";
+import { NavTabs } from "@/components/ui/tabs";
 
 export function AccountSettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const tab = pathname === "/account/security" ? "/account/security" : "/account";
+  const onSecurity = pathname === "/account/security";
 
   return (
-    <Stack spacing={3} sx={{ maxWidth: 720, mx: "auto", py: { xs: 3, sm: 5 } }}>
-      <Stack spacing={0.5}>
-        <Typography variant="h3" component="h1">Account settings</Typography>
-        <Typography color="text.secondary">Manage your personal profile and account security.</Typography>
-      </Stack>
-      <Tabs value={tab} aria-label="Account settings">
-        <Tab component={Link} href="/account" value="/account" label="Profile" />
-        <Tab component={Link} href="/account/security" value="/account/security" label="Security" />
-      </Tabs>
+    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
+      <div>
+        <h1 className="text-display-m text-ink">Account</h1>
+        <p className="mt-2 text-body-ui text-ink-secondary">Your personal profile and sign-in security.</p>
+      </div>
+      <NavTabs
+        label="Account settings"
+        items={[
+          { href: "/account", label: "Profile", active: !onSecurity },
+          { href: "/account/security", label: "Security", active: onSecurity },
+        ]}
+      />
       {children}
-    </Stack>
+    </div>
   );
 }
