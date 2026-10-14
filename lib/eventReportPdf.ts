@@ -119,6 +119,8 @@ function roundedRectPath(width: number, height: number, radius: number) {
   return `M ${r} 0 H ${width - r} Q ${width} 0 ${width} ${r} V ${height - r} Q ${width} ${height} ${width - r} ${height} H ${r} Q 0 ${height} 0 ${height - r} V ${r} Q 0 0 ${r} 0 Z`;
 }
 
+const PRIVACY: Record<string, string> = { PUBLIC: "Public", HIDDEN_LINK: "Anyone with the link", APPROVAL_REQUIRED: "Approval required", INVITE_ONLY: "Invite only" };
+
 const SPONSOR_TIERS: Record<string, string> = { PLATINUM: "Platinum", GOLD: "Gold", SILVER: "Silver", PARTNER: "Partners", COMMUNITY_PARTNER: "Community partners" };
 
 /** Groups arrival times into 15, 30 or 60 minute windows, up to 16 columns. */
@@ -233,7 +235,6 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
   // ---------- Pages and flow ----------
 
   const pages: PDFPage[] = [];
-  const contents: string[] = [];
   let page!: PDFPage;
   let y = 0;
 
@@ -256,7 +257,10 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
 
   const paragraph = (value: string, style = T.body(), width = CONTENT_WIDTH, x = MARGIN, gapAfter = 8) => {
     const lineHeight = style.size * 1.5;
-    for (const line of wrap(value, style, width)) {
+    const lines = wrap(value, style, width);
+    // Keep short paragraphs in one piece.
+    if (lines.length <= 6) ensure(lines.length * lineHeight);
+    for (const line of lines) {
       ensure(lineHeight);
       drawText(page, line, x, y - style.size, style);
       y -= lineHeight;
@@ -265,10 +269,9 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
   };
 
   const section = (overline: string, title: string, intro?: string) => {
-    // The first section opens after the cover; later ones share a page when a good part of it is left.
-    if (pages.length === 1 || y - 280 < BOTTOM) newPage();
+    // Sections share a page when a good part of it is left.
+    if (y - 280 < BOTTOM) newPage();
     else if (y < TOP - 1) y -= 30;
-    contents.push(title);
     drawText(page, overline.toUpperCase(), MARGIN, y - 8, T.overline(A.text));
     drawText(page, title, MARGIN, y - 36, T.display(26));
     y -= 52;
@@ -276,8 +279,9 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
     y -= 6;
   };
 
-  const subheading = (title: string, note?: string) => {
-    ensure(note ? 60 : 44);
+  /** `keepWith` is the height of what follows, so a heading never ends a page alone. */
+  const subheading = (title: string, note?: string, keepWith = 0) => {
+    ensure((note ? 60 : 44) + keepWith);
     y -= 10;
     drawText(page, title, MARGIN, y - 15, T.heading(15));
     y -= 24;
@@ -382,68 +386,105 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
     }
   };
 
-  // ---------- Cover ----------
+  // ---------- Page 1: header band, details and key numbers ----------
 
   newPage();
-  const coverTop = PAGE[1] - 300;
-  page.drawRectangle({ x: 0, y: coverTop, width: PAGE[0], height: 300, color: A.soft });
-  dotMark(page, MARGIN, PAGE[1] - 40, 20);
-  drawText(page, "yuyu", MARGIN + 26, PAGE[1] - 55, T.display(15));
-  const reportLabel = metrics.targetType === "occurrence" ? "SERIES DATE REPORT" : "EVENT REPORT";
-  drawText(page, reportLabel, PAGE[0] - MARGIN - textWidth(reportLabel, T.overline()), PAGE[1] - 52, T.overline());
-
-  drawText(page, fit(metrics.organisationName, T.strong(12, C.textSecondary), CONTENT_WIDTH), MARGIN, PAGE[1] - 116, T.strong(12, C.textSecondary));
-  const titleStyle = T.display(metrics.title.length > 42 ? 32 : 40, A.text);
+  const titleStyle = T.display(metrics.title.length > 42 ? 28 : 34, A.text);
   const titleLines = wrap(metrics.title, titleStyle, CONTENT_WIDTH).slice(0, 3);
-  let coverY = PAGE[1] - 128;
+  const tagline = metrics.tagline?.trim() ? fit(metrics.tagline, T.body(11.5), CONTENT_WIDTH) : "";
+  const bandHeight = 112 + titleLines.length * titleStyle.size * 1.04 + (tagline ? 22 : 0);
+  page.drawRectangle({ x: 0, y: PAGE[1] - bandHeight, width: PAGE[0], height: bandHeight, color: A.soft });
+  dotMark(page, MARGIN, PAGE[1] - 36, 20);
+  drawText(page, "yuyu", MARGIN + 26, PAGE[1] - 51, T.display(15));
+  const reportLabel = metrics.targetType === "occurrence" ? "SERIES DATE REPORT" : "EVENT REPORT";
+  drawText(page, reportLabel, PAGE[0] - MARGIN - textWidth(reportLabel, T.overline()), PAGE[1] - 48, T.overline());
+  let bandY = PAGE[1] - 96;
+  drawText(page, fit(metrics.organisationName, T.strong(11.5, C.textSecondary), CONTENT_WIDTH), MARGIN, bandY, T.strong(11.5, C.textSecondary));
+  bandY -= 6;
   for (const line of titleLines) {
-    coverY -= titleStyle.size * 1.02;
-    drawText(page, line, MARGIN, coverY, titleStyle);
+    bandY -= titleStyle.size * 1.04;
+    drawText(page, line, MARGIN, bandY, titleStyle);
   }
-  if (metrics.tagline?.trim()) {
-    coverY -= 24;
-    drawText(page, fit(metrics.tagline, T.body(12), CONTENT_WIDTH), MARGIN, coverY, T.body(12));
-  }
+  if (tagline) drawText(page, tagline, MARGIN, bandY - 22, T.body(11.5));
+  y = PAGE[1] - bandHeight - 26;
 
   // Date block, as on the event page: accent header, big day number.
   const block = formatDateBlock(metrics.startDateTime, tz);
-  const blockTop = coverTop + 86;
-  box(page, MARGIN, blockTop, 58, 64, { fill: C.canvas, border: C.border, radius: 10 });
-  page.drawSvgPath("M 10 0 H 48 Q 58 0 58 10 V 18 H 0 V 10 Q 0 0 10 0 Z", { x: MARGIN, y: blockTop, color: A.solid });
-  drawText(page, block.month, MARGIN + 29 - textWidth(block.month, T.overline(A.on)) / 2, blockTop - 13, T.overline(A.on));
-  drawText(page, block.day, MARGIN + 29 - textWidth(block.day, T.display(24)) / 2, blockTop - 50, T.display(24));
+  box(page, MARGIN, y, 58, 64, { fill: C.canvas, border: C.border, radius: 10 });
+  page.drawSvgPath("M 10 0 H 48 Q 58 0 58 10 V 18 H 0 V 10 Q 0 0 10 0 Z", { x: MARGIN, y, color: A.solid });
+  drawText(page, block.month, MARGIN + 29 - textWidth(block.month, T.overline(A.on)) / 2, y - 13, T.overline(A.on));
+  drawText(page, block.day, MARGIN + 29 - textWidth(block.day, T.display(24)) / 2, y - 50, T.display(24));
+  const durationMinutes = Math.round((metrics.endDateTime.getTime() - metrics.startDateTime.getTime()) / 60_000);
+  const duration = durationMinutes >= 1440
+    ? plural(Math.round(durationMinutes / 1440), "day")
+    : [Math.floor(durationMinutes / 60) ? plural(Math.floor(durationMinutes / 60), "hour") : "", durationMinutes % 60 ? `${durationMinutes % 60} min` : ""].filter(Boolean).join(" ");
   const place = metrics.isOnline ? "Online event" : [metrics.venueName, metrics.location].filter((part) => part?.trim()).join(", ");
-  drawText(page, formatDayLong(metrics.startDateTime, tz, now), MARGIN + 74, blockTop - 16, T.strong(12));
-  drawText(page, formatTimeRange(metrics.startDateTime, metrics.endDateTime, tz), MARGIN + 74, blockTop - 34, T.body(10.5));
-  if (place) drawText(page, fit(place, T.body(10.5), CONTENT_WIDTH - 74), MARGIN + 74, blockTop - 51, T.body(10.5));
-
-  // Key numbers.
-  y = coverTop - 36;
-  drawText(page, "AT A GLANCE", MARGIN, y, T.overline());
-  y -= 14;
-  const feedbackValue = metrics.feedbackResponseCount == null ? "–" : metrics.feedbackResponseCount.toLocaleString("en-GB");
-  const tiles: Array<{ label: string; value: string; detail: string }> = [
-    { label: "Signed up", value: metrics.total.toLocaleString("en-GB"), detail: metrics.capacity ? `for ${plural(metrics.capacity, "place")}` : "no capacity limit" },
-    { label: "Going", value: metrics.confirmed.toLocaleString("en-GB"), detail: `${metrics.waitlisted.toLocaleString("en-GB")} on the waitlist` },
-    { label: "Checked in", value: metrics.checkedIn.toLocaleString("en-GB"), detail: `${percentLabel(metrics.checkedIn, metrics.confirmed)} of people going` },
-    { label: "Feedback", value: feedbackValue, detail: metrics.feedbackResponseCount == null ? "not collected" : plural(metrics.feedbackResponseCount, "response") },
-  ];
-  const tileGap = 10;
-  const tileWidth = (CONTENT_WIDTH - tileGap * 3) / 4;
-  tiles.forEach((tile, index) => {
-    const x = MARGIN + index * (tileWidth + tileGap);
-    box(page, x, y, tileWidth, 98, { fill: C.muted, radius: 16 });
-    drawText(page, tile.label, x + 14, y - 22, T.strong(9.5, C.textMuted));
-    drawText(page, fit(tile.value, T.display(30), tileWidth - 28), x + 14, y - 60, T.display(30));
-    drawText(page, fit(tile.detail, T.body(8.5, C.textMuted), tileWidth - 28), x + 14, y - 80, T.body(8.5, C.textMuted));
-  });
-  y -= 122;
+  // A reference date in another year makes formatDayLong include the year, which a record should always show.
+  drawText(page, formatDayLong(metrics.startDateTime, tz, new Date(0)), MARGIN + 74, y - 16, T.strong(12));
+  drawText(page, `${formatTimeRange(metrics.startDateTime, metrics.endDateTime, tz)}  ·  ${duration}`, MARGIN + 74, y - 34, T.body(10.5));
+  if (place) drawText(page, fit(place, T.body(10.5), CONTENT_WIDTH - 74), MARGIN + 74, y - 51, T.body(10.5));
+  y -= 84;
 
   const summary = metrics.total === 0
     ? "Nobody signed up for this event through Yuyu."
     : `${plural(metrics.total, "person", "people")} signed up and ${metrics.confirmed.toLocaleString("en-GB")} had a place on the day. ${metrics.checkedIn ? `${metrics.checkedIn.toLocaleString("en-GB")} of them were checked in at the door (${percentLabel(metrics.checkedIn, metrics.confirmed)})` : "Nobody was checked in with Yuyu"}${metrics.feedbackResponseCount ? `, and ${plural(metrics.feedbackResponseCount, "person", "people")} shared feedback afterwards` : ""}.`;
-  paragraph(summary, T.body(12, C.textSecondary), CONTENT_WIDTH, MARGIN, 30);
-  const contentsTop = y;
+  paragraph(summary, T.body(11.5, C.textSecondary), CONTENT_WIDTH, MARGIN, 10);
+
+  const detailRows: Array<[string, string]> = [
+    ["Visibility", PRIVACY[metrics.privacyType ?? "PUBLIC"] ?? "Public"],
+    ["Capacity", metrics.capacity == null ? "No limit" : plural(metrics.capacity, "place")],
+  ];
+  if (metrics.registrationClosesAt) detailRows.push(["Registration closed", `${formatDate(metrics.registrationClosesAt, tz)}, ${formatTime(metrics.registrationClosesAt, tz)}`]);
+  if (metrics.tags?.length) detailRows.push(["Tags", metrics.tags.join(", ")]);
+  facts(detailRows);
+
+  const tileRow = (items: Array<{ label: string; value: string; detail?: string }>, height: number, valueSize: number) => {
+    const gap = 10;
+    const width = (CONTENT_WIDTH - gap * (items.length - 1)) / items.length;
+    ensure(height + 12);
+    items.forEach((tile, index) => {
+      const x = MARGIN + index * (width + gap);
+      box(page, x, y, width, height, { fill: C.muted, radius: 14 });
+      drawText(page, fit(tile.label, T.strong(9, C.textMuted), width - 24), x + 12, y - 19, T.strong(9, C.textMuted));
+      drawText(page, fit(tile.value, T.display(valueSize), width - 24), x + 12, y - 19 - valueSize * 1.15, T.display(valueSize));
+      if (tile.detail) drawText(page, fit(tile.detail, T.body(8.5, C.textMuted), width - 24), x + 12, y - height + 14, T.body(8.5, C.textMuted));
+    });
+    y -= height + 10;
+  };
+  const count = (value: number | undefined | null) => (value == null ? "–" : value.toLocaleString("en-GB"));
+
+  y -= 4;
+  ensure(40);
+  drawText(page, "ATTENDANCE", MARGIN, y - 8, T.overline());
+  y -= 20;
+  tileRow([
+    { label: "Signed up", value: count(metrics.total), detail: metrics.capacity ? `for ${plural(metrics.capacity, "place")}` : "no capacity limit" },
+    { label: "Going", value: count(metrics.confirmed), detail: `${count(metrics.waitlisted)} on the waitlist` },
+    { label: "Checked in", value: count(metrics.checkedIn), detail: `${percentLabel(metrics.checkedIn, metrics.confirmed)} of people going` },
+    { label: "Feedback", value: count(metrics.feedbackResponseCount), detail: metrics.feedbackResponseCount == null ? "not collected" : `${percentLabel(metrics.feedbackResponseCount, metrics.checkedIn || metrics.confirmed)} response rate` },
+  ], 84, 28);
+
+  const sessionList = metrics.sessions ?? [];
+  const totalSessionMinutes = sessionList.filter((session) => session.type.toLowerCase() !== "break").reduce((sum, session) => sum + (session.end.getTime() - session.start.getTime()) / 60_000, 0);
+  y -= 6;
+  ensure(40);
+  drawText(page, "THE EVENT", MARGIN, y - 8, T.overline());
+  y -= 20;
+  tileRow([
+    { label: "Sessions", value: count(sessionList.length), detail: totalSessionMinutes ? `${Math.round((totalSessionMinutes / 60) * 10) / 10} h of content` : undefined },
+    { label: "Speakers", value: count(metrics.speakers?.length ?? 0) },
+    { label: "Tracks", value: count(new Set(sessionList.map((session) => session.track)).size) },
+    { label: "Sponsors", value: count(metrics.sponsors?.length ?? 0) },
+    { label: "Resources", value: count(metrics.resourceCount ?? 0) },
+  ], 74, 22);
+  tileRow([
+    { label: "Emails sent", value: metrics.targetType === "occurrence" ? "–" : count(metrics.broadcasts?.length ?? 0) },
+    { label: "Invitations", value: count(metrics.invitationCount) },
+    { label: "Sign-up form", value: count(metrics.registrationQuestions?.length ?? 0), detail: "questions" },
+    { label: "Feedback form", value: count(metrics.feedbackQuestions?.length ?? 0), detail: "questions" },
+    { label: "Co-organisers", value: count(metrics.coOrganiserCount ?? 0) },
+  ], 74, 22);
+
 
   // ---------- Registrations ----------
 
@@ -475,13 +516,8 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
   registrationFacts.push(["Invitations", metrics.invitationCount ? plural(metrics.invitationCount, "person", "people") + " invited by email" : "None sent"]);
   facts(registrationFacts);
 
-  if (metrics.capacity) {
-    subheading("Places filled");
-    barRows([{ label: "Going", value: metrics.confirmed, whole: metrics.capacity, color: A.solid }]);
-  }
-
   if (timeline && timeline.columns.length > 1) {
-    subheading("Sign-ups over time", timeline.intervalDays === 1 ? "Sign-ups per day." : `Sign-ups per ${timeline.intervalDays} days.`);
+    subheading("Sign-ups over time", timeline.intervalDays === 1 ? "Sign-ups per day." : `Sign-ups per ${timeline.intervalDays} days.`, 210);
     // Grouped columns are labelled by their first day; the note above says how many days each holds.
     columnChart(timeline.columns.map((column) => ({ ...column, label: column.label.split(" – ")[0]! })), A.solid, `${plural(timeline.total, "sign-up")} over ${plural(timeline.spanDays, "day")}, up to the end of the event.`);
   }
@@ -513,7 +549,7 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
     }
     facts(doorFacts);
     if (arrivals && arrivals.columns.length > 1) {
-      subheading("Arrivals", `Check-ins per ${arrivals.minutes < 60 ? `${arrivals.minutes} minutes` : arrivals.minutes === 60 ? "hour" : `${arrivals.minutes / 60} hours`}, in ${formatTimeZoneName(metrics.startDateTime, tz)}.`);
+      subheading("Arrivals", `Check-ins per ${arrivals.minutes < 60 ? `${arrivals.minutes} minutes` : arrivals.minutes === 60 ? "hour" : `${arrivals.minutes / 60} hours`}, in ${formatTimeZoneName(metrics.startDateTime, tz)}.`, 210);
       columnChart(arrivals.columns, C.successSolid, `Times show when each guest was checked in, from the first arrival to the last.`);
     }
   }
@@ -641,7 +677,6 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
   if (metrics.targetType !== "occurrence") subheading("Team");
   facts([
     ["Co-organisers", metrics.coOrganiserCount ? `${plural(metrics.coOrganiserCount, "person", "people")} helped run this event` : "None added"],
-    ["Hosted by", metrics.organisationName],
   ]);
 
   // ---------- About this report ----------
@@ -656,17 +691,7 @@ export async function createEventReportPdf(metrics: EventReportMetrics, now = ne
   aboutLines.slice(0, 5).forEach((line, index) => drawText(page, line, MARGIN + 50, y - 52 - index * 14, T.body(9.5)));
   y -= 130;
 
-  // ---------- Cover contents and footers ----------
-
-  const cover = pages[0]!;
-  let contentsY = contentsTop;
-  drawText(cover, "IN THIS REPORT", MARGIN, contentsY, T.overline());
-  contentsY -= 12;
-  for (const title of contents) {
-    cover.drawLine({ start: { x: MARGIN, y: contentsY - 4 }, end: { x: PAGE[0] - MARGIN, y: contentsY - 4 }, thickness: 0.5, color: C.border });
-    drawText(cover, title, MARGIN, contentsY - 22, T.strong(11));
-    contentsY -= 30;
-  }
+  // ---------- Footers ----------
 
   pages.forEach((current, index) => {
     current.drawLine({ start: { x: MARGIN, y: 52 }, end: { x: PAGE[0] - MARGIN, y: 52 }, thickness: 0.75, color: C.border });

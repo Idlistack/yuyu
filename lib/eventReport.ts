@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { RegistrationFieldType, RsvpStatus, SponsorTier } from "@prisma/client";
+import type { EventPrivacyType, RegistrationFieldType, RsvpStatus, SponsorTier } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export { createEventReportPdf } from "@/lib/eventReportPdf";
@@ -52,6 +52,8 @@ export type EventReportMetrics = ReportRsvpMetrics & {
   invitationCount: number;
   feedbackResponseCount: number | null;
   accentColor?: string | null;
+  privacyType?: EventPrivacyType;
+  tags?: string[];
   tagline?: string;
   venueName?: string;
   registrationClosesAt?: Date | null;
@@ -172,6 +174,8 @@ export async function getEventReportMetrics(eventId: string): Promise<EventRepor
       location: true,
       isOnline: true,
       capacity: true,
+      privacyType: true,
+      tags: true,
       registrationClosesAt: true,
       organisation: { select: { id: true, name: true } },
       page: { select: { accentColor: true, tagline: true } },
@@ -237,6 +241,8 @@ export async function getEventReportMetrics(eventId: string): Promise<EventRepor
     invitationCount: event._count.invites,
     feedbackResponseCount: event.feedbackForm?.responses.length ?? 0,
     accentColor: event.page?.accentColor ?? null,
+    privacyType: event.privacyType,
+    tags: event.tags,
     tagline: event.page?.tagline ?? "",
     venueName: event.venue?.visibility === "PUBLISHED" ? event.venue.name : "",
     registrationClosesAt: event.registrationClosesAt,
@@ -286,6 +292,7 @@ export async function getOccurrenceReportMetrics(instanceId: string): Promise<Ev
           title: true,
           timezone: true,
           capacity: true,
+          privacyType: true,
           organisation: { select: { id: true, name: true } },
           _count: { select: { invites: true, collaborators: true } },
         },
@@ -310,6 +317,7 @@ export async function getOccurrenceReportMetrics(instanceId: string): Promise<Ev
     capacity: instance.series.capacity,
     invitationCount: instance.series._count.invites,
     feedbackResponseCount: null,
+    privacyType: instance.series.privacyType,
     signupDates: instance.rsvps.map((rsvp) => rsvp.createdAt),
     checkInTimes: checkedIn.map((rsvp) => rsvp.checkedInAt!),
     checkInSources: countCheckInSources(checkedIn.map((rsvp) => rsvp.checkInEvents[0]?.source ?? null)),
