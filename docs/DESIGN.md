@@ -538,7 +538,7 @@ Stack: Next.js 16 App Router, React 19, TypeScript, **Tailwind 4**, **Radix UI**
 2. **Tailwind 4** maps them in `@theme inline` in `app/globals.css` (e.g. `--color-canvas: var(--yy-bg-canvas)`, `--color-accent: var(--yy-accent)`, `--color-brand-marigold: var(--yy-brand-marigold)`). The type scale lives there as `text-display-*`, `text-h*`, `text-body*`, `text-label`, `text-caption` and `text-overline`.
 3. UI primitives live in `components/ui/*` (Button, Field, Select, Choice, Tabs, Menu, Dialog, Table, display helpers such as `EmptyState`), built on Radix with Tailwind classes.
 4. Brand components live in `components/brand/*`; see §2.3. Never redraw the mark by hand. Use `DotMark`/`DotLockup`, or the SVG/PNG masters in `public/brand/` where React can't render, such as email and OG images.
-5. Emails use the hosted `public/brand/email-lockup.png`, built from `NEXT_PUBLIC_BASE_URL` with `width`/`height`/`alt="Yuyu"`, never inline SVG. Share cards (`lib/og/shareCard.tsx`) and the report PDF (`lib/eventReport.ts`, pdf-lib circles) use the same mark.
+5. Emails use the hosted `public/brand/email-lockup.png`, built from `NEXT_PUBLIC_BASE_URL` with `width`/`height`/`alt="Yuyu"`, never inline SVG. Share cards (`lib/og/shareCard.tsx`) and the report PDF (`lib/eventReportPdf.ts`, pdf-lib circles) use the same mark. The PDF embeds static Bricolage Grotesque and Figtree instances from `public/brand/fonts/`, built from the same `@fontsource-variable` files the site uses.
 
 ### 9.2 Event accent at runtime
 
