@@ -35,3 +35,10 @@ test suite. For authorization, mutation, public-route, operational, API, or
 deployment changes, follow the stronger checks listed in `AGENTS.md` and
 `docs/TESTING.md`. Other sessions may edit the tree in parallel: commit with
 explicit paths only, and commit the user manual only when asked.
+
+Every new feature goes on its own branch (`feat/<short-name>`, or
+`fix/<short-name>` for a bug fix) created from the integration branch
+(currently `v1-design-overhaul`), and is merged back with `git merge --no-ff`
+once checks pass. Never commit a feature directly to the integration branch;
+don't touch `main` or `staging`, push, or delete branches unless asked. See
+"Branching" in `AGENTS.md`.

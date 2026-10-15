@@ -184,6 +184,25 @@ Other sessions may edit this tree in parallel. Commit with explicit paths, and
 do not sweep in or revert other sessions' uncommitted files. The user manual
 (`docs/manual/`, `docs/Yuyu-User-Manual.pdf`) is committed only when asked.
 
+### Branching: one branch per feature
+
+Every new feature gets its own branch; never commit a feature straight onto the
+integration branch (currently `v1-design-overhaul`; `main` and `staging` are
+release branches and are only changed when asked).
+
+- Branch from the latest integration branch: `git switch -c feat/<short-name>`
+  (use `fix/<short-name>` for a standalone bug fix). One feature per branch.
+- Commit the work there, with checks passing (lint, TypeScript, relevant tests,
+  plus the stronger checks above where they apply).
+- Merge back with a merge commit so the feature stays visible in history:
+  `git switch v1-design-overhaul && git merge --no-ff feat/<short-name>`,
+  then re-run the checks on the merged result.
+- Push the integration branch and the feature branch only when asked. Delete a
+  merged feature branch only when asked.
+- When other sessions are working in parallel, prefer a separate worktree per
+  feature branch (`git worktree add ../yuyu-<short-name> -b feat/<short-name>`)
+  so branches don't switch under someone else's uncommitted work.
+
 ## Deployment-sensitive changes
 
 - Production requires TLS-backed PostgreSQL, `rediss://`, private S3 storage,
