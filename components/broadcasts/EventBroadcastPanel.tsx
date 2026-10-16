@@ -167,7 +167,9 @@ export function EventBroadcastPanel(props: {
     showToast("Loaded the previous email into the editor", "success");
   }
 
-  const canSend = !pending && statuses.length > 0 && hasContent && (recipientCount ?? 0) > 0;
+  // Sending waits for the preview of the current edit, so the confirmation
+  // always shows the subject that will actually go out.
+  const canSend = !pending && statuses.length > 0 && hasContent && (recipientCount ?? 0) > 0 && previewReady && !preview.error;
 
   return (
     <Stack spacing={3}>
@@ -349,7 +351,7 @@ export function EventBroadcastPanel(props: {
       <ConfirmationDialog
         open={confirmOpen}
         title="Send this email?"
-        message={`“${preview.subject || subject}” will be queued for ${recipientCount ?? 0} ${recipientCount === 1 ? "person" : "people"} (${audienceText}). This cannot be recalled once delivery starts.`}
+        message={`“${(previewReady && preview.subject) || subject}” will be queued for ${recipientCount ?? 0} ${recipientCount === 1 ? "person" : "people"} (${audienceText}). This cannot be recalled once delivery starts.`}
         confirmLabel="Send email"
         loading={pending}
         onCancel={() => setConfirmOpen(false)}

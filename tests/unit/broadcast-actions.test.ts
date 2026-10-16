@@ -134,6 +134,14 @@ describe("event broadcast actions", () => {
     expect(mocks.orgFind).not.toHaveBeenCalled();
   });
 
+  it("limits test sends in their own bucket so testing never blocks the real send", async () => {
+    mocks.rateLimited.mockImplementation(async (bucket: string) => bucket === "broadcastTest");
+    expect((await sendEventBroadcastTest(baseInput)).ok).toBe(false);
+    expect(mocks.orgFind).not.toHaveBeenCalled();
+    expect(mocks.rateLimited).toHaveBeenCalledWith("broadcastTest", expect.any(String));
+    expect(mocks.rateLimited).not.toHaveBeenCalledWith("broadcast", expect.any(String));
+  });
+
   it("reports the deduplicated recipient count", async () => {
     mocks.rsvpFindMany.mockResolvedValue([
       { id: "rsvp_1", guestEmail: "same@example.test", user: null },
