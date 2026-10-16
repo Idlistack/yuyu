@@ -118,4 +118,16 @@ describe("audience helpers", () => {
     expect(sampleBroadcastVariables({ ...base, location: "", isOnline: false }).location).toBe("the venue");
     expect(sampleBroadcastVariables({ ...base, location: "Hall A", isOnline: false }, "Organiser").name).toBe("Organiser");
   });
+
+  it("writes each link URL once in the plain-text version, decoded once", () => {
+    expect(broadcastHtmlToText('<p><a href="https://example.test/?a=1&amp;b=2">https://example.test/?a=1&amp;b=2</a></p>')).toBe("https://example.test/?a=1&b=2");
+    expect(broadcastHtmlToText('<p><a href="https://example.test/?q=&amp;lt;b&amp;gt;">Form</a></p>')).toBe("Form (https://example.test/?q=&lt;b&gt;)");
+  });
+
+  it("leaves out-of-range numeric entities as written instead of throwing", () => {
+    const base = { title: "Demo", startDateTime: new Date("2030-01-01T10:00:00Z"), timezone: "UTC", location: "Hall A", isOnline: false, eventUrl: "https://events.test/o/e", organisationName: "Org" };
+    const html = renderBroadcastHtml('<p><a href="https://forms.test/?n={{name}}">Form</a></p>', sampleBroadcastVariables(base, "&#99999999;"));
+    expect(broadcastHtmlToText(html)).toBe("Form (https://forms.test/?n=&#99999999;)");
+    expect(broadcastHtmlToText("<p>&#99999999; &#x110000; &#65;</p>")).toBe("&#99999999; &#x110000; A");
+  });
 });

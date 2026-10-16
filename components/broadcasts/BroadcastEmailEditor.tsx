@@ -47,6 +47,11 @@ function isAcceptableHref(href: string) {
 
 /** Links carry an optional `cta` class so a paragraph link can render as a button in the email. */
 const EmailLink = Link.extend({
+  // Tiptap makes links inclusive whenever autolink is on, so text typed after
+  // an inserted link or button would silently join it.
+  inclusive() {
+    return false;
+  },
   addAttributes() {
     return {
       ...this.parent?.(),
