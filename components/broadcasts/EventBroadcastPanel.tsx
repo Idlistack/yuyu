@@ -201,7 +201,9 @@ export function EventBroadcastPanel(props: {
     showToast("Loaded the previous email into the editor", "success");
   }
 
-  const canSend = !pending && statuses.length > 0 && hasContent && (recipientCount ?? 0) > 0;
+  // Sending waits for the preview of the current edit, so the review step
+  // always shows the subject and design that will actually go out.
+  const canSend = !pending && statuses.length > 0 && hasContent && (recipientCount ?? 0) > 0 && previewReady && !preview.error;
   function startCountdown(payload: SendPayload) {
     let left = UNDO_SECONDS;
     setCountdown({ left, count: payload.count });
@@ -472,7 +474,7 @@ export function EventBroadcastPanel(props: {
         open={confirmOpen}
         recipientCount={recipientCount ?? 0}
         audienceText={audienceText}
-        subject={preview.subject || subject}
+        subject={(previewReady && preview.subject) || subject}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
           setConfirmOpen(false);

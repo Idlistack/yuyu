@@ -38,7 +38,9 @@ export type BroadcastRecipient = { rsvpId: string; email: string };
 
 /**
  * One recipient per email address. A person who registered as a guest and
- * again with an account would otherwise receive the message twice.
+ * again with an account would otherwise receive the message twice. When one
+ * of their registrations is confirmed, that one is used, so the email carries
+ * their ticket link rather than the event page.
  */
 export async function resolveBroadcastRecipients(
   client: BroadcastClient,
@@ -47,18 +49,20 @@ export async function resolveBroadcastRecipients(
 ): Promise<BroadcastRecipient[]> {
   const rsvps = await client.rSVP.findMany({
     where: broadcastRecipientWhere(eventId, audience),
-    select: { id: true, guestEmail: true, user: { select: { email: true } } },
+    select: { id: true, status: true, guestEmail: true, user: { select: { email: true } } },
     orderBy: { createdAt: "asc" },
   });
-  const seen = new Set<string>();
-  const recipients: BroadcastRecipient[] = [];
+  const byEmail = new Map<string, BroadcastRecipient & { confirmed: boolean }>();
   for (const rsvp of rsvps) {
     const email = (rsvp.user?.email ?? rsvp.guestEmail ?? "").trim().toLowerCase();
-    if (!email || seen.has(email)) continue;
-    seen.add(email);
-    recipients.push({ rsvpId: rsvp.id, email });
+    if (!email) continue;
+    const confirmed = rsvp.status === "CONFIRMED";
+    const existing = byEmail.get(email);
+    if (existing && (existing.confirmed || !confirmed)) continue;
+    // Map insertion order is kept on replacement, so recipients stay in registration order.
+    byEmail.set(email, { rsvpId: rsvp.id, email, confirmed });
   }
-  return recipients;
+  return [...byEmail.values()].map(({ rsvpId, email }) => ({ rsvpId, email }));
 }
 
 export function getBroadcastBaseUrl(): string {
@@ -101,7 +105,8 @@ export function sanitizeBroadcastHtml(html: string): string {
     .replace(HREF_SENTINEL, (_match, key: string) => `href="{{${key}}}"`)
     // sanitize-html keeps relative targets; a typo like {{nope}} would become a broken relative link.
     .replace(/<a\b([^>]*?)\s*href="([^"]*)"([^>]*)>/g, (match, before: string, href: string, after: string) =>
-      /^(https?:\/\/|mailto:|\{\{(ticketLink|eventUrl|feedbackUrl|scheduleUrl)\}\})/.test(href) ? match : `<a${before}${after}>`);
+      // URL schemes are case-insensitive (the editor accepts HTTPS://…); placeholder names are not.
+      /^(https?:\/\/|mailto:)/i.test(href) || /^\{\{(ticketLink|eventUrl|feedbackUrl|scheduleUrl)\}\}$/.test(href) ? match : `<a${before}${after}>`);
 }
 
 /** Fields a broadcast design may use, selected alongside the event. */
