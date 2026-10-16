@@ -168,7 +168,7 @@ export async function sendEventBroadcastTest(input: unknown): Promise<ActionResu
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return { ok: false, error: "You must be signed in." };
-  if (await isActionRateLimited("broadcast", userId)) {
+  if (await isActionRateLimited("broadcastTest", userId)) {
     return { ok: false, error: "Too many test emails. Please wait a little before sending another." };
   }
   const parsed = sendEventBroadcastTestSchema.safeParse(input);

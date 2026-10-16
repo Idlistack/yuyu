@@ -106,7 +106,8 @@ function decodeEntities(value: string) {
   return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, entity: string) => {
     if (entity[0] === "#") {
       const code = entity[1]?.toLowerCase() === "x" ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+      // fromCodePoint throws past U+10FFFF; text can come from attendee names.
+      return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
     }
     return NAMED_ENTITIES[entity.toLowerCase()] ?? match;
   });
@@ -118,8 +119,9 @@ export function broadcastHtmlToText(html: string): string {
     .replace(/\r\n?/g, "\n")
     .replace(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_match, href: string, inner: string) => {
       const label = inner.replace(/<[^>]+>/g, "").trim();
-      const url = decodeEntities(href);
-      return label && label !== url ? `${label} (${url})` : url;
+      // Label and URL stay encoded here: the whole text is decoded once below,
+      // and decoding twice would turn an escaped "&amp;lt;" into "<".
+      return label && decodeEntities(label) !== decodeEntities(href) ? `${label} (${href})` : href;
     })
     .replace(/<li\b[^>]*>/gi, "• ")
     .replace(/<\/li>/gi, "\n")

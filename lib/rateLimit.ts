@@ -14,6 +14,7 @@ export type Bucket =
   | "upload"
   | "invite"
   | "broadcast"
+  | "broadcastTest"
   | "checkin"
   | "checkinStationPin"
   | "search"
@@ -37,6 +38,8 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   upload: { max: 12, windowMs: 60 * 60_000 },
   invite: { max: 30, windowMs: 60 * 60_000 },
   broadcast: { max: 10, windowMs: 60 * 60_000 },
+  // Tests only reach the organiser's own inbox; kept apart so testing never blocks the real send.
+  broadcastTest: { max: 20, windowMs: 60 * 60_000 },
   checkin: { max: 180, windowMs: 60_000 },
   checkinStationPin: { max: 5, windowMs: 60_000 },
   search: { max: 60, windowMs: 60_000 },
