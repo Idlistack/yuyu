@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   collaboratorInvite: vi.fn(),
   undo: vi.fn(),
   outbox: vi.fn(),
+  mobileSession: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ prisma: {
@@ -19,6 +20,7 @@ vi.mock("@/lib/db", () => ({ prisma: {
   eventCollaboratorInvite: { deleteMany: mocks.collaboratorInvite },
   rsvpDeletionUndo: { deleteMany: mocks.undo },
   outboxMessage: { deleteMany: mocks.outbox },
+  mobileSession: { deleteMany: mocks.mobileSession },
 } }));
 
 import { purgeExpiredOperationalData } from "@/lib/retention";
@@ -29,7 +31,7 @@ describe("operational retention", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OUTBOX_RETENTION_DAYS = "30";
-    for (const mock of [mocks.verification, mocks.session, mocks.orgInvite, mocks.collaboratorInvite, mocks.undo, mocks.outbox]) {
+    for (const mock of [mocks.verification, mocks.session, mocks.orgInvite, mocks.collaboratorInvite, mocks.undo, mocks.outbox, mocks.mobileSession]) {
       mock.mockResolvedValue({ count: 1 });
     }
     mocks.transaction.mockImplementation((operations: Array<Promise<unknown>>) => Promise.all(operations));
@@ -50,6 +52,7 @@ describe("operational retention", () => {
       undoSnapshots: 1,
       sentOutboxMessages: 1,
       failedOutboxMessages: 1,
+      mobileSessions: 1,
     });
     expect(mocks.orgInvite).toHaveBeenCalledWith({ where: { usedAt: null, expiresAt: { lt: now } } });
     expect(mocks.collaboratorInvite).toHaveBeenCalledWith({ where: { usedAt: null, expiresAt: { lt: now } } });

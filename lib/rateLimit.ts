@@ -23,7 +23,9 @@ export type Bucket =
   | "dataExport"
   | "ticketStatus"
   | "ticketEvents"
-  | "shortLink";
+  | "shortLink"
+  | "mobileAuth"
+  | "mobileApi";
 
 const limits: Record<Bucket, { max: number; windowMs: number }> = {
   global: { max: 300, windowMs: 60_000 },
@@ -52,6 +54,11 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   ticketEvents: { max: 60, windowMs: 60_000 },
   // Public short-link lookups. Kept tight so the code space cannot be scanned.
   shortLink: { max: 30, windowMs: 60_000 },
+  // Mobile app token refreshes per IP (one per device every ~15 minutes;
+  // generous because a venue's organisers often share one NAT address).
+  mobileAuth: { max: 30, windowMs: 60_000 },
+  // Authenticated mobile API requests per user, on top of the proxy IP limit.
+  mobileApi: { max: 300, windowMs: 60_000 },
 };
 
 // Local fallback store
