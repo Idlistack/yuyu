@@ -53,8 +53,12 @@ limits, emails and audit behaviour are identical.
 
 Mobile sessions are rows in `MobileSession`; only SHA-256 digests of tokens are
 stored. Access tokens (`yma_…`) live 15 minutes, refresh tokens (`ymr_…`) 60
-days and rotate on every refresh. Presenting a refresh token that has already
-been rotated away revokes the whole session (it was copied). Each session is
+days and rotate on every refresh. If a refresh succeeded but its response was
+lost, retrying with the previous refresh token within 30 seconds of the
+rotation gets a plain `UNAUTHENTICATED` without revoking anything (the app
+should then use the newest tokens it holds, or sign in again). Presenting a
+rotated-away refresh token after that window revokes the whole session (it was
+copied). Each session is
 bound to the user's `sessionVersion`: a password change, password reset, MFA
 enable/disable or "sign out everywhere" bumps it and invalidates every mobile
 session together with web sessions (the rows are also marked revoked).
@@ -96,7 +100,9 @@ Success → `Session`:
 the Google ID token's signature against Google's JWKS, the issuer
 (`accounts.google.com`), expiry, and that `aud` is the instance's web Google
 client id or one of `GOOGLE_MOBILE_CLIENT_IDS` (Android and iOS OAuth client
-ids). Requires `email_verified: true`. Applies the same linking and
+ids). When `aud` is the web client id (the usual "server client id" flow) and
+`GOOGLE_MOBILE_CLIENT_IDS` is configured, the token's `azp` must be one of
+those mobile ids. Requires `email_verified: true`. Applies the same linking and
 account-creation policy as web Google sign-in (`lib/googleSignIn.ts`); new
 Google links keep identity fields only. Success → `Session`.
 `FORBIDDEN` when Google sign-in is not configured on the instance, account
@@ -266,7 +272,8 @@ up to 200.
 
 ### `GET /orgs/:orgSlug/events/:eventId`
 
-`{ "event": EventSummary & { "privacyType", "registrationOpen", "registrationClosesAt|null", "feedbackOpen", "eventUrl", "shortUrl|null" }, "counts": EventCounts|null, "myPermissions": EventPermissions }`
+`{ "event": EventSummary & { "privacyType", "registrationOpen", "registrationClosesAt|null", "registrationClosedReason|null", "registrationManuallyClosed", "feedbackOpen", "eventUrl", "shortUrl|null" }, "counts": EventCounts|null, "myPermissions": EventPermissions }`
+(`registrationManuallyClosed`: sign-ups were closed from an app and can be reopened there).
 
 ### Guests
 
@@ -283,7 +290,8 @@ ticket tokens.
   / `rejectRsvp` / `promoteFromWaitlist` (organisation admins).
 - `POST …/guests` `{ "name", "email", "answers"? }` → `201` `Guest` (as `addManualRsvp`).
 - `DELETE …/guests/:rsvpId` → `{ "undoId" }` (as `deleteRsvp`; the undo lasts five minutes).
-- `POST …/guests/restore` `{ "undoId" }` → `null` (as `restoreRsvp`).
+- `POST …/guests/restore` `{ "undoId" }` → `null` (as `restoreRsvp`). `NOT_FOUND`
+  unless the undo was created by the caller for this same event.
 
 ### Check-in (the event `CHECK_IN` permission, checked by the shared core)
 
@@ -334,11 +342,18 @@ send call client-side.
 - `POST …/feedback/state` `{ "open": bool }` → `{ "open" }`. Saves through the
   shared feedback-settings function with every other setting unchanged;
   organisation admins only. Opening needs at least one question (`CONFLICT` otherwise).
-- `POST …/registration/state` `{ "open": bool }` → `{ "registrationOpen", "registrationClosesAt|null" }`.
-  Closing sets `registrationClosesAt` to now; reopening clears every cutoff
-  (fixed time and lead minutes). Organisation admins only (the same permission
-  as editing the event on the web), rate limited, revalidated and audited as
-  `EVENT_REGISTRATION_CLOSED` / `EVENT_REGISTRATION_REOPENED`.
+- `POST …/registration/state` `{ "open": bool }` → `{ "registrationOpen", "registrationClosesAt|null", "registrationClosedReason|null", "registrationManuallyClosed" }`.
+  Closing stores the organiser's configured cutoff (fixed time or lead
+  minutes) and sets `registrationClosesAt` to the earlier of now and the event
+  start, so the event still satisfies the website's "close on or before the
+  start" rule. Reopening is allowed only after such a close
+  (`registrationManuallyClosed: true`, otherwise `CONFLICT`) and restores the
+  stored cutoff exactly; if that cutoff has itself passed, the response says
+  `registrationOpen: false` with the reason. Saving the event form on the
+  website discards the stored cutoff (the form's value wins). Organisation
+  admins only (the same permission as editing the event on the web), rate
+  limited, revalidated and audited as `EVENT_REGISTRATION_CLOSED` /
+  `EVENT_REGISTRATION_REOPENED`.
 
 ## App links
 
@@ -348,10 +363,41 @@ configured:
 - `GET /.well-known/assetlinks.json` — Android App Links for package
   `com.twilighty.yuyu`, from `ANDROID_APP_SHA256_CERT_FINGERPRINTS`
   (comma-separated `AA:BB:…` SHA-256 signing-certificate fingerprints); `[]`
-  when unset.
+  when unset. It only proves the domain; the app's manifest decides the paths.
 - `GET /.well-known/apple-app-site-association` — iOS Universal Links for
   bundle `com.twilighty.yuyu`, served as `application/json` with no file
-  extension, from `APPLE_APP_IDS` (comma-separated `TEAMID.com.twilighty.yuyu`).
-  It claims `/ticket/*`, `/*/*/feedback`, `/*/*` (event pages) and 7-character
-  short codes, excluding application areas (`/api`, `/dashboard`, `/account`,
-  `/login`, …); `{ "applinks": { "details": [] } }` when unset.
+  extension, from `APPLE_APP_IDS` (comma-separated `TEAMID.com.twilighty.yuyu`);
+  `{ "applinks": { "details": [] } }` when unset. It uses `components`, with the
+  exclusions below listed before the claimed paths.
+
+Both apps should open exactly these paths:
+
+| Claimed | Meaning |
+| --- | --- |
+| `/ticket/*` | Attendee ticket |
+| `/*/*/feedback` | Event feedback form |
+| `/*/*` | Event page (`/:orgSlug/:eventSlug`) |
+
+Never claimed (they stay in the browser):
+
+`/api/*`, `/_next/*`, `/.well-known/*`, `/dashboard` and `/dashboard/*`,
+`/account` and `/account/*`, `/super-admin`, `/super-admin/*`,
+`/super-admin-mfa`, `/login`, `/reset-password`, `/verify-email` (and their
+sub-paths), `/join/*`, `/embed/*`, `/*/*/check-in` (the venue kiosk),
+`/*/i/*` (series occurrences), `/*/*/schedule`, `/*/*/sessions/*` and
+`/*/*/speakers/*`.
+
+Event short links (`/:shortCode`, seven characters with at least one uppercase
+letter) are **not** claimed: Apple's patterns cannot require the uppercase
+letter, so a `/???????` pattern would also capture seven-character
+organisation pages. A short link opens the website, which redirects to the
+event page; apps that receive a short code another way can resolve it with
+`GET /public/short/:code`.
+
+For the Android manifest, declare the three claimed shapes (for example
+`android:pathPrefix="/ticket/"` and `android:pathAdvancedPattern` entries for
+`/[^/]+/[^/]+` and `/[^/]+/[^/]+/feedback`), and in the activity reject the
+excluded first segments (`api`, `_next`, `.well-known`, `dashboard`,
+`account`, `super-admin`, `super-admin-mfa`, `login`, `reset-password`,
+`verify-email`, `join`, `embed`) and second segment `i` by handing the URL
+back to the browser, since manifest filters cannot express exclusions.

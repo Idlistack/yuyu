@@ -21,33 +21,64 @@ export function assetLinksStatement(rawFingerprints = process.env.ANDROID_APP_SH
   }];
 }
 
-/** First path segments that are application pages, never organisation slugs or short codes. */
-const RESERVED_SEGMENTS = [
-  "api", "dashboard", "account", "super-admin", "super-admin-mfa", "embed", "join", "about", "features",
-  "privacy", "terms", "discover", "search", "login", "reset-password", "verify-email", "_next", ".well-known",
-];
+/*
+ * Apple `components` patterns support only `*` (any characters, including
+ * "/") and `?` (one character), evaluated in order with the first match
+ * winning. Exclusions therefore come first. Event short codes are left out:
+ * `/???????` cannot require the uppercase letter every short code has, so it
+ * would also claim 7-character organisation pages. Short links still open the
+ * website, which redirects to the event page (claimed below).
+ */
+export const APP_LINK_EXCLUDED_PATHS = [
+  "/api/*",
+  "/_next/*",
+  "/.well-known/*",
+  "/dashboard",
+  "/dashboard/*",
+  "/account",
+  "/account/*",
+  "/super-admin",
+  "/super-admin/*",
+  "/super-admin-mfa",
+  "/super-admin-mfa/*",
+  "/login",
+  "/login/*",
+  "/reset-password",
+  "/reset-password/*",
+  "/verify-email",
+  "/verify-email/*",
+  "/join/*",
+  "/embed/*",
+  "/*/*/check-in",
+  "/*/*/check-in/*",
+  "/*/i/*",
+  "/*/*/schedule",
+  "/*/*/schedule/*",
+  "/*/*/sessions/*",
+  "/*/*/speakers/*",
+] as const;
+
+/** Claimed after the exclusions: attendee tickets, feedback forms and event pages. */
+export const APP_LINK_INCLUDED_PATHS = [
+  { path: "/ticket/*", comment: "Attendee tickets" },
+  { path: "/*/*/feedback", comment: "Event feedback forms" },
+  { path: "/*/*", comment: "Event pages" },
+] as const;
 
 /**
  * Apple App Site Association from `APPLE_APP_IDS` ("TEAMID.bundle.id", comma
- * separated): tickets, event pages, feedback forms and 7-character short codes.
+ * separated); empty details when unset.
  */
 export function appleAppSiteAssociation(rawAppIds = process.env.APPLE_APP_IDS) {
   const appIDs = list(rawAppIds).filter((value) => /^[A-Z0-9]{10}\.[A-Za-z0-9.-]+$/.test(value));
   if (appIDs.length === 0) return { applinks: { details: [] } };
-  const excluded = RESERVED_SEGMENTS.flatMap((segment) => [
-    { "/": `/${segment}`, exclude: true },
-    { "/": `/${segment}/*`, exclude: true },
-  ]);
   return {
     applinks: {
       details: [{
         appIDs,
         components: [
-          ...excluded,
-          { "/": "/ticket/*", comment: "Attendee tickets" },
-          { "/": "/*/*/feedback", comment: "Event feedback forms" },
-          { "/": "/*/*", comment: "Event pages" },
-          { "/": "/???????", comment: "Event short links" },
+          ...APP_LINK_EXCLUDED_PATHS.map((path) => ({ "/": path, exclude: true })),
+          ...APP_LINK_INCLUDED_PATHS.map(({ path, comment }) => ({ "/": path, comment })),
         ],
       }],
     },

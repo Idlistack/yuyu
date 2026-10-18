@@ -21,7 +21,7 @@ export const POST = mobileRoute("POST /api/mobile/v1/auth/google", async (reques
   const config = await getMobileGoogleConfig();
   if (!config) return mobileError("FORBIDDEN", "Google sign-in is not available on this Yuyu instance.");
 
-  const identity = await verifyGoogleIdToken(parsed.data.idToken, config.audiences);
+  const identity = await verifyGoogleIdToken(parsed.data.idToken, config);
   if (!identity) return mobileError("UNAUTHENTICATED", REJECTED);
 
   // Same linking and account-creation policy as web Google sign-in.

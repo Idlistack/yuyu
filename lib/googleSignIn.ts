@@ -64,24 +64,29 @@ export function mobileGoogleClientIds(raw = process.env.GOOGLE_MOBILE_CLIENT_IDS
  * Mobile Google sign-in is available when web Google SSO is configured. The
  * accepted audiences are the web client id plus `GOOGLE_MOBILE_CLIENT_IDS`.
  */
-export async function getMobileGoogleConfig(): Promise<{ webClientId: string; audiences: string[] } | null> {
+export type MobileGoogleConfig = { webClientId: string; mobileClientIds: string[] };
+
+export async function getMobileGoogleConfig(): Promise<MobileGoogleConfig | null> {
   const settings = await getGoogleSsoSettings();
   if (!settings) return null;
-  return {
-    webClientId: settings.clientId,
-    audiences: Array.from(new Set([settings.clientId, ...mobileGoogleClientIds()])),
-  };
+  return { webClientId: settings.clientId, mobileClientIds: mobileGoogleClientIds() };
 }
 
 /**
  * Verify a Google ID token's signature (Google JWKS), issuer, expiry and
- * audience, and require a verified email. Returns null on any failure.
+ * audience, and require a verified email. `aud` must be the web client id or
+ * a mobile client id. When the app requested the token for the web client id
+ * (the usual Android/iOS "server client id" flow) and mobile client ids are
+ * configured, the authorised party `azp` must be one of them, so a token
+ * minted for some other client of the web id is refused. Returns null on any
+ * failure.
  */
 export async function verifyGoogleIdToken(
   idToken: string,
-  audiences: string[],
+  config: MobileGoogleConfig,
   keySet: JWTVerifyGetKey = defaultGoogleKeySet(),
 ): Promise<GoogleIdentity | null> {
+  const audiences = Array.from(new Set([config.webClientId, ...config.mobileClientIds].filter(Boolean)));
   if (audiences.length === 0 || idToken.length > 8192) return null;
   try {
     const { payload } = await jwtVerify(idToken, keySet, {
@@ -92,6 +97,10 @@ export async function verifyGoogleIdToken(
       clockTolerance: 30,
     });
     if (payload.email_verified !== true) return null;
+    const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (aud.includes(config.webClientId) && config.mobileClientIds.length > 0) {
+      if (typeof payload.azp !== "string" || !config.mobileClientIds.includes(payload.azp)) return null;
+    }
     const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
     if (!email || typeof payload.sub !== "string" || !payload.sub) return null;
     return {
