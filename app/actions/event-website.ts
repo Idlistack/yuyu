@@ -6,11 +6,9 @@ import {
   EventPermission,
   SponsorTier,
 } from "@prisma/client";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { canAccessEvent } from "@/lib/eventAccess";
 import { isUserEmailVerified } from "@/lib/permissions";
 import { slugifyTitle, withSlugSuffix } from "@/lib/slug";
 import { sanitizeRichText } from "@/lib/richText";
@@ -19,6 +17,12 @@ import { isActionRateLimited } from "@/lib/actionRateLimit";
 import { createSafeWebpDerivative } from "@/lib/imageValidation";
 import { getPublicUrl, uploadFile } from "@/lib/storage";
 import type { ActionResult } from "./org";
+import {
+  eventWebsiteContextForUser,
+  eventWebsiteTarget,
+  revalidateEventWebsitePaths,
+  setEventSessionDelayForUser,
+} from "@/lib/core/eventProgramme";
 import { isOrganisationUploadUrl, isUploadedImageUrl } from "@/lib/uploadUrl";
 
 const http = z
@@ -41,10 +45,7 @@ const optionalImageUrl = z
     z.null(),
   ])
   .optional();
-const target = z.object({
-  organisationSlug: z.string().min(1),
-  eventId: z.string().min(1),
-});
+const target = eventWebsiteTarget;
 const visibility = z
   .nativeEnum(ContentVisibility)
   .default(ContentVisibility.DRAFT);
@@ -55,32 +56,10 @@ async function context(
   permission: EventPermission,
 ) {
   const session = await auth();
-  if (!session?.user?.id) return null;
-  if (await isActionRateLimited("action", session.user.id)) return null;
-  const org = await prisma.organisation.findUnique({
-    where: { slug: input.organisationSlug },
-  });
-  if (
-    !org ||
-    !(await canAccessEvent({
-      userId: session.user.id,
-      organisationId: org.id,
-      eventId: input.eventId,
-      permission,
-    }))
-  )
-    return null;
-  const event = await prisma.event.findFirst({
-    where: { id: input.eventId, organisationId: org.id },
-    select: { id: true, slug: true },
-  });
-  return event ? { session, org, event } : null;
+  return eventWebsiteContextForUser(session?.user?.id ?? null, input, permission);
 }
 function paths(orgSlug: string, event: { id: string; slug: string }) {
-  revalidatePath(`/${orgSlug}/${event.slug}`);
-  revalidatePath(`/${orgSlug}/${event.slug}/schedule`);
-  revalidatePath(`/dashboard/${orgSlug}/event/${event.id}`);
-  revalidatePath(`/dashboard/${orgSlug}/event/${event.id}/schedule`);
+  revalidateEventWebsitePaths(orgSlug, event);
 }
 function fail(message: string): ActionResult {
   return { ok: false, error: message };
@@ -753,36 +732,9 @@ export async function saveSession(
 export async function setEventSessionDelay(
   input: unknown,
 ): Promise<ActionResult> {
-  const parsed = target
-    .extend({
-      sessionId: z.string().min(1),
-      delayMinutes: z.number().int().min(0).max(1440),
-    })
-    .safeParse(input);
-  if (!parsed.success) return fail("Invalid programme delay.");
-  const c = await context(parsed.data, EventPermission.PUBLISH_AND_SCHEDULE);
-  if (!c) return fail("You do not have permission to manage the programme.");
-  const result = await prisma.eventSession.updateMany({
-    where: { id: parsed.data.sessionId, eventId: c.event.id },
-    data: { delayMinutes: parsed.data.delayMinutes },
-  });
-  if (!result.count) return fail("Session not found.");
-  const session = await prisma.eventSession.findFirst({
-    where: { id: parsed.data.sessionId, eventId: c.event.id },
-    select: { slug: true },
-  });
-  await recordAuditEvent({
-    action: "EVENT_SESSION_DELAY_SET",
-    actorUserId: c.session.user.id,
-    organisationId: c.org.id,
-    targetType: "EventSession",
-    targetId: parsed.data.sessionId,
-    metadata: { delayMinutes: parsed.data.delayMinutes },
-  });
-  paths(c.org.slug, c.event);
-  if (session)
-    revalidatePath(`/${c.org.slug}/${c.event.slug}/sessions/${session.slug}`);
-  return { ok: true };
+  // Shared with the mobile API (lib/core/eventProgramme.ts).
+  const session = await auth();
+  return setEventSessionDelayForUser(session?.user?.id ?? null, input);
 }
 
 export async function deleteWebsiteContent(

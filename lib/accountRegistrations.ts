@@ -80,8 +80,11 @@ const eventSelect = {
   isOnline: true,
   status: true,
   privacyType: true,
-  page: { select: { isPublished: true } },
-  organisation: { select: { name: true, slug: true } },
+  // Mobile registration cards (lib/mobile); never rendered by the web rows.
+  coverImageUrl: true,
+  mapLinkUrl: true,
+  page: { select: { isPublished: true, accentColor: true } },
+  organisation: { select: { name: true, slug: true, logoUrl: true } },
 } satisfies Prisma.EventSelect;
 
 const instanceSelect = {
@@ -92,10 +95,11 @@ const instanceSelect = {
     select: {
       id: true,
       title: true,
+      slug: true,
       timezone: true,
       status: true,
       privacyType: true,
-      organisation: { select: { name: true, slug: true } },
+      organisation: { select: { name: true, slug: true, logoUrl: true } },
     },
   },
 } satisfies Prisma.EventInstanceSelect;
@@ -105,11 +109,12 @@ const rsvpSelect = {
   status: true,
   checkedInAt: true,
   checkInToken: true,
+  createdAt: true,
   event: { select: eventSelect },
   eventInstance: { select: instanceSelect },
 } satisfies Prisma.RSVPSelect;
 
-type RsvpRow = Prisma.RSVPGetPayload<{ select: typeof rsvpSelect }>;
+export type AccountRsvpRow = Prisma.RSVPGetPayload<{ select: typeof rsvpSelect }>;
 
 /** Serializable, client-safe row. The ticket token travels only inside `ticketHref`/`cancelToken`, never as display text. */
 export type AccountRegistrationRow = {
@@ -138,8 +143,8 @@ export type AccountCertificateRow = {
   certificateHref: string;
 };
 
-type Normalised = {
-  rsvp: RsvpRow;
+export type NormalisedAccountRegistration = {
+  rsvp: AccountRsvpRow;
   title: string;
   organisationName: string;
   start: Date;
@@ -152,7 +157,7 @@ type Normalised = {
   eventHref: string | null;
 };
 
-function normalise(rsvp: RsvpRow, invitedEventIds: Set<string>, invitedSeriesIds: Set<string>): Normalised | null {
+function normalise(rsvp: AccountRsvpRow, invitedEventIds: Set<string>, invitedSeriesIds: Set<string>): NormalisedAccountRegistration | null {
   if (rsvp.event) {
     const event = rsvp.event;
     const reachable = isEventPageReachable({
@@ -201,7 +206,7 @@ function normalise(rsvp: RsvpRow, invitedEventIds: Set<string>, invitedSeriesIds
   return null;
 }
 
-function toRow(item: Normalised, now: Date): AccountRegistrationRow {
+function toRow(item: NormalisedAccountRegistration, now: Date): AccountRegistrationRow {
   const { rsvp } = item;
   const cancellable = canCancelRegistration({ status: rsvp.status, checkedInAt: rsvp.checkedInAt, end: item.end }, now);
   const showTicket = rsvp.status !== RsvpStatus.REJECTED;
@@ -228,6 +233,34 @@ function toRow(item: Normalised, now: Date): AccountRegistrationRow {
  * `RSVP.userId` (never an email match) and bounded with `take`.
  */
 export async function loadAccountRegistrations(userId: string, now: Date = new Date()) {
+  const { upcoming, past, certificates } = await loadAccountRegistrationRecords(userId, now);
+  return {
+    upcoming: upcoming.map((item) => toRow(item, now)),
+    past: past.map((item) => toRow(item, now)),
+    certificates: certificates.map((certificate): AccountCertificateRow => ({
+      id: certificate.id,
+      title: certificate.title,
+      organisationName: certificate.organisationName,
+      issuedLabel: formatDayShort(certificate.issuedAt, certificate.timeZone, now),
+      certificateHref: certificate.certificateHref,
+    })),
+  };
+}
+
+export type AccountCertificateRecord = {
+  id: string;
+  title: string;
+  organisationName: string;
+  issuedAt: Date;
+  timeZone: string;
+  certificateHref: string;
+};
+
+/**
+ * The records behind `loadAccountRegistrations`, shared with the mobile API so
+ * both apply the same ownership, ordering, caps and page-reachability rules.
+ */
+export async function loadAccountRegistrationRecords(userId: string, now: Date = new Date()) {
   const take = ACCOUNT_REGISTRATIONS_LIMIT;
   const [upcomingEvents, upcomingInstances, pastEvents, pastInstances, certificates, user] = await Promise.all([
     prisma.rSVP.findMany({
@@ -296,15 +329,16 @@ export async function loadAccountRegistrations(userId: string, now: Date = new D
   const { upcoming, past } = splitRegistrations(normalised, now);
 
   return {
-    upcoming: upcoming.map((item) => toRow(item, now)),
-    past: past.map((item) => toRow(item, now)),
-    certificates: certificates.flatMap((response): AccountCertificateRow[] =>
+    upcoming,
+    past,
+    certificates: certificates.flatMap((response): AccountCertificateRecord[] =>
       response.certificateToken
         ? [{
             id: response.id,
             title: response.form.event.title,
             organisationName: response.form.event.organisation.name,
-            issuedLabel: formatDayShort(response.submittedAt, safeTimeZone(response.form.event.timezone), now),
+            issuedAt: response.submittedAt,
+            timeZone: safeTimeZone(response.form.event.timezone),
             certificateHref: `/api/feedback/certificate/${response.certificateToken}`,
           }]
         : [],
