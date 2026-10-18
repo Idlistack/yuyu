@@ -18,7 +18,12 @@ type Visibility = Target & {
 /** Resolve page access from current database state; URL knowledge is not an invite. */
 export async function resolvePublicEventAccess(input: Visibility) {
   const session = await auth();
-  const userId = session?.user?.id;
+  return resolvePublicEventAccessForUser(session?.user?.id ?? null, input);
+}
+
+/** The same rule for an explicitly identified viewer (the mobile API's bearer user, or null). */
+export async function resolvePublicEventAccessForUser(viewerUserId: string | null, input: Visibility) {
+  const userId = viewerUserId ?? undefined;
   const eventTarget = input.eventId ? { eventId: input.eventId } : { eventSeriesId: input.eventSeriesId };
   const canPreview = Boolean(userId && (
     await canAccessEvent({

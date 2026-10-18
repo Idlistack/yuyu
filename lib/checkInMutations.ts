@@ -4,7 +4,8 @@ import type { RsvpStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { publishTicketCheckedIn } from "@/lib/ticketCheckInEvents";
 
-type CheckInSource = "online" | "offline-sync" | "venue-station";
+/** Must match the `CheckInEvent_known_source` database constraint. */
+export type CheckInSource = "online" | "offline-sync" | "venue-station" | "mobile-scan" | "mobile-manual";
 
 export type CheckInCommitResult =
   | { state: "checked-in"; checkedInAt: Date }
@@ -18,7 +19,7 @@ export type CheckInCommitResult =
  * admitted using a stale preview.
  *
  * Every path that sets `RSVP.checkedInAt` (online scan/manual, offline sync,
- * venue station) goes through here, so the realtime ticket notification is
+ * venue station, mobile apps) goes through here, so the realtime ticket notification is
  * published once, only for a real transition, and only after the transaction
  * has committed.
  */
@@ -63,7 +64,7 @@ export async function commitCheckInProjection(params: {
 export function commitUndoCheckInProjection(params: {
   rsvpId: string;
   actorUserId: string | null;
-  source: "online" | "venue-station";
+  source: "online" | "venue-station" | "mobile-scan" | "mobile-manual";
 }) {
   return prisma.$transaction(async (tx) => {
     const changed = await tx.rSVP.updateMany({

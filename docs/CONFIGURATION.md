@@ -15,6 +15,9 @@ Copy `.env.example` to `.env` for local development. Production secrets must com
 | `AUTH_GOOGLE_ID` | Legacy fallback | Google OAuth client ID; configure new instances in Super admin → Settings |
 | `AUTH_GOOGLE_SECRET` | Legacy fallback | Google OAuth client secret; configure new instances in Super admin → Settings |
 | `SUPER_ADMIN_EMAIL` | Recommended | Sole email allowed into the instance administration area |
+| `GOOGLE_MOBILE_CLIENT_IDS` | Optional | Comma-separated Google OAuth client ids of the Yuyu mobile apps (Android and iOS). Mobile Google sign-in accepts ID tokens whose `aud` is the web Google client id or one of these; when set, a token issued for the web client id must also name one of these as `azp`. Available only when web Google sign-in is configured |
+| `ANDROID_APP_SHA256_CERT_FINGERPRINTS` | Optional | Comma-separated SHA-256 signing-certificate fingerprints (`AA:BB:…`) published in `/.well-known/assetlinks.json` for Android App Links (package `com.twilighty.yuyu`); unset serves `[]` |
+| `APPLE_APP_IDS` | Optional | Comma-separated `TEAMID.bundle.id` values (for example `ABCDE12345.com.twilighty.yuyu`) published in `/.well-known/apple-app-site-association` for iOS Universal Links (tickets, event pages and feedback forms; see [Mobile API](MOBILE_API.md#app-links)); unset serves empty details |
 
 ### Deployment example: `events.dev.idliapps.com`
 

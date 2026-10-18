@@ -14,6 +14,8 @@ Fast Vitest tests cover validation and isolated domain/security behavior. Watch 
 
 Machine API coverage includes bearer parsing and hashing, credential state, strict DTOs, cursor validation, scope behavior, and forbidden-field regression checks.
 
+Mobile API coverage includes token hashing, rotation and refresh-reuse revocation, version-stale session rejection, envelope/error mapping, DTO forbidden-field regressions, Google ID-token verification failures (local JWKS), the app-link association files, and `mobile-api-contract`, which validates `docs/mobile-api-fixtures/` against `docs/mobile-api.openapi.yaml` and the routes' Zod schemas and checks that the spec lists exactly the implemented routes. The `mobile-api` integration suite covers sign-in/refresh/reuse, sign-out everywhere, cross-tenant `NOT_FOUND`, a `CHECK_IN`-only collaborator (check-in published through `commitCheckInProjection`, no approval or email), own-RSVP cancellation, and ticket-token ownership.
+
 Other security-relevant unit suites include `super-admin-page-guards` (fails if any `app/super-admin/**/page.tsx` omits `await requireSuperAdminMfa()`), the live-ticket suites (`ticket-check-in-events`, `ticket-check-in-publish`, `ticket-check-in-routes`, `ticket-check-in-watcher`, `use-ticket-check-in`), `account-data-export` and `account-organisations-actions`, `short-link-actions` and `short-link-resolve`, `broadcast-designs`, `event-publishing`, `safe-http-url`, and `image-validation`.
 
 ### PostgreSQL integration tests

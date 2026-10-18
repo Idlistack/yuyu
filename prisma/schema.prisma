@@ -129,6 +129,7 @@ model User {
   eventCollaborations EventCollaborator[]
   eventCollaboratorInvitesUsed EventCollaboratorInvite[] @relation("EventCollaboratorInviteUsedBy")
   eventBroadcasts   EventBroadcast[]
+  mobileSessions    MobileSession[]
 }
 
 model Account {
@@ -156,6 +157,39 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// A signed-in Yuyu mobile app (Android or iOS). Only SHA-256 digests of the
+/// bearer tokens are stored. A session is valid only while `sessionVersion`
+/// matches the user's, so password/MFA changes and "sign out everywhere"
+/// revoke it together with web sessions.
+model MobileSession {
+  id                       String    @id @default(cuid())
+  userId                   String
+  /// Hex SHA-256 of the current access token.
+  accessTokenHash          String    @unique
+  /// Hex SHA-256 of the current refresh token.
+  refreshTokenHash         String    @unique
+  /// Hex SHA-256 of the refresh token this one replaced. Presenting it again
+  /// is treated as token theft and revokes the session.
+  previousRefreshTokenHash String?   @unique
+  /// When the refresh token was last rotated. A retry with the previous token
+  /// inside a short grace window (a lost response) is refused without revoking.
+  rotatedAt                DateTime?
+  sessionVersion           Int
+  deviceName               String?
+  /// "android" or "ios"; informational only.
+  platform                 String?
+  createdAt                DateTime  @default(now())
+  lastUsedAt               DateTime  @default(now())
+  accessExpiresAt          DateTime
+  refreshExpiresAt         DateTime
+  revokedAt                DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([refreshExpiresAt])
 }
 
 model VerificationToken {
@@ -288,6 +322,12 @@ model Event {
   listedPublicly        Boolean          @default(false)
   registrationClosesAt  DateTime?
   registrationLeadMinutes Int?
+  /// Set while sign-ups are closed from the mobile app. The organiser's
+  /// previous cutoff is kept below so reopening restores it exactly; saving
+  /// the dashboard event form clears all three.
+  registrationManuallyClosedAt DateTime?
+  registrationCutoffBeforeManualClose DateTime?
+  registrationLeadBeforeManualClose Int?
   /// bcrypt hash for the public venue check-in station PIN. Incrementing the
   /// version invalidates all existing station proofs.
   checkInStationPinHash String?

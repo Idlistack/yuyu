@@ -8,24 +8,10 @@ import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/permissions";
 import { hasRecentAuthentication } from "@/lib/reauth";
 import { isActionRateLimited } from "@/lib/actionRateLimit";
-import { recordAuditEvent } from "@/lib/audit";
 import { flattenZodErrors } from "./utils";
 import type { ActionResult } from "./org";
-import { isUploadedImageUrl, isUserUploadUrl } from "@/lib/uploadUrl";
-
-const updateProfileSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Name is required")
-    .max(120, "Name must be at most 120 characters"),
-  profileImageUrl: z
-    .string()
-    .trim()
-    .max(2048, "Profile image URL must be at most 2048 characters")
-    .refine(isUploadedImageUrl, "Choose an uploaded profile image")
-    .or(z.literal("")),
-});
+import { updateAccountProfileForUser } from "@/lib/core/accountProfile";
+import { revokeUserMobileSessions } from "@/lib/mobileAuth";
 
 const updatePasswordSchema = z
   .object({
@@ -42,40 +28,8 @@ export async function updateAccountProfile(
   input: unknown,
 ): Promise<ActionResult<{ name: string; profileImageUrl: string | null }>> {
   const session = await requireAuth();
-  if (await isActionRateLimited("action", session.user.id)) {
-    return { ok: false, error: "Too many updates. Please try again later." };
-  }
-
-  const parsed = updateProfileSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: "Invalid input.",
-      fieldErrors: flattenZodErrors(parsed.error),
-    };
-  }
-
-  const { name, profileImageUrl } = parsed.data;
-  const savedProfileImageUrl = profileImageUrl || null;
-  if (
-    savedProfileImageUrl &&
-    !isUserUploadUrl(savedProfileImageUrl, session.user.id)
-  ) {
-    return { ok: false, error: "Choose your uploaded profile image." };
-  }
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { name, profileImageUrl: savedProfileImageUrl },
-  });
-  await recordAuditEvent({
-    action: "ACCOUNT_PROFILE_UPDATED",
-    actorUserId: session.user.id,
-    targetType: "User",
-    targetId: session.user.id,
-  });
-  revalidatePath("/account");
-
-  return { ok: true, data: { name, profileImageUrl: savedProfileImageUrl } };
+  // Shared with the mobile API (lib/core/accountProfile.ts).
+  return updateAccountProfileForUser(session.user.id, input);
 }
 
 export async function updateAccountPassword(
@@ -130,6 +84,7 @@ export async function updateAccountPassword(
     if (updated.count !== 1) return false;
     await tx.verificationToken.deleteMany({ where: { identifier: { in: [`reset:${user.email}`, `mfa:${session.user.id}`] } } });
     await tx.session.deleteMany({ where: { userId: session.user.id } });
+    await revokeUserMobileSessions(tx, session.user.id);
     await tx.auditEvent.create({
       data: {
         action: user.passwordHash

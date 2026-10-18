@@ -11,6 +11,7 @@
 - Authenticator-app MFA for credential accounts, including recovery codes.
 - Account pages at `/account`, `/account/registrations`, `/account/organisations`, and `/account/security`. The personal data export (`GET /api/exports/account`) returns only the signed-in user's own allow-listed data as JSON, is limited to five downloads per hour, and is audited as `ACCOUNT_DATA_EXPORTED`. Leaving an organisation removes only your own membership, is refused for the sole owner, and is audited as `ORGANISATION_MEMBER_LEFT`.
 - JWT session-version invalidation after sensitive account operations.
+- A user-authenticated mobile API (`/api/mobile/v1`) for the Yuyu mobile apps (Android and iOS): email/password and Google sign-in with rotating refresh tokens, your registrations and tickets, public discovery and registration, and organiser day-of work (guest approval, check-in with offline roster and sync, attendee emails, live programme delays, feedback open/close, closing sign-ups). Mobile sessions end with "sign out everywhere" and password or MFA changes. Android App Links and iOS Universal Links association files are served under `/.well-known/` when configured. See [Mobile API](MOBILE_API.md).
 
 Google OAuth users rely on the Google account's MFA policy; the application TOTP prompt applies to password authentication.
 

@@ -15,6 +15,7 @@ This directory is the source of truth for the current product, its operation, an
 | [Routes](ROUTES.md) | Public pages, dashboards, APIs, and protected endpoints |
 | [Security](SECURITY.md) | Authentication, authorization, privacy, abuse protection, and known boundaries |
 | [Machine API v1](API.md) | Server-to-server authentication, scopes, contracts, and credential lifecycle |
+| [Mobile API v1](MOBILE_API.md) | User-authenticated API for the Yuyu mobile apps (Android and iOS), with an [OpenAPI 3.1 spec](mobile-api.openapi.yaml) and [fixtures](mobile-api-fixtures/) |
 | [Testing](TESTING.md) | Test suites, CI checks, coverage, and release verification |
 
 ## Deployment and operations

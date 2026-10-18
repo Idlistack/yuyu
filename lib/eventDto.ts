@@ -3,6 +3,7 @@ import type { Event } from "@prisma/client";
 /** Event data that is safe to serialize into browser component props. */
 export type EventClientDto = Omit<Event,
   "checkInStationPinHash" | "checkInStationPinEncrypted" | "checkInStationSecretVersion"
+  | "registrationManuallyClosedAt" | "registrationCutoffBeforeManualClose" | "registrationLeadBeforeManualClose"
 >;
 
 export function toEventClientDto(event: Event): EventClientDto {
