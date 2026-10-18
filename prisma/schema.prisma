@@ -173,6 +173,9 @@ model MobileSession {
   /// Hex SHA-256 of the refresh token this one replaced. Presenting it again
   /// is treated as token theft and revokes the session.
   previousRefreshTokenHash String?   @unique
+  /// When the refresh token was last rotated. A retry with the previous token
+  /// inside a short grace window (a lost response) is refused without revoking.
+  rotatedAt                DateTime?
   sessionVersion           Int
   deviceName               String?
   /// "android" or "ios"; informational only.
@@ -319,6 +322,12 @@ model Event {
   listedPublicly        Boolean          @default(false)
   registrationClosesAt  DateTime?
   registrationLeadMinutes Int?
+  /// Set while sign-ups are closed from the mobile app. The organiser's
+  /// previous cutoff is kept below so reopening restores it exactly; saving
+  /// the dashboard event form clears all three.
+  registrationManuallyClosedAt DateTime?
+  registrationCutoffBeforeManualClose DateTime?
+  registrationLeadBeforeManualClose Int?
   /// bcrypt hash for the public venue check-in station PIN. Incrementing the
   /// version invalidates all existing station proofs.
   checkInStationPinHash String?

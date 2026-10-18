@@ -86,6 +86,10 @@ paths:
     post:
       tags: [Auth]
       summary: Rotate the refresh token
+      description: |
+        Returns new access and refresh tokens. Replaying the previous refresh
+        token within 30 seconds of a rotation (a lost response) is a plain 401;
+        later replays revoke the session.
       security: []
       requestBody:
         required: true
@@ -316,7 +320,7 @@ paths:
   /api/mobile/v1/orgs/{orgSlug}/events/{eventId}/guests/restore:
     post:
       tags: [Organiser]
-      summary: Undo a guest deletion within five minutes
+      summary: Undo a guest deletion within five minutes (404 unless the undo belongs to this event)
       parameters: [{ $ref: "#/components/parameters/orgSlug" }, { $ref: "#/components/parameters/eventId" }]
       requestBody:
         required: true
@@ -636,7 +640,13 @@ paths:
   /api/mobile/v1/orgs/{orgSlug}/events/{eventId}/registration/state:
     post:
       tags: [Day-of]
-      summary: Close sign-ups now, or reopen them (organisation admins)
+      summary: Close sign-ups now, or reopen them after a mobile close (organisation admins)
+      description: |
+        Closing stores the organiser's cutoff and sets `registrationClosesAt` to
+        min(now, event start). Reopening is allowed only while
+        `registrationManuallyClosed` is true and restores the stored cutoff
+        (which may itself have passed: then `registrationOpen` is false with a
+        reason); otherwise 409 `CONFLICT`.
       parameters: [{ $ref: "#/components/parameters/orgSlug" }, { $ref: "#/components/parameters/eventId" }]
       requestBody:
         required: true
@@ -647,6 +657,7 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationStateResponse" } } } }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
 
   /api/ticket/{token}/status:
     get:
@@ -747,7 +758,7 @@ paths:
       summary: Apple App Site Association (bundle com.twilighty.yuyu)
       security: []
       responses:
-        "200": { description: "`{ applinks: { details: [] } }` when `APPLE_APP_IDS` is unset.", content: { application/json: { schema: { type: object } } } }
+        "200": { description: "Claims `/ticket/*`, `/*/*/feedback` and `/*/*` after excluding application paths (see MOBILE_API.md); `{ applinks: { details: [] } }` when `APPLE_APP_IDS` is unset.", content: { application/json: { schema: { type: object } } } }
 
 components:
   securitySchemes:
@@ -1123,11 +1134,13 @@ components:
           allOf:
             - { $ref: "#/components/schemas/EventSummary" }
             - type: object
-              required: [privacyType, registrationOpen, registrationClosesAt, feedbackOpen, eventUrl, shortUrl]
+              required: [privacyType, registrationOpen, registrationClosesAt, registrationClosedReason, registrationManuallyClosed, feedbackOpen, eventUrl, shortUrl]
               properties:
                 privacyType: { $ref: "#/components/schemas/PrivacyType" }
                 registrationOpen: { type: boolean }
                 registrationClosesAt: { $ref: "#/components/schemas/NullableDateTime" }
+                registrationClosedReason: { type: [string, "null"] }
+                registrationManuallyClosed: { type: boolean, description: Sign-ups were closed from a mobile app and can be reopened there. }
                 feedbackOpen: { type: boolean }
                 eventUrl: { type: string, format: uri }
                 shortUrl: { $ref: "#/components/schemas/NullableUrl" }
@@ -1387,4 +1400,13 @@ components:
     BroadcastSendResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { type: object, additionalProperties: false, required: [broadcastId, recipientCount], properties: { broadcastId: { type: string }, recipientCount: { type: integer } } } } }
     ScheduleResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { $ref: "#/components/schemas/Schedule" } } }
     FeedbackStateResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { type: object, additionalProperties: false, required: [open], properties: { open: { type: boolean } } } } }
-    RegistrationStateResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { type: object, additionalProperties: false, required: [registrationOpen, registrationClosesAt], properties: { registrationOpen: { type: boolean }, registrationClosesAt: { $ref: "#/components/schemas/NullableDateTime" } } } } }
+    RegistrationState:
+      type: object
+      additionalProperties: false
+      required: [registrationOpen, registrationClosesAt, registrationClosedReason, registrationManuallyClosed]
+      properties:
+        registrationOpen: { type: boolean }
+        registrationClosesAt: { $ref: "#/components/schemas/NullableDateTime" }
+        registrationClosedReason: { type: [string, "null"], description: UI-safe reason when registration is closed. }
+        registrationManuallyClosed: { type: boolean }
+    RegistrationStateResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { $ref: "#/components/schemas/RegistrationState" } } }

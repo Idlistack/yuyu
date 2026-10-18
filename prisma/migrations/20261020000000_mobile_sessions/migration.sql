@@ -8,6 +8,7 @@ CREATE TABLE "MobileSession" (
     "accessTokenHash" TEXT NOT NULL,
     "refreshTokenHash" TEXT NOT NULL,
     "previousRefreshTokenHash" TEXT,
+    "rotatedAt" TIMESTAMP(3),
     "sessionVersion" INTEGER NOT NULL,
     "deviceName" TEXT,
     "platform" TEXT,
@@ -44,3 +45,11 @@ ALTER TABLE "CheckInEvent" DROP CONSTRAINT "CheckInEvent_known_source";
 ALTER TABLE "CheckInEvent" ADD CONSTRAINT "CheckInEvent_known_source"
   CHECK ("source" IN ('online', 'offline-sync', 'venue-station', 'mobile-scan', 'mobile-manual')) NOT VALID;
 ALTER TABLE "CheckInEvent" VALIDATE CONSTRAINT "CheckInEvent_known_source";
+
+-- Closing sign-ups from a mobile app snapshots the organiser's cutoff so that
+-- reopening restores it; the dashboard event form clears the snapshot.
+ALTER TABLE "Event" ADD COLUMN "registrationManuallyClosedAt" TIMESTAMP(3),
+ADD COLUMN "registrationCutoffBeforeManualClose" TIMESTAMP(3),
+ADD COLUMN "registrationLeadBeforeManualClose" INTEGER;
+ALTER TABLE "Event" ADD CONSTRAINT "Event_manual_close_snapshot_mode"
+  CHECK (NOT ("registrationCutoffBeforeManualClose" IS NOT NULL AND "registrationLeadBeforeManualClose" IS NOT NULL));

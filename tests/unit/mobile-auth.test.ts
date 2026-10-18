@@ -16,7 +16,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { refreshMobileSession, requireMobileUser } from "@/lib/mobileAuth";
+import { REFRESH_REUSE_GRACE_MS, refreshMobileSession, requireMobileUser } from "@/lib/mobileAuth";
 
 const ACCESS = `yma_${"a".repeat(43)}`;
 const REFRESH = `ymr_${"b".repeat(43)}`;
@@ -80,12 +80,20 @@ describe("refreshMobileSession", () => {
     const update = mocks.updateMany.mock.calls[0]![0];
     expect(update.where).toMatchObject({ id: "ms_1", refreshTokenHash: hashMobileToken(REFRESH), revokedAt: null });
     expect(update.data.previousRefreshTokenHash).toBe(hashMobileToken(REFRESH));
+    expect(update.data.rotatedAt).toBeInstanceOf(Date);
     expect(update.data.refreshTokenHash).toBe(hashMobileToken(outcome.session.refreshToken));
     expect(JSON.stringify(update)).not.toContain(outcome.session.refreshToken);
   });
 
+  it("refuses, without revoking, a retry of the previous token inside the grace window", async () => {
+    mocks.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "ms_1", userId: "user_1", revokedAt: null, rotatedAt: new Date(Date.now() - 5_000) });
+    await expect(refreshMobileSession(REFRESH)).resolves.toEqual({ ok: false, reason: "invalid" });
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
   it("revokes the whole session when an already-rotated refresh token is replayed", async () => {
-    mocks.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "ms_1", userId: "user_1", revokedAt: null });
+    mocks.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "ms_1", userId: "user_1", revokedAt: null, rotatedAt: new Date(Date.now() - REFRESH_REUSE_GRACE_MS - 1_000) });
     await expect(refreshMobileSession(REFRESH)).resolves.toEqual({ ok: false, reason: "reused" });
     expect(mocks.updateMany).toHaveBeenCalledWith({ where: { id: "ms_1", revokedAt: null }, data: { revokedAt: expect.any(Date) } });
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "MOBILE_REFRESH_TOKEN_REUSED" }));

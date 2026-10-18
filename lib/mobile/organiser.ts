@@ -138,6 +138,7 @@ export async function loadOrgEventDetail(ctx: MobileEventContext, baseUrl: strin
       shortCode: true,
       registrationClosesAt: true,
       registrationLeadMinutes: true,
+      registrationManuallyClosedAt: true,
       feedbackForm: { select: { isOpen: true } },
     },
   });
@@ -149,6 +150,8 @@ export async function loadOrgEventDetail(ctx: MobileEventContext, baseUrl: strin
       privacyType: event.privacyType,
       registrationOpen: window.registrationOpen,
       registrationClosesAt: window.registrationClosesAt,
+      registrationClosedReason: window.registrationClosedReason,
+      registrationManuallyClosed: window.registrationManuallyClosed,
       feedbackOpen: Boolean(event.feedbackForm?.isOpen),
       eventUrl: `${baseUrl}/${event.organisation.slug}/${event.slug}`,
       shortUrl: event.shortCode ? `${baseUrl}/${event.shortCode}` : null,

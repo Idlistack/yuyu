@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { effectiveEventProgram } from "@/lib/eventProgram";
 import { listedEventAudienceWhere } from "@/lib/eventVisibility";
 import { resolvePublicEventAccessForUser } from "@/lib/publicEventAccess";
-import { isRegistrationClosed } from "@/lib/registrationCutoff";
+import { registrationClosedReason } from "@/lib/core/registrationWindow";
 import { countConfirmedForEvent } from "@/lib/rsvpCapacity";
 import { absoluteUrl, eventSummarySelect, toEventSummary, toRegistrationField } from "@/lib/mobile/dto";
 import { eventListDtoSchema, feedbackFormDtoSchema, publicEventDtoSchema } from "@/lib/mobile/schemas";
@@ -67,14 +67,6 @@ export async function searchPublicEvents(q: string, baseUrl: string) {
     take: 48,
   });
   return eventListDtoSchema.parse({ events: events.map((event) => toEventSummary(event, baseUrl)), nextCursor: null });
-}
-
-function closedReason(event: { status: EventStatus; endDateTime: Date; startDateTime: Date; registrationClosesAt: Date | null; registrationLeadMinutes: number | null }, now: Date) {
-  if (event.status === EventStatus.CANCELLED) return "This event has been cancelled.";
-  if (event.status !== EventStatus.PUBLISHED) return "Registration is not open yet.";
-  if (event.endDateTime <= now) return "This event has ended.";
-  if (isRegistrationClosed(event, now)) return "Registration has closed.";
-  return null;
 }
 
 /**
@@ -141,7 +133,7 @@ export async function loadPublicEvent(params: { orgSlug: string; eventSlug: stri
   ]);
 
   const now = new Date();
-  const reason = closedReason(event, now);
+  const reason = registrationClosedReason(event, now);
   const program = effectiveEventProgram(sessions);
   const tracks = new Map<string, { trackName: string | null; sortOrder: number; sessions: Array<{ id: string; title: string; startDateTime: string; endDateTime: string; delayMinutes: number; room: string | null; speakers: string[] }> }>();
   for (const session of program) {

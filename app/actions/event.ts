@@ -324,6 +324,10 @@ export async function updateEvent(input: unknown): Promise<ActionResult> {
           listedPublicly: data.privacyType === EventPrivacyType.APPROVAL_REQUIRED && data.listedPublicly,
           registrationClosesAt: data.registrationClosesAt ?? null,
           registrationLeadMinutes: data.registrationLeadMinutes ?? null,
+          // The form's explicit cutoff wins over a mobile "close sign-ups".
+          registrationManuallyClosedAt: null,
+          registrationCutoffBeforeManualClose: null,
+          registrationLeadBeforeManualClose: null,
         },
       });
       await tx.eventPage.upsert({

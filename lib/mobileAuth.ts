@@ -34,6 +34,12 @@ export type MobileAuthContext = {
 };
 
 const LAST_USED_THROTTLE_MS = 5 * 60_000;
+/**
+ * A refresh whose response was lost (common on venue Wi-Fi) is retried with
+ * the previous token. Inside this window that retry is refused without
+ * revoking; afterwards a replay is treated as theft.
+ */
+export const REFRESH_REUSE_GRACE_MS = 30_000;
 
 /**
  * Create a session bound to the `sessionVersion` that was current when the
@@ -90,9 +96,11 @@ export type RefreshOutcome =
   | { ok: false; reason: "invalid" | "reused" };
 
 /**
- * Rotate a refresh token. Presenting the refresh token that was already
- * rotated away revokes the whole session (the token was copied), and every
- * failure is reported to the client the same way.
+ * Rotate a refresh token. Presenting the refresh token that was rotated away
+ * revokes the whole session (the token was copied), except within
+ * REFRESH_REUSE_GRACE_MS of the rotation, when it is a likely retry after a
+ * lost response and is refused without revoking. Every failure is reported to
+ * the client the same way.
  */
 export async function refreshMobileSession(refreshToken: string): Promise<RefreshOutcome> {
   if (!isRefreshTokenShape(refreshToken)) return { ok: false, reason: "invalid" };
@@ -110,8 +118,11 @@ export async function refreshMobileSession(refreshToken: string): Promise<Refres
   if (!session) {
     const replayed = await prisma.mobileSession.findUnique({
       where: { previousRefreshTokenHash: presentedHash },
-      select: { id: true, userId: true, revokedAt: true },
+      select: { id: true, userId: true, revokedAt: true, rotatedAt: true },
     });
+    if (replayed && !replayed.revokedAt && replayed.rotatedAt && now.getTime() - replayed.rotatedAt.getTime() <= REFRESH_REUSE_GRACE_MS) {
+      return { ok: false, reason: "invalid" };
+    }
     if (replayed && !replayed.revokedAt) {
       await prisma.$transaction(async (tx) => {
         const revoked = await tx.mobileSession.updateMany({
@@ -144,6 +155,7 @@ export async function refreshMobileSession(refreshToken: string): Promise<Refres
       accessTokenHash: tokens.accessTokenHash,
       refreshTokenHash: tokens.refreshTokenHash,
       previousRefreshTokenHash: presentedHash,
+      rotatedAt: now,
       accessExpiresAt: tokens.accessExpiresAt,
       refreshExpiresAt: tokens.refreshExpiresAt,
       lastUsedAt: now,

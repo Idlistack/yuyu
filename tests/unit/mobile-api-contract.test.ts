@@ -88,6 +88,8 @@ const fixtures: Array<[file: string, component: string, zod: z.ZodType]> = [
   ["check-in-preview.json", "CheckInPreviewResponse", dto.successEnvelope(dto.checkInPreviewSchema)],
   ["broadcasts-meta.json", "BroadcastsMetaResponse", dto.successEnvelope(dto.broadcastsMetaDtoSchema)],
   ["org-events.json", "OrgEventsResponse", dto.successEnvelope(dto.orgEventsDtoSchema)],
+  ["org-event-detail.json", "OrgEventDetailResponse", dto.successEnvelope(dto.orgEventDetailDtoSchema)],
+  ["registration-state.json", "RegistrationStateResponse", dto.successEnvelope(dto.registrationStateDtoSchema)],
   ["error.json", "ErrorEnvelope", dto.errorEnvelopeSchema],
 ];
 
@@ -162,6 +164,7 @@ describe("mobile API contract", () => {
     ["SyncResult", dto.syncDtoSchema],
     ["BroadcastsMeta", dto.broadcastsMetaDtoSchema],
     ["Schedule", dto.scheduleDtoSchema],
+    ["RegistrationState", dto.registrationStateDtoSchema],
   ];
 
   it.each(parity)("OpenAPI %s has the same fields as the Zod schema", (component, zod) => {

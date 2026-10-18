@@ -228,6 +228,8 @@ export const orgEventDetailDtoSchema = z.object({
     privacyType: privacyTypeSchema,
     registrationOpen: z.boolean(),
     registrationClosesAt: iso.nullable(),
+    registrationClosedReason: z.string().nullable(),
+    registrationManuallyClosed: z.boolean(),
     feedbackOpen: z.boolean(),
     eventUrl: url,
     shortUrl: url.nullable(),
@@ -336,7 +338,12 @@ export const scheduleDtoSchema = z.object({
 }).strict();
 
 export const feedbackStateDtoSchema = z.object({ open: z.boolean() }).strict();
-export const registrationStateDtoSchema = z.object({ registrationOpen: z.boolean(), registrationClosesAt: iso.nullable() }).strict();
+export const registrationStateDtoSchema = z.object({
+  registrationOpen: z.boolean(),
+  registrationClosesAt: iso.nullable(),
+  registrationClosedReason: z.string().nullable(),
+  registrationManuallyClosed: z.boolean(),
+}).strict();
 
 export type UserDto = z.infer<typeof userDtoSchema>;
 export type EventSummaryDto = z.infer<typeof eventSummarySchema>;

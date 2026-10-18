@@ -13,11 +13,13 @@ process.env.TRUSTED_PROXY_IP_HEADER = "x-real-ip";
 const published = vi.hoisted(() => vi.fn());
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-real-ip": `198.51.100.${Math.floor(Math.random() * 250)}` }) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ auth: vi.fn(async () => null) }));
+const authMock = vi.hoisted(() => vi.fn(async (): Promise<{ user: { id: string } } | null> => null));
+vi.mock("@/lib/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/outboxWorker", () => ({ startOutboxWorker: vi.fn() }));
 vi.mock("@/lib/ticketCheckInEvents", () => ({ publishTicketCheckedIn: published }));
 
 import { prisma } from "@/lib/db";
+import { REFRESH_REUSE_GRACE_MS } from "@/lib/mobileAuth";
 import { POST as login } from "@/app/api/mobile/v1/auth/login/route";
 import { POST as refresh } from "@/app/api/mobile/v1/auth/refresh/route";
 import { POST as logoutAll } from "@/app/api/mobile/v1/auth/logout-all/route";
@@ -31,6 +33,11 @@ import { POST as checkIn } from "@/app/api/mobile/v1/orgs/[orgSlug]/events/[even
 import { POST as sendBroadcast } from "@/app/api/mobile/v1/orgs/[orgSlug]/events/[eventId]/broadcasts/route";
 import { GET as broadcastsMeta } from "@/app/api/mobile/v1/orgs/[orgSlug]/events/[eventId]/broadcasts/meta/route";
 import { GET as publicEvent } from "@/app/api/mobile/v1/public/events/[orgSlug]/[eventSlug]/route";
+import { POST as registrationState } from "@/app/api/mobile/v1/orgs/[orgSlug]/events/[eventId]/registration/state/route";
+import { DELETE as deleteGuest } from "@/app/api/mobile/v1/orgs/[orgSlug]/events/[eventId]/guests/[rsvpId]/route";
+import { POST as restoreGuest } from "@/app/api/mobile/v1/orgs/[orgSlug]/events/[eventId]/guests/restore/route";
+import { updateEvent } from "@/app/actions/event";
+import { updateEventSchema } from "@/lib/validators";
 
 const suffix = randomUUID().replaceAll("-", "").slice(0, 16);
 const PASSWORD = "correct horse battery staple";
@@ -113,6 +120,8 @@ describe.sequential("mobile API integration", () => {
     expect((await me(get("/api/mobile/v1/me", first.accessToken), none)).status).toBe(401);
     expect((await me(get("/api/mobile/v1/me", second.accessToken), none)).status).toBe(200);
 
+    // Replayed after the lost-response grace window: treated as a copied token.
+    await prisma.mobileSession.update({ where: { id: stored.id }, data: { rotatedAt: new Date(Date.now() - REFRESH_REUSE_GRACE_MS - 1_000) } });
     const replay = await refresh(post("/api/mobile/v1/auth/refresh", { refreshToken: first.refreshToken }), none);
     expect(replay.status).toBe(401);
     await expect(replay.json()).resolves.toMatchObject({ ok: false, error: { code: "UNAUTHENTICATED" } });
@@ -217,5 +226,91 @@ describe.sequential("mobile API integration", () => {
     expect((await cancelMine(post("/x", {}, attendee.accessToken), params({ rsvpId: mine.id }))).status).toBe(200);
     await expect(prisma.rSVP.findUnique({ where: { id: mine.id } })).resolves.toBeNull();
     expect((await cancelMine(post("/x", {}, other.accessToken), params({ rsvpId: theirs.id }))).status).toBe(200);
+  });
+  it("treats a quick retry of the previous refresh token as a lost response, not theft", async () => {
+    const first = await signIn("attendee", "Flaky Wi-Fi");
+    const rotated = await refresh(post("/api/mobile/v1/auth/refresh", { refreshToken: first.refreshToken }), none);
+    const second = (await rotated.json()).data as { accessToken: string; refreshToken: string };
+    const retry = await refresh(post("/api/mobile/v1/auth/refresh", { refreshToken: first.refreshToken }), none);
+    expect(retry.status).toBe(401);
+    expect((await me(get("/api/mobile/v1/me", second.accessToken), none)).status).toBe(200);
+
+    // After the grace window the same replay revokes the session.
+    const session = await prisma.mobileSession.findFirstOrThrow({ where: { deviceName: "Flaky Wi-Fi", userId: ids.attendee }, orderBy: { createdAt: "desc" } });
+    await prisma.mobileSession.update({ where: { id: session.id }, data: { rotatedAt: new Date(Date.now() - REFRESH_REUSE_GRACE_MS - 1_000) } });
+    expect((await refresh(post("/api/mobile/v1/auth/refresh", { refreshToken: first.refreshToken }), none)).status).toBe(401);
+    expect((await me(get("/api/mobile/v1/me", second.accessToken), none)).status).toBe(401);
+  });
+
+  it("closes sign-ups after the start without breaking the web cutoff rule", async () => {
+    const owner = await signIn("owner");
+    const started = await prisma.event.create({ data: {
+      organisationId: ids.orgA, title: "Started", slug: `started-${suffix}`,
+      startDateTime: new Date(Date.now() - 30 * 60_000), endDateTime: new Date(Date.now() + 2 * 60 * 60_000),
+      timezone: "UTC", status: EventStatus.PUBLISHED, location: "Main hall", registrationLeadMinutes: 15,
+      page: { create: { isPublished: true } },
+    } });
+    const closed = await registrationState(post("/x", { open: false }, owner.accessToken), params({ orgSlug: slugs.orgA, eventId: started.id }));
+    expect(closed.status).toBe(200);
+    await expect(closed.json()).resolves.toMatchObject({ ok: true, data: { registrationOpen: false, registrationManuallyClosed: true, registrationClosesAt: started.startDateTime.toISOString() } });
+    const row = await prisma.event.findUniqueOrThrow({ where: { id: started.id } });
+    expect(row.registrationClosesAt).toEqual(started.startDateTime);
+    expect(row.registrationLeadMinutes).toBeNull();
+    expect(row.registrationLeadBeforeManualClose).toBe(15);
+    // What the dashboard form would submit for this event passes the cutoff rule.
+    const issues = updateEventSchema.safeParse({
+      organisationSlug: slugs.orgA, eventId: started.id, title: row.title, startDateTime: row.startDateTime, endDateTime: row.endDateTime,
+      timezone: row.timezone, location: row.location, status: row.status, privacyType: row.privacyType, registrationClosesAt: row.registrationClosesAt?.toISOString(),
+    }).error?.issues ?? [];
+    expect(issues.filter((issue) => issue.path[0] === "registrationClosesAt")).toEqual([]);
+  });
+
+  it("reopens only after a manual close, restoring the organiser's lead time; a web save clears the snapshot", async () => {
+    const owner = await signIn("owner");
+    const upcoming = await prisma.event.create({ data: {
+      organisationId: ids.orgA, title: "Upcoming", slug: `upcoming-${suffix}`,
+      startDateTime: new Date(Date.now() + 5 * 24 * 60 * 60_000), endDateTime: new Date(Date.now() + 5 * 24 * 60 * 60_000 + 7_200_000),
+      timezone: "UTC", status: EventStatus.PUBLISHED, location: "Main hall", registrationLeadMinutes: 60,
+      page: { create: { isPublished: true } },
+    } });
+    const target = params({ orgSlug: slugs.orgA, eventId: upcoming.id });
+
+    const premature = await registrationState(post("/x", { open: true }, owner.accessToken), target);
+    expect(premature.status).toBe(409);
+    await expect(premature.json()).resolves.toMatchObject({ ok: false, error: { code: "CONFLICT" } });
+
+    expect((await registrationState(post("/x", { open: false }, owner.accessToken), target)).status).toBe(200);
+    expect((await registrationState(post("/x", { open: false }, owner.accessToken), target)).status).toBe(200);
+    const reopened = await registrationState(post("/x", { open: true }, owner.accessToken), target);
+    await expect(reopened.json()).resolves.toMatchObject({ ok: true, data: { registrationOpen: true, registrationManuallyClosed: false, registrationClosedReason: null } });
+    await expect(prisma.event.findUniqueOrThrow({ where: { id: upcoming.id } })).resolves.toMatchObject({
+      registrationLeadMinutes: 60, registrationClosesAt: null, registrationManuallyClosedAt: null, registrationLeadBeforeManualClose: null,
+    });
+
+    // Close again, then save the dashboard form: its explicit cutoff wins and there is nothing to reopen.
+    expect((await registrationState(post("/x", { open: false }, owner.accessToken), target)).status).toBe(200);
+    authMock.mockResolvedValueOnce({ user: { id: ids.owner } });
+    const saved = await updateEvent({
+      organisationSlug: slugs.orgA, eventId: upcoming.id, title: "Upcoming", startDateTime: upcoming.startDateTime.toISOString(),
+      endDateTime: upcoming.endDateTime.toISOString(), timezone: "UTC", location: "Main hall", status: "PUBLISHED", privacyType: "PUBLIC",
+      registrationLeadMinutes: 30,
+    });
+    expect(saved).toEqual({ ok: true });
+    await expect(prisma.event.findUniqueOrThrow({ where: { id: upcoming.id } })).resolves.toMatchObject({
+      registrationLeadMinutes: 30, registrationClosesAt: null, registrationManuallyClosedAt: null, registrationLeadBeforeManualClose: null, registrationCutoffBeforeManualClose: null,
+    });
+    expect((await registrationState(post("/x", { open: true }, owner.accessToken), target)).status).toBe(409);
+  });
+
+  it("restores a deleted guest only through the event it was deleted from", async () => {
+    const owner = await signIn("owner");
+    const otherEvent = await createEvent(ids.orgA, `other-${suffix}`);
+    const guest = await prisma.rSVP.create({ data: { eventId: ids.eventA, attendeeKey: `guest:${email("undo")}`, guestEmail: email("undo"), guestName: "Undo", status: RsvpStatus.WAITLISTED } });
+    const deleted = await deleteGuest(new Request("https://yuyu.test/x", { method: "DELETE", headers: { authorization: `Bearer ${owner.accessToken}` } }), params({ orgSlug: slugs.orgA, eventId: ids.eventA, rsvpId: guest.id }));
+    const { undoId } = (await deleted.json()).data as { undoId: string };
+    expect((await restoreGuest(post("/x", { undoId }, owner.accessToken), params({ orgSlug: slugs.orgA, eventId: otherEvent }))).status).toBe(404);
+    await expect(prisma.rSVP.findUnique({ where: { id: guest.id } })).resolves.toBeNull();
+    expect((await restoreGuest(post("/x", { undoId }, owner.accessToken), params({ orgSlug: slugs.orgA, eventId: ids.eventA }))).status).toBe(200);
+    await expect(prisma.rSVP.count({ where: { eventId: ids.eventA, guestEmail: email("undo") } })).resolves.toBe(1);
   });
 });
