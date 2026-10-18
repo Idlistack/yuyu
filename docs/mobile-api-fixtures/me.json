@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "data": {
+    "user": {
+      "id": "cluser0000000000000000001",
+      "name": "Ada Organiser",
+      "email": "ada@example.test",
+      "imageUrl": null,
+      "emailVerified": true,
+      "mfaEnabled": true
+    },
+    "organisations": [
+      { "id": "clorg00000000000000000001", "slug": "civic-tech", "name": "Civic Tech Meetup", "logoUrl": "https://yuyu.example/api/uploads/organisations/clorg00000000000000000001/logos/logo.webp", "role": "OWNER" }
+    ],
+    "collaborations": [
+      { "organisation": { "slug": "design-club", "name": "Design Club" }, "eventId": "clevent000000000000000002", "eventTitle": "Design Jam", "permissions": ["CHECK_IN"] }
+    ]
+  }
+}
