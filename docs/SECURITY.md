@@ -18,6 +18,15 @@ This page documents implemented controls and security boundaries. It is not a su
 - Super-admins with a fresh TOTP proof can disable new password and Google account creation; existing users can continue to sign in.
 - External applications use high-entropy, tenant-bound API credentials under `/api/v1`; raw secrets are displayed once and only SHA-256 digests are stored.
 
+## Mobile sessions
+
+- The Yuyu mobile apps (Android and iOS) authenticate as ordinary users under `/api/mobile/v1`; they are never machine clients and never receive organisation-wide credentials.
+- Password sign-in uses the web verifier (`lib/credentialsAuth.ts`): the same per-account and per-IP limits, equal-work bcrypt, inbox-verification gate, and MFA/recovery-code consumption. Google sign-in verifies the ID token's signature against Google's JWKS, issuer, expiry, audience (web client id or `GOOGLE_MOBILE_CLIENT_IDS`) and `email_verified`, then applies the web linking and account-creation policy (`lib/googleSignIn.ts`).
+- Access tokens (15 minutes) and refresh tokens (60 days) are 32 random bytes; only SHA-256 digests are stored in `MobileSession`. Refresh tokens rotate on every use, and replaying a rotated refresh token revokes the session. All authentication failures return one generic 401.
+- Every session records the user's `sessionVersion` and is rejected once it changes, so password change/reset, MFA enable/disable and "sign out everywhere" revoke mobile sessions together with web sessions; those transactions also mark the rows revoked.
+- Mobile routes resolve the organisation and event server-side, return `NOT_FOUND` for events outside the caller's dashboard access (including other organisations'), and call the same `lib/core/*` functions as the Server Actions for every mutation, so role checks, capacity transactions, rate limits and audit are shared. Responses are strict DTOs: no credential hashes, MFA material, or other people's ticket tokens; ticket tokens go only to their owner and, in the offline roster, to `CHECK_IN` holders.
+- Sign-in, sign-out and refresh-token reuse are audited without token values. Mobile API traffic has a per-user limit in addition to the proxy IP ceiling.
+
 ## Authorization and tenancy
 
 - Organisation membership is the tenant boundary.
