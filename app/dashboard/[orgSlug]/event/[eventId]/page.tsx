@@ -143,6 +143,13 @@ export default async function EventManagePage({ params }: Props) {
     }),
   ]) : [[], []];
 
+  const broadcastRecords = canManageRegistrations ? await prisma.eventBroadcast.findMany({
+    where: { eventId: event.id },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: { id: true, subject: true, body: true, statuses: true, attendance: true, recipientCount: true, createdAt: true, createdBy: { select: { name: true } } },
+  }) : [];
+
   const form = await prisma.eventRegistrationForm.findUnique({
     where: { eventId: event.id },
     include: { fields: { orderBy: { sortOrder: "asc" } } },
@@ -269,6 +276,16 @@ website={{ page: event.page, highlights: event.highlights.map((x) => ({ id: x.id
         canCheckIn={canCheckIn}
         canEditDetails={isAdmin}
         canManageSchedule={hasPermission(EventPermission.PUBLISH_AND_SCHEDULE)}
+        broadcasts={broadcastRecords.map((row) => ({
+          id: row.id,
+          subject: row.subject,
+          body: row.body,
+          statuses: row.statuses,
+          attendance: row.attendance,
+          recipientCount: row.recipientCount,
+          createdAt: row.createdAt.toISOString(),
+          createdByName: row.createdBy?.name ?? null,
+        }))}
         collaborators={collaborators.map((collaborator) => ({ id: collaborator.id, name: collaborator.user.name, email: collaborator.user.email, permissions: collaborator.permissions }))}
         pendingCollaboratorInvites={pendingCollaboratorInvites.map((invite) => ({ id: invite.id, email: invite.email, expiresAt: invite.expiresAt.toISOString() }))}
         analytics={{

@@ -70,7 +70,8 @@ describe("real Nodemailer composition and access restrictions", () => {
   it.each(["attachment", "raw"] as const)("rejects URL-backed %s content without making a request", async kind => {
     const before = requests;
     const content = kind === "raw" ? { raw: { href: url } } : { attachments: [{ href: url }] };
-    await expect(transporter.sendMail({ ...envelope, text: "Safe text", ...content, disableUrlAccess: false }))
+    // Deliberately malformed `raw` input: the type cast keeps the runtime rejection under test.
+    await expect(transporter.sendMail({ ...envelope, text: "Safe text", ...content, disableUrlAccess: false } as unknown as Parameters<typeof transporter.sendMail>[0]))
       .rejects.toThrow(/Url access rejected/);
     expect(requests).toBe(before);
   });

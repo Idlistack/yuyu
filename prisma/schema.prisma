@@ -93,6 +93,12 @@ enum ApiClientStatus {
   DISABLED
 }
 
+enum BroadcastAttendanceFilter {
+  ANY
+  CHECKED_IN
+  NOT_CHECKED_IN
+}
+
 model User {
   id                 String    @id @default(cuid())
   name               String?
@@ -122,6 +128,7 @@ model User {
   rsvpDeletionUndos RsvpDeletionUndo[]
   eventCollaborations EventCollaborator[]
   eventCollaboratorInvitesUsed EventCollaboratorInvite[] @relation("EventCollaboratorInviteUsedBy")
+  eventBroadcasts   EventBroadcast[]
 }
 
 model Account {
@@ -303,11 +310,34 @@ model Event {
   venue            EventVenue?
   faqs             EventFaq[]
   resources        EventResource[]
+  broadcasts       EventBroadcast[]
 
   @@unique([organisationId, slug])
   @@index([organisationId])
   @@index([organisationId, status])
   @@index([organisationId, status, privacyType])
+}
+
+/// An organiser email sent to a selected set of existing registrations.
+/// The row is the editable template history; delivery happens one outbox
+/// message per recipient so retries never resend the whole audience.
+model EventBroadcast {
+  id              String                    @id @default(cuid())
+  eventId         String
+  createdByUserId String?
+  /// Registration statuses included in the audience (at least one).
+  statuses        RsvpStatus[]
+  attendance      BroadcastAttendanceFilter @default(ANY)
+  subject         String
+  /// Sanitised HTML template with {{placeholders}}; rendered per recipient.
+  body            String
+  recipientCount  Int                       @default(0)
+  createdAt       DateTime                  @default(now())
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User? @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
 }
 
 model EventInvite {

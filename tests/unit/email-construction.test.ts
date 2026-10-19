@@ -8,7 +8,7 @@ vi.mock("@/lib/email/transporter", () => ({
   }),
 }));
 
-import { sendCollaboratorInvitation, sendReminder, sendRSVPConfirmation } from "@/lib/email";
+import { sendCollaboratorInvitation, sendEventBroadcast, sendReminder, sendRSVPConfirmation } from "@/lib/email";
 import { RsvpStatus } from "@prisma/client";
 
 describe("email construction", () => {
@@ -70,5 +70,31 @@ describe("email construction", () => {
     expect(message.html).toContain("calendar.google.com/calendar/render?action=TEMPLATE");
     expect(message.text).toContain("Starts: Tue, Jan 1, 2030, 3:30 PM GMT+5:30");
     expect(message.text).toContain("Add to Google Calendar: https://calendar.google.com/calendar/render?action=TEMPLATE");
+  });
+});
+
+describe("event broadcast email", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("inlines email styles, renders buttons, and escapes surrounding text", async () => {
+    await sendEventBroadcast({
+      to: "person@example.test",
+      subject: "Doors\r\nBcc: victim@example.test",
+      bodyHtml: '<p>Hello <strong>Priya</strong>,</p><p></p><p><a class="cta" href="https://events.test/ticket/abc?x=1&amp;y=2">View ticket</a></p><ul><li>Bring ID</li></ul>',
+      bodyText: "Hello Priya,\n\nView ticket (https://events.test/ticket/abc?x=1&y=2)\n\n• Bring ID",
+      eventTitle: "Mixer <script>",
+      organisationName: "Org & Co",
+      messageId: "<stable@outbox.invalid>",
+    });
+    const message = mocks.sendMail.mock.calls[0]?.[0];
+    expect(message.subject).not.toMatch(/[\r\n]/);
+    expect(message.html).toContain('<a href="https://events.test/ticket/abc?x=1&amp;y=2" style="display: inline-block; background-color: #6750A4;');
+    expect(message.html).toContain('<p style="margin: 0 0 16px; font-size: 16px; line-height: 1.6; color: #1c1b1f;"><br></p>');
+    expect(message.html).toContain('<li style="');
+    expect(message.html).toContain("Org &amp; Co");
+    expect(message.html).toContain("Mixer &lt;script&gt;");
+    expect(message.html).not.toContain("<script>");
+    expect(message.text).toContain("View ticket (https://events.test/ticket/abc?x=1&y=2)");
+    expect(message.text).toContain('registered for "Mixer <script>" with Org & Co');
   });
 });

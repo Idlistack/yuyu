@@ -12,18 +12,22 @@ const mocks = vi.hoisted(() => ({
   passwordReset: vi.fn(),
   verification: vi.fn(),
   rsvpFind: vi.fn(),
+  broadcast: vi.fn(),
+  broadcastFind: vi.fn(),
+  eventFind: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ prisma: { outboxMessage: {
   updateMany: mocks.updateMany,
   findMany: mocks.findMany,
   deleteMany: mocks.deleteMany,
-}, rSVP: { findUnique: mocks.rsvpFind } } }));
+}, rSVP: { findUnique: mocks.rsvpFind }, eventBroadcast: { findUnique: mocks.broadcastFind }, event: { findUnique: mocks.eventFind } } }));
 vi.mock("@/lib/email", () => ({
   sendRSVPConfirmation: mocks.rsvp,
   sendApprovalNotification: mocks.approval,
   sendEventInvitation: mocks.eventInvite,
   sendCollaboratorInvitation: mocks.collaborator,
+  sendEventBroadcast: mocks.broadcast,
 }));
 vi.mock("@/lib/email/passwordReset", () => ({ sendPasswordResetEmail: mocks.passwordReset }));
 vi.mock("@/lib/email/emailVerification", () => ({ sendEmailVerificationEmail: mocks.verification }));
@@ -159,5 +163,99 @@ describe("outbox delivery", () => {
       where: expect.objectContaining({ id: "msg_1", status: OutboxStatus.PROCESSING }),
       data: expect.objectContaining({ status: OutboxStatus.FAILED, lockedAt: null, lastError: "PermanentOutboxError" }),
     });
+  });
+});
+
+describe("event broadcast delivery", () => {
+  const broadcastEvent = {
+    title: "Mixer",
+    slug: "mixer",
+    startDateTime: new Date("2030-03-07T12:30:00.000Z"),
+    timezone: "Asia/Kolkata",
+    location: "Hall A",
+    isOnline: false,
+    organisation: { name: "Org", slug: "org" },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+    mocks.deleteMany.mockResolvedValue({ count: 1 });
+    mocks.broadcastFind.mockResolvedValue({
+      subject: "Update for {{name}}",
+      body: "Hi {{name}}, {{event}} starts {{eventDate}} at {{location}}. Ticket: {{ticketLink}}",
+      statuses: [RsvpStatus.CONFIRMED],
+      attendance: "ANY",
+      eventId: "event_1",
+      event: broadcastEvent,
+    });
+    mocks.rsvpFind.mockResolvedValue({ eventId: "event_1", status: RsvpStatus.CONFIRMED, checkedInAt: null, checkInToken: "ticket-secret", guestName: "Priya", user: null });
+  });
+
+  it("renders the template per recipient at send time and keeps a sent row without capabilities", async () => {
+    mocks.findMany.mockResolvedValue([message({ kind: "event-broadcast", payload: { to: "priya@example.test", broadcastId: "broadcast_1", rsvpId: "rsvp_1" } })]);
+
+    await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 1, failed: 0 });
+    const sent = mocks.broadcast.mock.calls[0]?.[0];
+    expect(sent.to).toBe("priya@example.test");
+    expect(sent.subject).toBe("Update for Priya");
+    expect(sent.bodyText).toContain("Hi Priya, Mixer starts");
+    expect(sent.bodyText).toContain("at Hall A. Ticket: ");
+    expect(sent.bodyText).toContain("/ticket/ticket-secret");
+    expect(sent.bodyHtml).toContain("Hi Priya, Mixer starts");
+    expect(sent.messageId).toBe("<yuyu-msg_1@outbox.invalid>");
+    expect(mocks.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: OutboxStatus.SENT }) }));
+    expect(mocks.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("does not expose a ticket link to registrations that are not confirmed", async () => {
+    mocks.broadcastFind.mockResolvedValue({
+      subject: "Waitlist update",
+      body: "Details: {{ticketLink}}",
+      statuses: [RsvpStatus.WAITLISTED],
+      attendance: "ANY",
+      eventId: "event_1",
+      event: broadcastEvent,
+    });
+    mocks.rsvpFind.mockResolvedValue({ eventId: "event_1", status: RsvpStatus.WAITLISTED, checkedInAt: null, checkInToken: "ticket-secret", guestName: null, user: { name: "Asha" } });
+    mocks.findMany.mockResolvedValue([message({ kind: "event-broadcast", payload: { to: "asha@example.test", broadcastId: "broadcast_1", rsvpId: "rsvp_1" } })]);
+
+    await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 1, failed: 0 });
+    const sent = mocks.broadcast.mock.calls[0]?.[0];
+    expect(sent.bodyText).not.toContain("ticket-secret");
+    expect(sent.bodyText).toContain("/org/mixer");
+  });
+
+  it("drops a recipient whose registration left the audience after queuing", async () => {
+    mocks.rsvpFind.mockResolvedValue({ eventId: "event_1", status: RsvpStatus.REJECTED, checkedInAt: null, checkInToken: "ticket-secret", guestName: "Priya", user: null });
+    mocks.findMany.mockResolvedValue([message({ kind: "event-broadcast", payload: { to: "priya@example.test", broadcastId: "broadcast_1", rsvpId: "rsvp_1" } })]);
+
+    await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 0, failed: 0 });
+    expect(mocks.broadcast).not.toHaveBeenCalled();
+    expect(mocks.deleteMany).toHaveBeenCalledWith({ where: expect.objectContaining({ id: "msg_1", status: OutboxStatus.PROCESSING }) });
+  });
+
+  it("drops a recipient whose registration belongs to a different event than the broadcast", async () => {
+    mocks.rsvpFind.mockResolvedValue({ eventId: "event_other", status: RsvpStatus.CONFIRMED, checkedInAt: null, checkInToken: "ticket-secret", guestName: "Priya", user: null });
+    mocks.findMany.mockResolvedValue([message({ kind: "event-broadcast", payload: { to: "priya@example.test", broadcastId: "broadcast_1", rsvpId: "rsvp_1" } })]);
+
+    await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 0, failed: 0 });
+    expect(mocks.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("marks a malformed broadcast payload as a permanent failure", async () => {
+    mocks.findMany.mockResolvedValue([message({ kind: "event-broadcast", payload: { to: "not-an-email", broadcastId: "b", rsvpId: "r" } })]);
+    await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 0, failed: 1 });
+    expect(mocks.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: OutboxStatus.FAILED }) }));
+  });
+
+  it("renders test sends with sample values and a visible test prefix", async () => {
+    mocks.eventFind.mockResolvedValue(broadcastEvent);
+    mocks.findMany.mockResolvedValue([message({ kind: "event-broadcast-test", payload: { to: "admin@example.test", eventId: "event_1", subject: "Hello {{name}}", body: "{{event}} / {{ticketLink}}", recipientName: "Admin" } })]);
+
+    await expect(deliverOutboxBatch()).resolves.toEqual({ sent: 1, failed: 0 });
+    const sent = mocks.broadcast.mock.calls[0]?.[0];
+    expect(sent.subject).toBe("[Test] Hello Admin");
+    expect(sent.bodyText).toBe("Mixer / http://localhost:3000/org/mixer");
   });
 });

@@ -47,4 +47,14 @@ describe("production migration safety contracts", () => {
     expect(repairSent).toBeGreaterThan(clearLocks);
     expect(constraint).toBeGreaterThan(repairSent);
   });
+
+  it("adds event broadcasts without touching existing tables, types, or indexes", () => {
+    const sql = readFileSync(resolve(root, "prisma/migrations/20261013000000_event_broadcasts/migration.sql"), "utf8");
+    expect(sql).not.toMatch(/\bDROP\b/i);
+    expect(sql).not.toMatch(/ALTER TABLE "(?!EventBroadcast")/);
+    expect(sql).toContain('CREATE TABLE "EventBroadcast"');
+    expect(sql).toContain('"EventBroadcast_statuses_nonempty" CHECK (cardinality("statuses") > 0)');
+    expect(sql).toContain('REFERENCES "Event"("id") ON DELETE CASCADE');
+    expect(sql).toContain('REFERENCES "User"("id") ON DELETE SET NULL');
+  });
 });
