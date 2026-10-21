@@ -9,6 +9,7 @@ import { isBroadcastDesign } from "@/lib/email/broadcastDesigns";
 import { sendPasswordResetEmail } from "@/lib/email/passwordReset";
 import { sendEmailVerificationEmail } from "@/lib/email/emailVerification";
 import { describeOperationalError } from "@/lib/redactSensitiveText";
+import { reportOpsAlert } from "@/lib/opsAlerts";
 
 type OutboxClient = Prisma.TransactionClient | typeof prisma;
 
@@ -526,6 +527,13 @@ export async function deliverOutboxBatch(limit = 20) {
           },
         });
       }
+      reportOpsAlert({
+        level: terminal ? "error" : "warning",
+        source: "email",
+        title: terminal ? "Email delivery failed permanently" : "Email delivery failed; will retry",
+        error,
+        context: { kind: message.kind, attempt: attempts },
+      });
       failed += 1;
     }
   }

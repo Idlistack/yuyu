@@ -49,7 +49,7 @@ Dashboard pages require authentication and enforce membership/role permissions o
 
 ## Super-admin pages
 
-The `/super-admin` area includes overview, activity, audit log, auth, email, events, invites, monitoring, operations, organisations (with a detail page per organisation), security, settings, storage, and users (with a detail page per user at `/super-admin/users/:userId`). The Auth page includes the instance-wide new-account creation control. `/super-admin/settings` manages SMTP, Google SSO, and displayed backup posture; secrets entered there are write-only. Access requires the authenticated email configured in `SUPER_ADMIN_EMAIL`; other users receive a not-found response.
+The `/super-admin` area includes overview, activity, audit log, auth, email, events, invites, monitoring, operations, organisations (with a detail page per organisation), security, settings, storage, and users (with a detail page per user at `/super-admin/users/:userId`). The Auth page includes the instance-wide new-account creation control. `/super-admin/settings` manages SMTP, Google SSO, displayed backup posture, and the operational alerts webhook; secrets (including the webhook URL) entered there are write-only. Access requires the authenticated email configured in `SUPER_ADMIN_EMAIL`; other users receive a not-found response.
 
 Every super-admin page additionally requires a current TOTP verification, and each `page.tsx` calls `requireSuperAdminMfa()` itself because layout checks do not re-run on client navigation (`tests/unit/super-admin-page-guards.test.ts` enforces this). Users without a valid 10-minute step-up proof are sent to `/super-admin-mfa`; authenticator MFA must be enrolled first from `/account/security`.
 
@@ -61,6 +61,7 @@ Every super-admin page additionally requires a current TOTP verification, and ea
 | `POST /api/feedback` | Public, rate-limited | Submit feedback; email is used only for certificate-enabled forms |
 | `POST /api/check-in/station` | PIN-scoped station session, rate-limited | Open and operate a venue check-in station |
 | `GET /api/search?q=...` | Public, rate-limited | Return matching public events |
+| `POST /api/client-errors` | Public, same-origin, rate-limited per IP (`clientError`, 10/min), 4 KB body cap | Browser crash report from the app error boundaries; forwarded (redacted) to the alert webhook when configured. Always an empty `204` |
 | `GET /api/ticket/:token/download` | Opaque token | Download the attendee ticket |
 | `GET /api/ticket/:token/status` | Opaque token, rate-limited per IP (`ticketStatus`, 120/min) | Return only `{ checkedIn, checkedInAt }` for the ticket (`no-store`, `no-referrer`; empty 404 for unknown tokens) |
 | `GET /api/ticket/:token/events` | Opaque token, rate-limited per IP (`ticketEvents`, 60/min) | Server-Sent Events: initial `state`, then one `checked-in` event when the attendee is admitted; `: ping` every 25 s, closes after at most 10 minutes |
