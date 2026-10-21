@@ -7,6 +7,7 @@ import {
   recordOutboxSchedulerSuccess,
 } from "@/lib/operationalHeartbeat";
 import { purgeExpiredOperationalData } from "@/lib/retention";
+import { logOpsError } from "@/lib/opsAlerts";
 
 const OUTBOX_WORKER_INTERVAL_MS = 60_000;
 
@@ -52,9 +53,9 @@ export function startOutboxWorker() {
     state.running = true;
     try {
       await runOutboxScheduler();
-    } catch {
+    } catch (error) {
       // Failure metadata is persisted separately without exception text.
-      console.error("[outbox worker] scheduler run failed");
+      logOpsError("[outbox worker] scheduler run failed", { level: "error", source: "outbox worker", title: "Scheduler run failed", error });
     } finally {
       state.running = false;
     }

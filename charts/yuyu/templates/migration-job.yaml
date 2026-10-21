@@ -32,7 +32,13 @@ spec:
         - name: migrate
           image: "{{ .Values.migration.image.repository }}:{{ default .Chart.AppVersion .Values.migration.image.tag }}"
           imagePullPolicy: {{ .Values.migration.image.pullPolicy }}
+          {{- if .Values.migration.checkInstanceSecrets }}
+          # Fail the release (before any pod rolls) when MFA_ENCRYPTION_KEY in
+          # the runtime Secret cannot decrypt the Super admin -> Settings secrets.
+          command: ["sh", "-c", "npx prisma migrate deploy && node scripts/check-instance-secrets.mjs"]
+          {{- else }}
           command: ["npx", "prisma", "migrate", "deploy"]
+          {{- end }}
           envFrom:
             - secretRef:
                 name: {{ required "existingSecret is required" .Values.existingSecret }}

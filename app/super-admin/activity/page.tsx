@@ -45,7 +45,7 @@ export default async function SuperAdminActivityPage() {
       where: { status: EventStatus.PUBLISHED, startDateTime: { gte: now, lt: nextWeek } },
       orderBy: { startDateTime: "asc" },
       take: 15,
-      select: { id: true, title: true, startDateTime: true, capacity: true, organisation: { select: { id: true, name: true } }, _count: { select: { rsvps: true } } },
+      select: { id: true, title: true, startDateTime: true, capacity: true, organisation: { select: { id: true, name: true } }, _count: { select: { rsvps: { where: { status: RsvpStatus.CONFIRMED } } } } },
     }),
     prisma.organisation.count({ where: { events: { none: {} }, eventSeries: { none: {} } } }),
     prisma.organisation.findMany({
@@ -143,7 +143,7 @@ export default async function SuperAdminActivityPage() {
                 <tr>
                   <TH>Event</TH>
                   <TH>Starts</TH>
-                  <TH className="text-right">Registrations</TH>
+                  <TH className="text-right">Confirmed</TH>
                 </tr>
               </THead>
               <TBody>

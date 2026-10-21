@@ -106,7 +106,6 @@ export default async function SuperAdminOrgDetailPage({ params }: Props) {
       take: 100,
       select: {
         id: true,
-        token: true,
         role: true,
         createdAt: true,
         expiresAt: true,

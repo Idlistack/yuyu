@@ -1,14 +1,42 @@
 import "server-only";
 
+import { cache } from "react";
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 import { prisma } from "@/lib/db";
 import { getGoogleSsoSettings, isNewUserRegistrationEnabled } from "@/lib/instanceSettings";
+import { logOpsError } from "@/lib/opsAlerts";
 
 /*
  * Google sign-in policy shared by the web Auth.js callback and the mobile
  * ID-token exchange: verified email only, never link to an unverified
  * password account, and create new accounts only while the instance allows it.
  */
+
+/**
+ * Google SSO settings for this request. They are read from the database on
+ * every request (never memoised across requests), so a change saved in
+ * Super admin -> Settings applies on every replica without a restart; React's
+ * `cache` only shares one read between the `auth()` calls of a single render.
+ *
+ * An unreadable configuration (for example a secret encrypted under another
+ * `MFA_ENCRYPTION_KEY`) disables Google sign-in instead of failing every
+ * request: Auth.js evaluates this for each `auth()` call, including the
+ * session check in the root layout, so a throw here would take the whole
+ * site down.
+ */
+export const loadGoogleSsoSettings = cache(async () => {
+  try {
+    return await getGoogleSsoSettings();
+  } catch (error) {
+    logOpsError("[auth] Google sign-in settings could not be loaded; Google sign-in is unavailable", {
+      level: "error",
+      source: "auth",
+      title: "Google sign-in settings could not be loaded",
+      error,
+    });
+    return null;
+  }
+});
 
 export type GoogleSignInDecision = "allow" | "deny" | "account_creation_disabled";
 
@@ -67,7 +95,7 @@ export function mobileGoogleClientIds(raw = process.env.GOOGLE_MOBILE_CLIENT_IDS
 export type MobileGoogleConfig = { webClientId: string; mobileClientIds: string[] };
 
 export async function getMobileGoogleConfig(): Promise<MobileGoogleConfig | null> {
-  const settings = await getGoogleSsoSettings();
+  const settings = await loadGoogleSsoSettings();
   if (!settings) return null;
   return { webClientId: settings.clientId, mobileClientIds: mobileGoogleClientIds() };
 }

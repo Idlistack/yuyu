@@ -25,7 +25,8 @@ export type Bucket =
   | "ticketEvents"
   | "shortLink"
   | "mobileAuth"
-  | "mobileApi";
+  | "mobileApi"
+  | "clientError";
 
 const limits: Record<Bucket, { max: number; windowMs: number }> = {
   global: { max: 300, windowMs: 60_000 },
@@ -59,6 +60,8 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   mobileAuth: { max: 30, windowMs: 60_000 },
   // Authenticated mobile API requests per user, on top of the proxy IP limit.
   mobileApi: { max: 300, windowMs: 60_000 },
+  // Browser crash reports forwarded to the operator alert webhook.
+  clientError: { max: 10, windowMs: 60_000 },
 };
 
 // Local fallback store

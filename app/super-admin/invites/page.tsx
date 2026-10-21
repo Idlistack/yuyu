@@ -13,7 +13,6 @@ export default async function SuperAdminInvitesPage() {
       take: 200,
       select: {
         id: true,
-        token: true,
         role: true,
         createdAt: true,
         expiresAt: true,
