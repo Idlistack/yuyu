@@ -11,13 +11,14 @@ the open at [github.com/twilighty-abhi/yuyu](https://github.com/twilighty-abhi/y
 - **Suggest an idea.** Start a thread in
   [Discussions](https://github.com/twilighty-abhi/yuyu/discussions). Describe the
   problem your community has before the solution you have in mind.
-- **Send a pull request.** For anything larger than a small fix, open an issue or
-  discussion first so we can agree on the approach.
+- **Pull requests.** Yuyu does not accept outside contributions for now; code
+  changes come from the core team. The rest of this guide describes how the team
+  works.
 
 ## Security issues
 
-Please **don't** report vulnerabilities in a public issue. Contact the maintainer
-privately through GitHub (the repository owner's profile) and allow time for a fix
+Please **don't** report vulnerabilities in a public issue. Report them in the
+team's private Mattermost channel for security issues and allow time for a fix
 before disclosing. The security model is described in
 [docs/SECURITY.md](docs/SECURITY.md).
 

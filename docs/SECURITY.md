@@ -126,4 +126,4 @@ Store secrets in a deployment secrets manager. Use a least-privileged database r
 
 ## Reporting a vulnerability
 
-The repository does not yet define a public security contact or `SECURITY.md` policy at its root. Add a monitored private reporting channel before public deployment or open-source distribution.
+Report vulnerabilities privately in the team's Mattermost channel for security issues, never in a public GitHub issue or discussion. Include the affected route or component, steps to reproduce and the impact, and allow time for a fix before disclosing. Never include real secrets, tokens or personal data in a report; rotate any credential that was exposed.
