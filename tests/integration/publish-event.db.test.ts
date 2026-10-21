@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { EventPrivacyType, EventStatus, MembershipRole } from "@prisma/client";
+import fs from "node:fs";
+import path from "node:path";
+import { EventPageSectionType, EventPrivacyType, EventStatus, MembershipRole } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const identity = vi.hoisted(() => ({ id: "" }));
@@ -9,6 +11,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { prisma } from "@/lib/db";
 import { publishEvent } from "@/app/actions/event";
+import { saveEventPage } from "@/app/actions/event-website";
 
 const suffix = randomUUID().replace(/-/g, "");
 let orgId: string;
@@ -78,5 +81,57 @@ describe("publishEvent", () => {
     identity.id = memberId;
     expect(await publishEvent({ organisationSlug: orgSlug, eventSlug: event.slug })).toMatchObject({ ok: false });
     expect(await stored(event.id)).toEqual({ status: EventStatus.DRAFT, page: { isPublished: false, tagline: "Kept" } });
+  });
+});
+
+async function makeEvent(status: EventStatus, page: boolean | null) {
+  const event = await makeDraft(page);
+  return prisma.event.update({ where: { id: event.id }, data: { status } });
+}
+
+const allSections = Object.values(EventPageSectionType).map((type, sortOrder) => ({ type, isVisible: true, sortOrder }));
+
+describe("saveEventPage", () => {
+  it("creates the website released for a published event that had no page row", async () => {
+    const event = await makeEvent(EventStatus.PUBLISHED, null);
+    identity.id = ownerId;
+    expect(await saveEventPage({ organisationSlug: orgSlug, eventId: event.id, tagline: "New", aboutHtml: "", sections: allSections })).toEqual({ ok: true });
+    expect((await stored(event.id)).page).toEqual({ isPublished: true, tagline: "New" });
+  });
+
+  it("creates it unreleased for a draft, and never changes release on update", async () => {
+    const draft = await makeEvent(EventStatus.DRAFT, null);
+    identity.id = ownerId;
+    expect(await saveEventPage({ organisationSlug: orgSlug, eventId: draft.id, tagline: "Draft", aboutHtml: "", sections: allSections })).toEqual({ ok: true });
+    expect((await stored(draft.id)).page?.isPublished).toBe(false);
+    const live = await makeEvent(EventStatus.PUBLISHED, true);
+    expect(await saveEventPage({ organisationSlug: orgSlug, eventId: live.id, tagline: "Edited", aboutHtml: "", sections: allSections })).toEqual({ ok: true });
+    expect((await stored(live.id)).page).toEqual({ isPublished: true, tagline: "Edited" });
+  });
+});
+
+describe("migration 20261021010000_realign_event_publication", () => {
+  const sql = fs.readFileSync(path.join(process.cwd(), "prisma/migrations/20261021010000_realign_event_publication/migration.sql"), "utf8");
+  const statements = sql.split(/;\s*$/m).map((s) => s.replace(/^\s*--.*$/gm, "").trim()).filter(Boolean);
+  const run = async () => { for (const statement of statements) await prisma.$executeRawUnsafe(statement); };
+
+  it("releases published events stuck at 404, withdraws others, adds missing pages, and is idempotent", async () => {
+    const stuck = await makeEvent(EventStatus.PUBLISHED, false);
+    const pageless = await makeEvent(EventStatus.PUBLISHED, null);
+    const hidden = await makeEvent(EventStatus.HIDDEN, true);
+    const draft = await makeEvent(EventStatus.DRAFT, false);
+    const fine = await makeEvent(EventStatus.PUBLISHED, true);
+    const before = await prisma.eventPage.findUniqueOrThrow({ where: { eventId: fine.id } });
+
+    await run();
+    expect(await stored(stuck.id)).toEqual({ status: EventStatus.PUBLISHED, page: { isPublished: true, tagline: "Kept" } });
+    expect((await stored(pageless.id)).page).toEqual({ isPublished: true, tagline: "" });
+    expect((await stored(hidden.id)).page?.isPublished).toBe(false);
+    expect((await stored(draft.id)).page?.isPublished).toBe(false);
+    expect((await prisma.eventPage.findUniqueOrThrow({ where: { eventId: fine.id } })).updatedAt).toEqual(before.updatedAt);
+
+    const pagesBefore = await prisma.eventPage.count({ where: { event: { organisationId: orgId } } });
+    await run();
+    expect(await prisma.eventPage.count({ where: { event: { organisationId: orgId } } })).toBe(pagesBefore);
   });
 });
