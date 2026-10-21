@@ -36,6 +36,8 @@ This page documents implemented controls and security boundaries. It is not a su
 - Leaving an organisation from `/account/organisations` removes only the caller's own membership. It locks the organisation row and refuses to remove the last owner, and is audited as `ORGANISATION_MEMBER_LEFT`.
 - Database foreign keys and uniqueness constraints provide a second integrity layer.
 - Machine clients resolve their organisation from the authenticated credential and require an explicit endpoint scope. Caller-supplied organisation identifiers never select the tenant.
+- Event collaborators are scoped to one event and to the exact `EventPermission` grants they hold (`EDIT_DETAILS`, `MANAGE_REGISTRATIONS`, `MANAGE_INVITATIONS`, `CHECK_IN`, `PUBLISH_AND_SCHEDULE`); a grant never implies another. Publishing an event (`canPublishEvents`) and creating or regenerating short links require an organisation owner or admin.
+- Event publication is one server-owned switch: `Event.status = PUBLISHED` and the released page (`EventPage.isPublished`) are written together in one transaction on every publish path (`createEvent`, `updateEvent`, and `publishEvent` in `app/actions/event.ts`). Public pages, RSVP (`lib/rsvpCore.ts`), and short links (`lib/shortLinkResolve.ts`) require both, so no path can expose an unpublished event, and a Live event is never left 404.
 
 ## Input, output, and browser controls
 
@@ -50,7 +52,7 @@ This page documents implemented controls and security boundaries. It is not a su
 
 - Check-in and certificate tokens are high-entropy random values.
 - The public ticket status and live-event routes validate the token shape, return only `{ checkedIn, checkedInAt }` with `no-store` and `no-referrer`, and answer unknown tokens with an empty 404. Realtime check-in channels are keyed by RSVP id, so ticket tokens never pass through Redis.
-- Event short codes are random seven-character values containing at least one uppercase letter, so they cannot collide with a lowercase organisation slug. Only owners and admins can create or regenerate them (audited as `EVENT_SHORT_LINK_CREATED`/`EVENT_SHORT_LINK_REGENERATED`). Resolution redirects only published events with a released page, so a code never reveals a draft or hidden event's slug; unknown, unreleased, and rate-limited lookups return the same not-found response as an unknown organisation, and the destination page still applies its own privacy rules.
+- Event short codes are random seven-character values containing at least one uppercase letter, so they cannot collide with a lowercase organisation slug. Only owners and admins can create or regenerate them (audited as `EVENT_SHORT_LINK_CREATED`/`EVENT_SHORT_LINK_REGENERATED`). Resolution redirects only published events with a released page, so a code never reveals a draft or hidden event's slug; unknown, unreleased, and rate-limited lookups return the same not-found response as an unknown organisation, and the destination page still applies its own privacy rules. Because publishing releases the page in the same transaction, a Live event's code resolves immediately; events published with the Overview **Publish event** button before that fix are repaired by the `20261021010000_realign_event_publication` data migration.
 - Venue check-in stations require an event-scoped, bcrypt-protected rotating PIN. PIN management/recovery requires a fresh administrator sign-in and recoverable PIN ciphertext uses a domain-separated authenticated-encryption key. A station can open only from 24 hours before the event through one hour after it ends. Successful entry creates a signed, HttpOnly proof bound to that event, expiry, and PIN version; rotation and disablement invalidate existing proofs immediately. Station PINs, proofs, attendee exports, and offline rosters are never exposed through the public station.
 - Ticket, certificate, invitation, password-reset, and MFA enrollment values are secrets or bearer capabilities.
 - They must not appear in logs, audit metadata, monitoring tags, or analytics.
@@ -59,7 +61,7 @@ This page documents implemented controls and security boundaries. It is not a su
 ## Abuse protection
 
 - Password login applies account and IP limits inside the credential verifier, in addition to proxy limits. Missing and OAuth-only identities perform dummy bcrypt work; signup returns the same response for existing and newly created accounts. Auth.js errors are logged without exception payloads.
-- Redis-backed limits cover APIs, authentication mutations, RSVP, feedback, search/discovery, uploads, Server Actions, object creation, invitations, broadcasts, check-in, personal data exports (per user), public ticket status and event streams (per IP), and short-link lookups (per IP). Bucket sizes live in `lib/rateLimit.ts`.
+- Redis-backed limits cover APIs, authentication mutations, RSVP, feedback, search/discovery, uploads, Server Actions, object creation, invitations, broadcasts, check-in, personal data exports (per user), public ticket status and event streams (per IP), short-link lookups (per IP), mobile token refresh (`mobileAuth`, per IP) and mobile API traffic (`mobileApi`, per user), and browser crash reports (`clientError`, per IP). Bucket sizes live in `lib/rateLimit.ts`.
 - Machine API traffic has an additional per-client limit so credential rotation cannot multiply request capacity.
 - Security-sensitive production traffic fails closed when Redis is unavailable.
 - Process-local fallback exists for development and an explicit CI-only production-build test mode.
@@ -73,6 +75,7 @@ This page documents implemented controls and security boundaries. It is not a su
 - Registration counts are omitted from public payloads when the organiser disables count display.
 - The personal data export (`GET /api/exports/account`) resolves the user only from the session, returns allow-listed fields of the user's own profile, memberships, registrations, feedback, and co-organiser roles, excludes passwords, hashes, MFA material, and every bearer token, is sent `private, no-store`, and is audited as `ACCOUNT_DATA_EXPORTED`.
 - Operational alerts leave the instance, so `lib/opsAlerts.ts` redacts their text (URLs and connection strings, emails, bearer values, `token=`-style parameters, long opaque strings), reports route patterns instead of request paths, and keeps the fixed console log lines unchanged. Error detail goes only to the alert, never to stdout or audit metadata. Webhook URLs must be `https:` in production and may not embed user info. Any host is accepted, including internal addresses; this outbound request is deliberately limited to the MFA-gated super-admin, uses no redirects, and never returns the response body. `POST /api/client-errors` accepts only same-origin, size-capped, rate-limited reports and always answers an empty `204`.
+- Event-level downloads are owner/admin only (the attendee CSV also allows collaborators with `MANAGE_REGISTRATIONS`), answer every denial with the same empty 404, are sent `private, no-store`, and are audited: attendee CSV (`ATTENDEE_LIST_EXPORTED`), feedback CSV (`FEEDBACK_RESPONSES_EXPORTED`), and the post-event PDF reports (`EVENT_REPORT_DOWNLOADED`, `EVENT_OCCURRENCE_REPORT_DOWNLOADED`), which are available only after the event or occurrence ends and count typed answers, emails, and phone numbers rather than copying them.
 - Super-admin insight pages never load tokens, credential hashes, registration answers, or message bodies; lists are capped and queries are parameterised.
 - Broadcast designs escape organiser values and accept only absolute http(s) image and link URLs. The ticket venue link is shown only for an `http(s)` map URL (`lib/safeHttpUrl.ts` rejects `javascript:`, `data:`, and other schemes).
 - Audit metadata is designed to exclude email addresses, answers, passwords, and bearer tokens.
@@ -90,8 +93,10 @@ This page documents implemented controls and security boundaries. It is not a su
   failure. Queue/heartbeat failures persist only normalized error class/code,
   and retries use a stable non-sensitive Message-ID under lease-owned state
   transitions. Protected scheduler/readiness routes require one exact bearer.
-- Retention cleanup covers expired sessions, invitations, verification tokens,
-  undo snapshots, and old sent/failed non-capability outbox records. Deployment
+- Retention cleanup covers expired sessions, expired or long-revoked mobile
+  sessions, unused expired organisation and collaborator invitations,
+  verification tokens, undo snapshots, and old sent/failed non-capability
+  outbox records. Deployment
   operators must define broader legal retention and deletion procedures.
 
 ## Audit trail

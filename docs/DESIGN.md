@@ -402,10 +402,10 @@ Phone-first. Heading "You're in, {firstName}!" (display, 34px). Stub card `r-2xl
 | Attending | Event page, Programme, Session, Speaker, Series date (RSVP), Live schedule, Feedback & certificate, Ticket (with live tear-away), Station PIN, Station scanning |
 | Auth & account | Sign in / Create account, Set new password, Verify email, Join organisation, Co-organiser invite, Account: Profile, Registrations, Organisations, Security (§5.5) |
 | Workspace | Workspace home, Organisation events, Create organisation, Members, Organisation settings, API access |
-| Event management | Event overview (short link), Event page tab with Publishing, cover photo editor and colour picker, Registration form builder, Emails (designs, review, undo), Check-in desk, Badge quick print + badge designer, Feedback results, Certificate designer, Analytics, Programme editor, Series manage (§5.4) |
+| Event management | Create Event dialog (three steps: Basics, Schedule, Location & platform), Event overview (readiness checklist with Publish event, short link), Guests list, Event page tab with Publishing, cover photo editor and colour picker, Registration form builder, Emails (designs, review, undo), Check-in desk, Badge quick print + badge designer, Feedback results, Certificate designer, Analytics, Programme editor, Series manage (§5.4) |
 | Operators | Super-admin top bar and pages: Overview, Activity, Monitoring, Operations, Email, Audit log, Organisations, Events, Users (+ per-user support), Auth, Security, Settings, Invites, Storage |
 | Brand & system states | Dot sign kit, app icons, social card, email header, error / empty states, loading screens (`DotLoader`), 404 (ticket tear) |
-| Not yet designed — follow this system | Create event / series flow, Guests list, Page content editor, Feedback form builder, Invites |
+| Not yet designed — follow this system | Create series flow, Page content editor, Feedback form builder, Invites |
 
 ### 5.2 Event page layout
 
@@ -440,7 +440,10 @@ Built in `app/dashboard/page.tsx` from `lib/dashboardHome.ts`; every number come
 
 ### 5.4 Event dashboard tabs
 
-- **Overview:** adds a **Short link** control for owners/admins (Create → copy `/aB3x9Kq`; Regenerate confirms that the old link stops working).
+Eight tabs: Overview, Guests (People · Invites), Event page (Details · Page & programme · Registration form), Emails, Check-in, Feedback, Analytics, and Settings. Deep links use `?tab=` and `?sub=`.
+
+- **Overview:** a readiness checklist whose **Publish event** button sets the event Live and releases its public page in one step (`publishEvent`), so the page, sign-ups and short link work at once.
+- **Overview** also adds a **Short link** control for owners/admins (Create → copy `/aB3x9Kq`; Regenerate confirms that the old link stops working).
 - **Publishing** (`components/event/PublishingSection.tsx`, the "Publishing" card on the Event page tab): three plain questions instead of a grid of switches.
   1. *Who can see this event?* option cards Draft / Live / Offline.
   2. *Who can find it?* option cards Everyone / People with the link / Invited people only, then an "Approve each sign-up" switch row whose description explains the current effect. Shows "Takes effect when the event is live." while not live.

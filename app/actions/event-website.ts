@@ -4,6 +4,7 @@ import {
   ContentVisibility,
   EventPageSectionType,
   EventPermission,
+  EventStatus,
   SponsorTier,
 } from "@prisma/client";
 import { z } from "zod";
@@ -209,7 +210,8 @@ export async function saveEventPage(input: unknown): Promise<ActionResult> {
       where: { eventId: c.event.id },
       create: {
         eventId: c.event.id,
-        isPublished: false,
+        // Website release follows the event's published status.
+        isPublished: c.event.status === EventStatus.PUBLISHED,
         tagline: parsed.data.tagline,
         logoUrl: parsed.data.logoUrl || null,
         accentColor: parsed.data.accentColor || null,

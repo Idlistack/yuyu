@@ -18,19 +18,43 @@ Mobile API coverage includes token hashing, rotation and refresh-reuse revocatio
 
 Other security-relevant unit suites include `super-admin-page-guards` (fails if any `app/super-admin/**/page.tsx` omits `await requireSuperAdminMfa()`), the live-ticket suites (`ticket-check-in-events`, `ticket-check-in-publish`, `ticket-check-in-routes`, `ticket-check-in-watcher`, `use-ticket-check-in`), `account-data-export` and `account-organisations-actions`, `short-link-actions` and `short-link-resolve`, `broadcast-designs`, `event-publishing`, `safe-http-url`, and `image-validation`.
 
+Instance settings and operations are covered by `ops-alerts` (redaction, de-duplication, and rate caps), `instance-settings` (saved SMTP replaces the environment as a whole), `instance-config-secrets` (a named error for an unreadable secret after a key change), `auth-google-runtime` (Google SSO follows saved settings and fails safe), `instance-admin-actions` (fresh MFA gate, no plaintext secrets to Prisma, webhook settings), `super-admin-maintenance-actions` (failed-email requeue limited to the last 7 days, UI-safe errors, rate limits), and `production-check-script` (no SMTP or Google environment required, blank placeholders treated as unset).
+
 ### PostgreSQL integration tests
+
+Use a separate, disposable database, never the development database
+(`yuyu_dev`) and never production. The suites create and delete their own rows
+and assume nothing else is writing to the database. With the development
+Compose PostgreSQL:
 
 ```bash
 docker compose up -d
-TEST_DATABASE_URL="postgresql://yuyu:yuyu_dev@localhost:5432/yuyu_dev" npm run test:integration
+docker compose exec postgres createdb -U yuyu yuyu_test
+DATABASE_URL="postgresql://yuyu:yuyu_dev@localhost:5432/yuyu_test" npm run db:deploy
+TEST_DATABASE_URL="postgresql://yuyu:yuyu_dev@localhost:5432/yuyu_test" npm run test:integration
 ```
 
-These tests exercise real constraints, transactions, audit triggers, RSVP
-capacity, and feedback persistence. `TEST_DATABASE_URL` is mandatory so the
-suite cannot silently inherit the application's ambient `DATABASE_URL`. Keep
-the named database disposable and never point it at production.
+The suite does not apply migrations itself, so re-run the `db:deploy` line after
+pulling new migrations. `TEST_DATABASE_URL` is mandatory
+(`vitest.integration.config.mts` refuses to start without it) and replaces
+`DATABASE_URL` for every Prisma client in the run, so the suite cannot silently
+inherit the application's database. Files run one at a time.
 
-The machine API integration suite additionally exercises persisted credential hashes, cross-tenant event access, participant privacy, and bounded collections. The short-link suite covers owner/admin-only creation, cross-tenant rejection, idempotent and concurrent creation, regeneration, the unique index, and resolution for every non-published status.
+| Suite (`tests/integration/`) | Covers |
+| --- | --- |
+| `api-v1.db.test.ts` | Machine API: persisted credential hashes, cross-tenant event access, participant privacy, bounded collections |
+| `auth-hardening.db.test.ts` | Single use of a TOTP across replicas, concurrent MFA enrollment, stale pending setup after revocation, and password recovery racing a password change |
+| `check-in.db.test.ts` | One history entry for concurrent scans and undo; eligibility enforced in the conditional write |
+| `feedback.db.test.ts` | Anonymous and certificate-linked feedback, waitlisted exclusion, and immutable answers after a field is removed |
+| `invite-acceptance.db.test.ts` | Concurrent organisation invite and collaborator invite acceptance |
+| `mfa-recovery.db.test.ts` | Concurrent recovery-code consumption |
+| `mobile-api.db.test.ts` | Mobile sign-in, refresh and reuse, sign-out everywhere, cross-tenant `NOT_FOUND`, a `CHECK_IN`-only collaborator, own-RSVP cancellation, ticket-token ownership |
+| `ops-alerts.db.test.ts` | Alert webhook settings (encrypted URL, audit without values, test message), `POST /api/client-errors` (same-origin, size cap, redaction, 10/min per IP), panel SMTP replacing the environment and **Send test email**, and outbox failure alerts with requeue |
+| `publish-event.db.test.ts` | `publishEvent` releases an existing unreleased page, creates a released page when none exists, and leaves a member's attempt untouched |
+| `rsvp-lifecycle.db.test.ts` | No registration for an unreleased website, final-slot races, mandatory approval when full, and per-occurrence capacity |
+| `rsvpCapacity.db.test.ts` | No overselling, waitlist promotion, and promotion that respects a concurrent status change |
+| `schema-invariants.db.test.ts` | Database CHECK constraints for event times and capacity, collaborator targets, feedback identity, and outbox states |
+| `short-links.db.test.ts` | Owner/admin-only creation, cross-tenant rejection, idempotent and concurrent creation, regeneration, the unique index, and resolution for every non-published status |
 
 ### Coverage
 
@@ -60,7 +84,24 @@ npm run build
 npm run test:e2e:production
 ```
 
-Production mode prepares and starts `.next/standalone/server.js`, including public and static assets. The suite checks liveness, Auth.js polling limits, mobile navigation, login/crawler controls, confirmed tickets, waitlisted ticket rejection, feedback, JPEG certificates, and short-link redirects and not-found behaviour.
+`npm run test:e2e` starts (or reuses) `npm run dev` on `127.0.0.1:3000`
+(`PLAYWRIGHT_PORT` changes the port). Production mode prepares and starts
+`.next/standalone/server.js`, including public and static assets.
+
+Every spec seeds and removes its own fixtures directly through Prisma, so all
+of them need a migrated, reachable PostgreSQL in `DATABASE_URL`: the same
+database the server under test uses. Locally that is your development
+database, so expect test rows there while a run is in progress. Point both at a
+disposable database in CI.
+
+| Spec (`tests/e2e/`) | Covers |
+| --- | --- |
+| `public-smoke.spec.ts` | Liveness, Auth.js polling limits, mobile navigation, login and crawler controls, confirmed tickets, waitlisted ticket rejection, feedback, and JPEG certificates |
+| `auth.spec.ts` | Bad credentials and return paths, unverified accounts, CSRF on the credential callback, MFA sign-in, single-use reset links, and email verification |
+| `event-visibility.spec.ts` | An unreleased website is absent from every anonymous surface (real 404s); release makes the page and programme reachable |
+| `short-links.spec.ts` | Short-link 307 redirect, not-found for unknown and unpublished codes, and owner/member permissions in the dashboard |
+| `api-v1.spec.ts` | Machine API credentials, tenant scoping, participant privacy, attendance scope, rotation, and revocation |
+| `redesign-journeys.spec.ts` | A serial organiser and attendee story: create an organisation, the three-step Create Event dialog, all eight dashboard tabs, publishing from the Overview checklist and the released public page, registration and waitlist, the guest list, check-in, the account area, dark mode, the sidebar and phone drawer, and responsive widths. Each test allows 120 seconds for first-visit compilation on a cold dev server |
 
 ## Static and dependency checks
 
@@ -82,7 +123,7 @@ npm run production:check
 ```
 
 - `db:status` confirms migration state.
-- `db:verify` checks required columns, constraints, and audit triggers against the running database.
+- `db:verify` checks the core contract of required columns, constraints, and audit triggers against the running database. It does not check every recent migration's columns, so also run `db:status`.
 - `production:check` validates required production settings and transport requirements.
 
 ## Build and container verification
@@ -94,7 +135,7 @@ docker build \
   -t yuyu:local .
 ```
 
-The quality workflow runs dependency, migration, schema, lint, type, unit, integration, build, standalone-container smoke, and browser checks using PostgreSQL and Redis services.
+Two GitHub workflows run on pull requests and pushes to `main`. The quality gate (`.github/workflows/quality.yml`) runs dependency, migration, schema, lint, type, unit, coverage, integration, production-check, build, standalone-container smoke, and production-mode browser checks using PostgreSQL and Redis services. `.github/workflows/ci.yml` runs `prisma validate`, lint, type, unit, build, and `npm audit --omit=dev --audit-level=high`, plus a `migration-integrity` job (`db:deploy` and `db:verify`). CI uses Node 20; the Docker image uses `node:22-alpine`.
 
 ## Release test priorities
 
@@ -102,8 +143,9 @@ For every release, prioritize tests around:
 
 1. Authentication, MFA, password reset, and session revocation.
 2. Cross-organisation authorization and role transitions.
-3. Event privacy, invitations, registration counts, discovery visibility (`listedPublicly`), and short-link resolution.
+3. Event privacy, invitations, registration counts, discovery visibility (`listedPublicly`), publishing (status and page release together), and short-link resolution.
 4. Capacity races, duplicate RSVP prevention, approval, waitlist, and cancellation.
 5. Ticket eligibility, online/offline check-in, undo, and the live ticket tear (with and without Redis, and behind the production reverse proxy).
 6. Anonymous feedback and certificate-enabled feedback.
 7. Upload rejection, object storage, outbox delivery, and retention.
+8. Instance settings (panel SMTP, Google SSO, alert webhook) on every replica, and `node scripts/check-instance-secrets.mjs` against the production key.

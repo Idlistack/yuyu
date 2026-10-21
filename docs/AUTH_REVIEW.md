@@ -1,5 +1,7 @@
 # Authentication production review — 2026-09-14
 
+> **Historical record.** This review describes the code as of 2026-09-14 and is not maintained. Counts such as migrations and tests are from that date. See [Security](SECURITY.md) for the current model.
+
 This review covers password signup/login, inbox verification, password recovery,
 account password changes, JWT sessions and revocation, MFA enrollment and removal,
 TOTP/recovery-code consumption, Google identity linking, super-admin step-up,

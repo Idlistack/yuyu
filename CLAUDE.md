@@ -9,13 +9,17 @@ deployment constraints.
 
 Yuyu is a production-oriented, self-hosted multi-tenant event platform. The
 most sensitive current scenarios are organisation isolation and role checks;
-event privacy and RSVP capacity; opaque ticket, certificate, invitation, and
-password-reset links; event short links that never reveal hidden events; the
+event privacy and RSVP capacity; publishing, which sets `Event.status` and
+releases `EventPage.isPublished` together in one transaction; opaque ticket,
+certificate, invitation, and password-reset links; event short links that never
+reveal hidden events; the
 realtime ticket check-in endpoints (`/api/ticket/:token/{status,events}`,
 check-in state only, channels keyed by RSVP id); the personal data export and
 leave-organisation actions (own data and membership only); MFA and the
 separate super-admin step-up, checked in every super-admin page; write-only,
-encrypted instance SMTP/Google settings; tenant-bound machine API credentials;
+encrypted instance SMTP/Google/alert-webhook settings; tenant-bound machine API
+credentials; user-bound mobile API sessions (`/api/mobile/v1`, shared
+`lib/core` mutations, strict DTOs);
 image safety; outbox email delivery with an absolute `NEXT_PUBLIC_BASE_URL`;
 and Docker/Helm deployment with PostgreSQL, Redis, S3, and SMTP.
 

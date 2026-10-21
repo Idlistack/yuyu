@@ -48,15 +48,32 @@ migration:
 ingress:
   enabled: true
   className: nginx
+  annotations:
+    # Live ticket stream (/api/ticket/:token/events) must not be buffered.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
   hosts:
-    - host: events.dev.idliapps.com
+    - host: events.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: events-dev-idliapps-com-tls
-      hosts: [events.dev.idliapps.com]
+    - secretName: events-example-com-tls
+      hosts: [events.example.com]
 ```
+
+### Live ticket stream and ingress buffering
+
+`GET /api/ticket/:token/events` is a long-lived `text/event-stream` that tears
+an attendee's ticket the moment they are checked in. The route sends
+`X-Accel-Buffering: no` and a comment heartbeat every 25 seconds, but the
+ingress must not buffer the response and must allow idle reads of at least
+30 seconds; otherwise the tear waits for the ticket's 15-second status check.
+The chart's `ingress.annotations` default is empty, so add the controller's
+equivalent of the ingress-nginx annotations above. They apply to every path on
+the host, which is harmless for Yuyu's other responses; to scope them, serve
+`/api/ticket/` from a separate Ingress object. Other controllers (Traefik, cloud
+load balancers) need their own unbuffered-streaming and idle-timeout settings.
 
 Validate and deploy:
 
@@ -65,9 +82,16 @@ helm lint charts/yuyu
 helm upgrade --install yuyu charts/yuyu --namespace yuyu --create-namespace --values /secure/path/values-production.yaml --wait --timeout 10m
 ```
 
-The migration Job is a Helm pre-install/pre-upgrade hook. A failed migration blocks the application rollout.
+The migration Job is a Helm pre-install/pre-upgrade hook that runs `prisma migrate deploy` (the same as `npm run db:deploy`). A failed migration blocks the application rollout.
 
 Set `migration.checkInstanceSecrets=true` to also run `scripts/check-instance-secrets.mjs` in the Job after migrating; the release then fails before any pod rolls if `MFA_ENCRYPTION_KEY` cannot decrypt the secrets already saved in the panel. It needs a migrator image built from this repository's Dockerfile at this version or later.
+
+## Probes
+
+The Deployment defines three probes (`templates/deployment.yaml`):
+
+- startup and liveness: `GET /api/health`, dependency-free;
+- readiness: an `exec` probe that calls `GET /api/health/db` on the pod with `Authorization: Bearer $HEALTHCHECK_SECRET`, so the runtime Secret must contain `HEALTHCHECK_SECRET`. A pod whose database check fails is taken out of the Service without being restarted.
 
 ## Replicas, Redis, and egress
 

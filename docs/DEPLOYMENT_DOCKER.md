@@ -37,7 +37,12 @@ The live ticket page holds a Server-Sent Events stream at
 `text/event-stream` responses (nginx: `proxy_buffering off` for
 `/api/ticket/`; the route also sends `X-Accel-Buffering: no`) and to allow idle
 reads of at least 30 seconds. Redis pub/sub carries check-in notifications
-between application replicas.
+between application replicas, so run more than one application container only
+when they all share the same `REDIS_URL` (rate limits are shared through it
+too). Mobile Google sign-in also needs outbound HTTPS to `www.googleapis.com`
+to fetch Google's signing keys. The mobile app-link variables
+(`GOOGLE_MOBILE_CLIENT_IDS`, `ANDROID_APP_SHA256_CERT_FINGERPRINTS`,
+`APPLE_APP_IDS`) are optional; see [Configuration](CONFIGURATION.md).
 
 The application image contains only the application. It does not run
 PostgreSQL, Redis, object storage, TLS termination, or SMTP. Keep the container

@@ -42,7 +42,7 @@ export async function eventWebsiteContextForUser(
     return null;
   const event = await prisma.event.findFirst({
     where: { id: input.eventId, organisationId: org.id },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, status: true },
   });
   return event ? { session, org, event } : null;
 }

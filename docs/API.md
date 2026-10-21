@@ -36,7 +36,7 @@ Invalid, expired, revoked, and disabled credentials all receive the same generic
 GET /api/v1/events?limit=50&cursor=<cursor>
 ```
 
-Requires `events:read`. The response contains explicit event fields and includes draft, published, and hidden standalone events owned by the authenticated organisation.
+Requires `events:read`. The response contains explicit event fields and includes standalone events in every status (draft, published, hidden, and cancelled) owned by the authenticated organisation.
 
 ### Read an event
 

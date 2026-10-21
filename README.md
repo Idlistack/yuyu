@@ -39,10 +39,12 @@ advertising trackers.
 - Offline-capable door check-in, PIN-locked door stations, and badge printing with a quick print sheet and stock-sized templates
 - Event websites with programme tracks, speakers, venues, sponsors, FAQs, and resources
 - Event emails with five designs, a review step, and a five-second undo before a broadcast sends
-- Feedback forms, response reporting, and certificates built from text and image layers on your own artwork
+- Feedback forms, response reporting with CSV export, certificates built from text and image layers on your own artwork, and a post-event PDF report
 - An account area with your registrations and certificates, your organisations (including leaving one), security settings, and a personal data export
 - Recurring event series, organisation roles, event collaborators, and tenant-bound API clients
-- A separate super-admin area with MFA step-up, instance settings, and read-only insights on activity, email, and security
+- A mobile API (`/api/mobile/v1`) for the Yuyu Android and iOS apps: sign-in, your tickets, discovery and registration, and organiser day-of work such as check-in and guest approval
+- A separate super-admin area with MFA step-up, instance settings that apply on every replica without a restart (SMTP with a test email, Google SSO, backup posture), and read-only insights on activity, email, and security
+- An optional operational alerts webhook (Mattermost or Slack-compatible) for server errors, sign-in and email failures, browser crashes, and restarts, with redacted text
 - Security-conscious operations: private object storage, CSP nonces, rate limiting, audit events, outbox email, and readiness checks
 - Light and dark modes, accessible defaults, and organiser colours on every event page
 
@@ -86,7 +88,8 @@ out the application image.
 `NEXT_PUBLIC_BASE_URL` must be the public HTTPS address (it is build-visible, so
 changing it needs a rebuild); emails use it for every link and image. Redis also
 carries live ticket check-in updates between replicas, so run more than one
-replica only with a shared `REDIS_URL`.
+replica only with a shared `REDIS_URL`. The reverse proxy or ingress must not
+buffer the live ticket stream at `/api/ticket/:token/events`.
 
 - [Docker deployment guide](docs/DEPLOYMENT_DOCKER.md)
 - [Helm chart](charts/yuyu/README.md)
@@ -103,12 +106,17 @@ The project handbook lives in [`docs/`](docs/README.md):
 - [Configuration](docs/CONFIGURATION.md)
 - [Routes and HTTP endpoints](docs/ROUTES.md)
 - [Machine API v1](docs/API.md)
+- [Mobile API v1](docs/MOBILE_API.md)
 - [Security model](docs/SECURITY.md)
 - [Testing and quality gates](docs/TESTING.md)
 - [Production release checklist](docs/PRODUCTION_RELEASE.md)
 - [Production operations](docs/production-operations.md)
 - [Production Docker deployment](docs/DEPLOYMENT_DOCKER.md)
+- [Isolated staging deployment](docs/DEPLOYMENT_STAGING.md)
+- [Docker Hub publishing](docs/DOCKERHUB_ACTIONS.md)
 - [Future work](docs/FUTURE_PHASES.md)
+- [Changelog](CHANGELOG.md)
+- [User manual](docs/manual/user-manual.html) ([PDF](docs/Yuyu-User-Manual.pdf))
 
 ## Common commands
 
@@ -117,13 +125,28 @@ npm run dev                  # development server
 npm run lint                 # ESLint
 npx tsc --noEmit             # TypeScript validation
 npm run test:unit            # unit tests
-npm run test:integration     # PostgreSQL-backed tests
+TEST_DATABASE_URL=… npm run test:integration  # PostgreSQL-backed tests; use a separate, disposable database
 npm run test:e2e             # browser tests against development
 npm run test:e2e:production  # browser tests against standalone output
 npm run test:coverage        # repository-wide coverage report
 npm run build                # production build
 npm run brand:generate       # rebuild favicon, app icons, social card and email lockup from public/brand SVGs
 ```
+
+Operator commands:
+
+```bash
+npm run db:deploy            # apply migrations (release step)
+npm run db:status            # show migration state
+npm run db:verify            # verify the production schema contract
+npm run production:check     # validate production configuration
+npm run db:backup            # create a database archive
+npm run db:restore           # restore an archive (destructive; see production operations)
+npm run storage:migrate      # move legacy database assets to S3
+node scripts/check-instance-secrets.mjs  # check MFA_ENCRYPTION_KEY decrypts saved panel secrets
+```
+
+See [Testing](docs/TESTING.md) and [Production operations](docs/production-operations.md) for details.
 
 ## Contributing
 

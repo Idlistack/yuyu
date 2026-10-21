@@ -189,7 +189,11 @@ rate limit.
 
 Resolves an event short link with the same rule and per-IP limit as
 `/:shortCode` → `{ "orgSlug", "eventSlug" }`. Unknown, unreleased and
-rate-limited codes are the same `NOT_FOUND`.
+rate-limited codes are the same `NOT_FOUND`. Publishing an event releases its
+page in the same transaction, so a Live event's code resolves at once; clients
+should not cache a `NOT_FOUND` for long, because events published before that
+fix return it until the `20261021010000_realign_event_publication` migration
+runs.
 
 ### `GET /public/events/:orgSlug/:eventSlug`
 
