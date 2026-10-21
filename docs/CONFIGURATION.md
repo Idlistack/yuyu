@@ -21,19 +21,21 @@ Blank values (for example `SMTP_HOST=""` left over from `.env.example`) are trea
 | `ANDROID_APP_SHA256_CERT_FINGERPRINTS` | Optional | Comma-separated SHA-256 signing-certificate fingerprints (`AA:BB:…`) published in `/.well-known/assetlinks.json` for Android App Links (package `com.twilighty.yuyu`); unset serves `[]` |
 | `APPLE_APP_IDS` | Optional | Comma-separated `TEAMID.bundle.id` values (for example `ABCDE12345.com.twilighty.yuyu`) published in `/.well-known/apple-app-site-association` for iOS Universal Links (tickets, event pages and feedback forms; see [Mobile API](MOBILE_API.md#app-links)); unset serves empty details |
 
-### Deployment example: `events.dev.idliapps.com`
+`.env.example` also lists `NEXTAUTH_SECRET`/`NEXTAUTH_URL`, commented out. Yuyu's code and `npm run production:check` read only `AUTH_SECRET` and `AUTH_URL`; the `NEXTAUTH_*` names are Auth.js compatibility aliases and are not a substitute in production.
 
-For the current deployment hostname, configure both canonical URL settings to the exact same HTTPS origin:
+### Deployment example: `events.example.com`
+
+Configure both canonical URL settings to the exact same HTTPS origin:
 
 ```env
-AUTH_URL=https://events.dev.idliapps.com
-NEXT_PUBLIC_BASE_URL=https://events.dev.idliapps.com
+AUTH_URL=https://events.example.com
+NEXT_PUBLIC_BASE_URL=https://events.example.com
 ```
 
 If Google OAuth is enabled, register this callback with Google Cloud:
 
 ```text
-https://events.dev.idliapps.com/api/auth/callback/google
+https://events.example.com/api/auth/callback/google
 ```
 
 Leave `ALLOWED_ACTION_ORIGINS` empty when browsers reach the application on this same hostname. Configure it only if a trusted CDN or reverse proxy uses a different host for Server Action requests.
@@ -71,11 +73,11 @@ It reports which stored values cannot be decrypted, never printing them, and exi
 | `TRUSTED_PROXY_IP_HEADER` | Required | One of `cf-connecting-ip`, `x-forwarded-for`, or `x-real-ip`; the edge must overwrite it |
 | `ALLOWED_ACTION_ORIGINS` | Optional | Comma-separated trusted proxy/CDN hosts allowed to invoke Server Actions |
 | `ALLOWED_EMBED_ORIGINS` | Optional | Exact HTTPS origins permitted to frame public event embeds; blank disables cross-site framing |
-| `NEXT_DEV_ALLOWED_ORIGINS` | Development only | Comma-separated LAN hosts permitted to request development assets |
+| `NEXT_DEV_ALLOWED_ORIGINS` | Development only | Comma-separated LAN hosts permitted to request development assets, in addition to the built-in `127.0.0.1` and `*.trycloudflare.com` (Cloudflare quick tunnels for phone testing; `next.config.ts`) |
 
 Do not expose the application directly while trusting a client-controlled forwarding header.
 
-Rate-limit windows are defined in code (`lib/rateLimit.ts`), not configured by environment. Recent buckets: `dataExport` (5 personal data exports per user per hour), `ticketStatus` (120 ticket status reads per IP per minute), `ticketEvents` (60 ticket event-stream connections per IP per minute), and `shortLink` (30 short-link lookups per IP per minute). The ticket buckets are generous because attendees at one venue often share a NAT address.
+Rate-limit windows are defined in code (`lib/rateLimit.ts`), not configured by environment. Recent buckets: `dataExport` (5 personal data exports per user per hour), `broadcastTest` (20 broadcast test sends per hour), `ticketStatus` (120 ticket status reads per IP per minute), `ticketEvents` (60 ticket event-stream connections per IP per minute), `shortLink` (30 short-link lookups per IP per minute), `mobileAuth` (30 mobile token refreshes per IP per minute), `mobileApi` (300 mobile API requests per user per minute), and `clientError` (10 browser crash reports per IP per minute). The ticket buckets are generous because attendees at one venue often share a NAT address.
 
 The live ticket stream at `/api/ticket/:token/events` is a long-lived `text/event-stream` response. Any reverse proxy in front of the application must not buffer it (for nginx, `proxy_buffering off`; the route also sends `X-Accel-Buffering: no`) and must allow idle reads of at least 30 seconds.
 
@@ -84,7 +86,7 @@ The live ticket stream at `/api/ticket/:token/events` is a long-lived `text/even
 | Variable | Production | Purpose |
 | --- | --- | --- |
 | `EMAIL_FROM` | Optional fallback | Verified sender identity; configure new instances in Super admin → Settings |
-| `SMTP_*` | Optional fallback | SMTP settings; configure new instances in Super admin → Settings. When `SMTP_SERVICE`/`SMTP_HOST` is set without `SMTP_ALLOW_UNAUTHENTICATED=1`, `production:check` requires `SMTP_USER` and `SMTP_PASSWORD` |
+| `SMTP_*` | Optional fallback | SMTP settings; configure new instances in Super admin → Settings. The names are `SMTP_SERVICE` (a Nodemailer well-known service such as `gmail`, used instead of host/port), `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` (`true`/`false`), `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_ALLOW_UNAUTHENTICATED` (`1` only for a private unauthenticated relay). When `SMTP_SERVICE`/`SMTP_HOST` is set without `SMTP_ALLOW_UNAUTHENTICATED=1`, `production:check` requires `SMTP_USER` and `SMTP_PASSWORD` |
 | `OUTBOX_RETENTION_DAYS` | Optional | Retention for non-capability sent/failed outbox history; defaults to 30 (capability-bearing rows are deleted immediately after delivery or terminal failure) |
 
 Configure SMTP, Google SSO, backup status, and operational alerts under **Super admin → Settings**. SMTP and Google client secrets and the alert webhook URL are encrypted at rest with a domain-separated key derived from `MFA_ENCRYPTION_KEY`, are never displayed after saving, and require the super-admin fresh-TOTP step-up. Production SMTP connections require TLS with certificate verification.
@@ -112,9 +114,13 @@ The bucket must remain private. Existing database-backed assets can be moved wit
 
 ## Operational metadata
 
-| Variable | Purpose |
-| --- | --- |
-| `BACKUP_*` | Legacy fallback | Backup status metadata; configure new instances in Super admin → Settings |
+| Variable | Production | Purpose |
+| --- | --- | --- |
+| `BACKUP_PROVIDER` | Legacy fallback | Displayed backup provider name (up to 80 characters) |
+| `BACKUP_LAST_SUCCESS_AT` | Legacy fallback | Displayed time of the last successful backup, as an ISO 8601 datetime |
+| `BACKUP_RETENTION_DAYS` | Legacy fallback | Displayed retention period, 1 to 3650 days |
+
+These values are display-only and do not run or retain backups; configure new instances in Super admin → Settings.
 
 ## Test-only bypass
 

@@ -11,18 +11,21 @@ Yuyu must not be released until every item below is complete and recorded in the
 - Private S3-compatible object storage configured with `S3_BUCKET` and `S3_REGION`. Use an IAM workload role where possible; keep the bucket private.
 - A transactional email provider with a verified sending domain, SPF, DKIM, DMARC, bounce handling, and alerting.
 - The self-hosted Node.js service runs an in-process outbox worker once per minute. Keep `POST /api/internal/outbox` with `Authorization: Bearer $CRON_SECRET` available as an independent scheduler or recovery trigger, and monitor both delivery and cleanup results.
-- WAF/CDN and TLS termination in front of the app. Forward only the configured trusted client-IP header.
+- WAF/CDN and TLS termination in front of the app. Forward only the configured trusted client-IP header, overwritten with the address the edge saw (never appended to a client-supplied value).
+- A reverse proxy or ingress that does not buffer `/api/ticket/:token/events` and allows idle reads of at least 30 seconds (see [Production operations](production-operations.md)).
 - Centralized PII-scrubbed logs, error reporting, uptime checks, and alerts for database, Redis, outbox, mail, and backup failures.
 
 ## Deployment procedure
 
-1. Configure the canonical production hostname. For the current example, set both `AUTH_URL` and `NEXT_PUBLIC_BASE_URL` to `https://events.dev.idliapps.com`; they must match exactly. Configure DNS, a valid TLS certificate, CDN/WAF origin routing, and the trusted proxy-IP header.
-2. If Google OAuth is enabled, register `https://events.dev.idliapps.com/api/auth/callback/google` as an authorized callback URL.
-3. Review and approve the Prisma migration; take a backup before applying it. The secure-token migration rotates existing ticket and certificate links.
-4. Run `npm ci`, `npm run production:check`, `npm run db:deploy`, `npm run db:verify`, `npm run storage:migrate`, `npm run lint`, `npx tsc --noEmit`, `npm run test:coverage`, and `npm run build` in staging.
-5. Exercise auth, organisation permissions, RSVP capacity, duplicate RSVP, upload rejection, email delivery, and offline-check-in sync in staging.
-6. Build an immutable image with `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` supplied as a BuildKit secret, inject that same value at runtime, run the authenticated `/api/health/db` readiness probe, and verify the outbox scheduler.
-7. Confirm alert delivery and record the release, backup point, migration version, and rollback owner.
+1. Configure the canonical production hostname. Set both `AUTH_URL` and `NEXT_PUBLIC_BASE_URL` to it (for example `https://events.example.com`); they must match exactly. Configure DNS, a valid TLS certificate, CDN/WAF origin routing, and the trusted proxy-IP header.
+2. If Google OAuth is enabled, register `https://events.example.com/api/auth/callback/google` (your hostname) as an authorized callback URL.
+3. Review and approve the pending Prisma migrations (see [Recent schema migrations](production-operations.md#recent-schema-migrations) and the [changelog](../CHANGELOG.md) upgrade notes); take a backup before applying them.
+4. Run `node scripts/check-instance-secrets.mjs` with the production environment so `MFA_ENCRYPTION_KEY` is known to decrypt the settings saved in Super admin → Settings.
+5. Run `npm ci`, `npm run production:check`, `npm run db:deploy`, `npm run db:verify`, `npm run storage:migrate`, `npm run lint`, `npx tsc --noEmit`, `npm run test:coverage`, and `npm run build` in staging.
+6. Exercise auth, organisation permissions, RSVP capacity, duplicate RSVP, upload rejection, email delivery, and offline-check-in sync in staging. Publish a draft event from the Overview checklist and confirm its public page, RSVP, and short link work at once, and that an open ticket tears on check-in through the production proxy without waiting for its 15-second status check.
+7. Build an immutable image with `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` supplied as a BuildKit secret, inject that same value at runtime, run the authenticated `/api/health/db` readiness probe, and verify the outbox scheduler.
+8. Use **Send test email** in Super admin → Settings, and **Send test message** for the alerts webhook if one is configured. If the mobile apps are released, set `GOOGLE_MOBILE_CLIENT_IDS`, `ANDROID_APP_SHA256_CERT_FINGERPRINTS`, and `APPLE_APP_IDS` and check `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association`.
+9. Confirm alert delivery and record the release, backup point, migration version, and rollback owner.
 
 ## Domain changes
 

@@ -18,13 +18,16 @@ CSS 4 with Radix primitives, Redis, S3-compatible private storage, Nodemailer,
 Vitest, and Playwright. Deployment supports Docker standalone output and the Helm chart in
 `charts/yuyu/`.
 
-The product currently includes organisations and member roles, public/private
-events and RRULE-based series, custom RSVP forms and waitlists, event short
-links, QR tickets with live check-in updates and offline check-in, badge
+The product currently includes organisations and member roles, event
+collaborators with per-event grants, public/private events and RRULE-based
+series, event websites (programme, speakers, sponsors), custom RSVP forms and
+waitlists, event short links, QR tickets with live check-in updates and offline check-in, badge
 printing, feedback and layered certificates, designed broadcast and
 transactional email, a personal account area (registrations, organisations,
 data export), and a separate super-admin operations, insights, and
-instance-settings area, plus a tenant-bound machine API. Treat this as a production-oriented application:
+instance-settings area with an operational alerts webhook, a tenant-bound
+machine API, and a user-authenticated mobile API (`/api/mobile/v1`) for the
+Yuyu apps. Treat this as a production-oriented application:
 tenant isolation, privacy, and secure operations are core behaviour rather
 than optional polish.
 
@@ -48,11 +51,13 @@ field, constraint, or cascade from a component alone.
 | `app/actions/` | Authenticated dashboard and account mutations |
 | `components/` | UI grouped by product area; client components are explicit |
 | `lib/` | Auth, permissions, validation, RSVP, storage, email, rate limits, and domain services |
+| `lib/core/` | Mutation cores shared by Server Actions and `/api/mobile/v1`; change behaviour here, not in one surface |
+| `lib/mobile/` | Mobile API tokens, sessions, permissions, schemas, and DTOs |
 | `prisma/` | Prisma schema and ordered migrations |
 | `tests/` | Unit, PostgreSQL integration, and Playwright suites |
 | `scripts/` | Production checks, schema checks, storage migration, and standalone helpers |
 | `charts/yuyu/` | Helm deployment chart and migration job |
-| `docs/` | Product, security, development, and operational handbook |
+| `docs/` | Product, security, development, and operational handbook; `docs/mobile-api.openapi.yaml` and `docs/mobile-api-fixtures/` are the mobile contract, checked by `tests/unit/mobile-api-contract.test.ts` |
 
 ## Working conventions
 
@@ -115,6 +120,11 @@ field, constraint, or cascade from a component alone.
   tokens), is rate limited, audited, and `no-store`; leaving an organisation
   removes only the caller's membership and blocks the sole owner under a row
   lock.
+- Event publication is one switch: `Event.status = PUBLISHED` and
+  `EventPage.isPublished` change together in one transaction (`createEvent`,
+  `updateEvent`, and `publishEvent` in `app/actions/event.ts`; `publishEvent`
+  creates a missing page row released). Never set one without the other;
+  public pages, RSVP (`lib/rsvpCore.ts`), and short links require both.
 - Event short codes resolve only for published events with a released
   website, and unknown, unreleased, and rate-limited codes share the
   unknown-organisation 404 so a code never reveals a hidden event's slug.
@@ -151,8 +161,18 @@ field, constraint, or cascade from a component alone.
   Organiser values in email designs are escaped and image/link URLs limited to
   absolute http(s).
 - Instance settings override legacy environment fallbacks for SMTP, Google SSO,
-  and backup posture. Backup settings are display-only; do not imply that the
+  and backup posture; saved SMTP replaces the `SMTP_*` environment as a whole,
+  and blank environment values count as unset. Backup settings are display-only; do not imply that the
   app creates, retains, or restores provider backups.
+- Mobile API sessions are user identities, never machine clients: tokens are
+  stored only as SHA-256 digests, refresh tokens rotate and reuse revokes the
+  session, sessions are bound to `sessionVersion`, mutations go through
+  `lib/core/*`, responses are strict DTOs, and ticket tokens go only to their
+  owner or `CHECK_IN` roster holders.
+- Operational alerts leave the instance: keep them redacted through
+  `lib/opsAlerts.ts`, keep the webhook URL write-only and encrypted, and keep
+  the public `POST /api/client-errors` same-origin, size-capped, rate limited,
+  and answering an empty `204`.
 - Machine API clients are tenant-bound bearer identities, not Auth.js users.
   Require explicit scopes, resolve the tenant solely from the credential, use
   explicit DTOs/selects, and never log or persist a raw credential.
@@ -169,7 +189,7 @@ checks before handoff:
 npm run lint
 npx tsc --noEmit
 npm run test:unit
-npm run test:integration       # requires disposable local PostgreSQL
+npm run test:integration       # requires TEST_DATABASE_URL for a disposable PostgreSQL
 npm run build
 npm run test:e2e               # routing/auth/public-flow changes
 npm run test:e2e:production    # security, headers, auth, tickets, public flows
