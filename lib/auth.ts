@@ -4,20 +4,11 @@ import NextAuth, { CredentialsSignin } from "next-auth";
 import { authAdapter } from "@/lib/authAdapter";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import { isActionRateLimited } from "@/lib/actionRateLimit";
-import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { hasVerifiedGoogleEmail } from "@/lib/googleAuth";
-import { consumeRecoveryCode, decryptMfaSecret, consumeMfaCode } from "@/lib/mfa";
-import { isNewUserRegistrationEnabled } from "@/lib/instanceSettings";
-import { getGoogleSsoSettings } from "@/lib/instanceSettings";
-
-const credentialsSchema = z.object({
-  email: z.string().trim().toLowerCase().email().max(254),
-  password: z.string().min(1).max(128),
-  totp: z.string().trim().max(32).optional(),
-});
+import { verifyPasswordCredentials } from "@/lib/credentialsAuth";
+import { evaluateGoogleSignIn, loadGoogleSsoSettings } from "@/lib/googleSignIn";
+import { logOpsError } from "@/lib/opsAlerts";
 
 /**
  * This code is returned only after the supplied password is valid. It lets the
@@ -32,8 +23,12 @@ class EmailVerificationRequiredError extends CredentialsSignin {
   code = "email_verification_required";
 }
 
+// The config callback runs for every Auth.js request, `auth()` call and
+// server-side signIn/signOut, so Google SSO follows the instance settings
+// stored in the database at request time (no restart or rebuild). When Google
+// is removed the provider disappears and its sign-in/callback routes stop.
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
-  const google = await getGoogleSsoSettings();
+  const google = await loadGoogleSsoSettings();
   return {
   adapter: authAdapter,
   // Credentials requires JWT sessions; OAuth accounts are still persisted
@@ -47,8 +42,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   },
   trustHost: true,
   logger: {
-    // Auth.js error causes can contain provider responses and credentials.
-    error() { console.error("[auth] Authentication failed"); },
+    // Auth.js error causes can contain provider responses and credentials, so
+    // the log line stays fixed; only the redacted alert carries the detail.
+    error(error) {
+      const { type } = error as Error & { type?: unknown };
+      const label = typeof type === "string" ? type : error.name;
+      logOpsError("[auth] Authentication failed", { level: "error", source: "auth", title: `Sign-in failed (${label})`, error });
+    },
   },
   pages: {
     signIn: "/login",
@@ -74,74 +74,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         password: { label: "Password", type: "password" },
       },
       async authorize(raw) {
-        const parsed = credentialsSchema.safeParse(raw);
-        if (!parsed.success) return null;
-        const { email, password } = parsed.data;
-        if (await isActionRateLimited("auth", email)) return null;
-
-        const user = await prisma.user.findUnique({
-          where: { email },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            passwordHash: true,
-            sessionVersion: true,
-            emailVerified: true,
-            mfaSecretEncrypted: true,
-          },
-        });
-        // Equal bcrypt work for missing and OAuth-only accounts prevents the
-        // obvious timing oracle. This is a fixed non-secret dummy hash.
-        const ok = await bcrypt.compare(password, user?.passwordHash ?? "$2b$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW");
-        if (!user?.passwordHash || !ok) return null;
-        if (!user.emailVerified) throw new EmailVerificationRequiredError();
-
-        if (user.mfaSecretEncrypted) {
-          const code = parsed.data.totp ?? "";
-          if (!user.email) return null;
-          if (!code) throw new MfaRequiredError();
-          const validTotp = await consumeMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), user.email, code);
-          if (!validTotp && !(await consumeRecoveryCode(user.id, code))) return null;
-        }
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-          sessionVersion: user.sessionVersion,
-        };
+        // Shared with mobile sign-in (lib/credentialsAuth.ts).
+        const result = await verifyPasswordCredentials(raw);
+        if (result.ok) return result.user;
+        if (result.reason === "email_verification_required") throw new EmailVerificationRequiredError();
+        if (result.reason === "mfa_required") throw new MfaRequiredError();
+        return null;
       },
     }),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider !== "google") return true;
-      if (!hasVerifiedGoogleEmail(profile)) return false;
       const email = user.email?.trim().toLowerCase();
-      if (!email) return false;
+      // Shared with mobile Google sign-in (lib/googleSignIn.ts).
+      const decision = await evaluateGoogleSignIn({
+        email,
+        emailVerified: hasVerifiedGoogleEmail(profile),
+        providerAccountId: account.providerAccountId,
+      });
+      if (decision === "deny") return false;
       user.email = email;
-      const existing = await prisma.user.findUnique({
-        where: { email }, select: { passwordHash: true, emailVerified: true },
-      });
-      // A pre-registered, unverified password must never survive linking to
-      // the real inbox owner's Google identity.
-      if (existing?.passwordHash && !existing.emailVerified) return false;
-
-      const existingAccount = await prisma.account.findUnique({
-        where: { provider_providerAccountId: { provider: account.provider, providerAccountId: account.providerAccountId } },
-        select: { id: true },
-      });
-      if (existingAccount || existing) return true;
-
-      // A verified Google identity may create an account only while the
-      // instance-wide account-creation policy permits it. Returning true lets
-      // Auth.js create the adapter user after this callback.
-      if (!(await isNewUserRegistrationEnabled())) {
-        return "/login?error=account_creation_disabled";
-      }
+      // Returning true lets Auth.js create the adapter user after this callback.
+      if (decision === "account_creation_disabled") return "/login?error=account_creation_disabled";
       return true;
     },
     async jwt({ token, user }) {

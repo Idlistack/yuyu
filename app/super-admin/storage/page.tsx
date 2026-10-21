@@ -1,26 +1,13 @@
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
+import { requireSuperAdminMfa } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
-
-function formatBytes(bytes: number | null): string {
-  if (bytes == null || Number.isNaN(bytes)) return "—";
-  const units = ["B", "KB", "MB", "GB", "TB"] as const;
-  let n = bytes;
-  let i = 0;
-  while (n >= 1024 && i < units.length - 1) {
-    n /= 1024;
-    i += 1;
-  }
-  return `${n.toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
-}
+import { AdminPanel, NameCell } from "@/components/super-admin/AdminPanel";
+import { EmptyState, PageHeader, StatTile } from "@/components/ui/display";
+import { formatBytes } from "@/lib/superAdminInsights";
+import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 export default async function SuperAdminStoragePage() {
+  // Layout checks don't re-run on client navigation, so every page checks too.
+  await requireSuperAdminMfa();
   let dbSizeBytes: number | null = null;
   let tableSizes:
     | Array<{ table_name: string; total_bytes: number; total_pretty: string }>
@@ -30,17 +17,23 @@ export default async function SuperAdminStoragePage() {
     const dbRows = await prisma.$queryRaw<Array<{ bytes: bigint }>>`
       select pg_database_size(current_database()) as bytes
     `;
-    dbSizeBytes = dbRows?.[0]?.bytes ? Number(dbRows[0].bytes) : null;
+    dbSizeBytes = dbRows?.[0]?.bytes != null ? Number(dbRows[0].bytes) : null;
+  } catch {
+    // Some managed Postgres setups restrict size functions; degrade gracefully.
+  }
 
+  try {
+    // relid (an OID) avoids resolving names through search_path, which
+    // can miss tables outside the default schema.
     tableSizes = await prisma.$queryRaw<
       Array<{ table_name: string; total_bytes: bigint; total_pretty: string }>
     >`
       select
-        relname as table_name,
-        pg_total_relation_size(quote_ident(relname)) as total_bytes,
-        pg_size_pretty(pg_total_relation_size(quote_ident(relname))) as total_pretty
+        case when schemaname = 'public' then relname::text else schemaname || '.' || relname end as table_name,
+        pg_total_relation_size(relid) as total_bytes,
+        pg_size_pretty(pg_total_relation_size(relid)) as total_pretty
       from pg_stat_user_tables
-      order by pg_total_relation_size(quote_ident(relname)) desc
+      order by pg_total_relation_size(relid) desc
       limit 25
     `.then((rows) =>
       rows.map((r) => ({
@@ -68,7 +61,8 @@ export default async function SuperAdminStoragePage() {
     .groupBy({
       by: ["organisationId"],
       _sum: { byteSize: true },
-      where: { organisationId: { not: null }, byteSize: { not: null } },
+      // Only the organisations listed below, so the grouping stays capped.
+      where: { organisationId: { in: perOrgCounts.map((o) => o.id) }, byteSize: { not: null } },
     })
     .then((rows) => {
       const m = new Map<string, number>();
@@ -82,92 +76,138 @@ export default async function SuperAdminStoragePage() {
     })
     .catch(() => new Map<string, number>());
 
+  const [assetSummary, assetsByType, recentAssets] = await Promise.all([
+    prisma.asset.aggregate({ _count: { _all: true }, _sum: { byteSize: true } }),
+    prisma.asset.groupBy({ by: ["provider", "contentType"], _count: { _all: true }, _sum: { byteSize: true } }),
+    prisma.asset.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 15,
+      // Object keys and URLs stay private; only type, size, and owner are shown.
+      select: { id: true, contentType: true, byteSize: true, provider: true, createdAt: true, organisation: { select: { id: true, name: true } } },
+    }),
+  ]);
+  const sortedTypes = [...assetsByType].sort((a, b) => Number(b._sum.byteSize ?? 0) - Number(a._sum.byteSize ?? 0));
+
   return (
-    <Stack spacing={2}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 800 }}>
-        Storage
-      </Typography>
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Storage" description="Database size, largest tables, and each organisation's footprint." />
 
-      <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Database size
-        </Typography>
-        <Typography color="text.secondary">
-          {dbSizeBytes == null
-            ? "Unavailable (DB functions may be restricted)."
-            : formatBytes(dbSizeBytes)}
-        </Typography>
-      </Paper>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <StatTile
+          className="rounded-2xl"
+          label="Database size"
+          value={dbSizeBytes == null ? "—" : formatBytes(dbSizeBytes)}
+          hint={dbSizeBytes == null ? "Unavailable (DB functions may be restricted)." : undefined}
+        />
+        <StatTile className="rounded-2xl" label="Stored files" value={assetSummary._count._all.toLocaleString()} />
+        <StatTile className="rounded-2xl" label="Stored file size" value={formatBytes(assetSummary._sum.byteSize == null ? 0 : Number(assetSummary._sum.byteSize))} />
+      </div>
 
-      <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          Largest tables (top 25)
-        </Typography>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AdminPanel title="Files by provider and type">
+          {sortedTypes.length === 0 ? (
+            <EmptyState mood="sleepy">No tracked files.</EmptyState>
+          ) : (
+            <Table label="Files by provider and type">
+              <THead>
+                <tr>
+                  <TH>Provider</TH>
+                  <TH>Type</TH>
+                  <TH className="text-right">Files</TH>
+                  <TH className="text-right">Size</TH>
+                </tr>
+              </THead>
+              <TBody>
+                {sortedTypes.map((row) => (
+                  <TR key={`${row.provider}:${row.contentType ?? ""}`}>
+                    <TD className="font-mono text-sm">{row.provider}</TD>
+                    <TD className="font-mono text-sm">{row.contentType ?? "unknown"}</TD>
+                    <TD className="text-right tabular-nums">{row._count._all.toLocaleString()}</TD>
+                    <TD className="text-right tabular-nums">{formatBytes(row._sum.byteSize == null ? 0 : Number(row._sum.byteSize))}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          )}
+        </AdminPanel>
+
+        <AdminPanel title="Recent uploads" description="Latest 15 tracked files. Storage keys and URLs are not shown.">
+          {recentAssets.length === 0 ? (
+            <EmptyState mood="sleepy">No tracked files.</EmptyState>
+          ) : (
+            <Table label="Recent uploads">
+              <THead>
+                <tr>
+                  <TH>Organisation</TH>
+                  <TH>Type</TH>
+                  <TH className="text-right">Size</TH>
+                  <TH>Uploaded</TH>
+                </tr>
+              </THead>
+              <TBody>
+                {recentAssets.map((asset) => (
+                  <TR key={asset.id}>
+                    <TD>{asset.organisation ? <NameCell href={`/super-admin/orgs/${asset.organisation.id}`} name={asset.organisation.name} /> : "—"}</TD>
+                    <TD className="font-mono text-sm">{asset.contentType ?? "unknown"}</TD>
+                    <TD className="text-right tabular-nums">{formatBytes(asset.byteSize == null ? null : Number(asset.byteSize))}</TD>
+                    <TD className="whitespace-nowrap text-ink-secondary">{asset.createdAt.toLocaleString()}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          )}
+        </AdminPanel>
+      </div>
+
+      <AdminPanel title="Largest tables (top 25)">
         {tableSizes == null ? (
-          <Typography color="text.secondary">
-            Unavailable (DB functions may be restricted).
-          </Typography>
+          <p className="text-body-ui text-ink-muted">Unavailable (DB functions may be restricted).</p>
         ) : (
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Table</TableCell>
-                <TableCell align="right">Bytes</TableCell>
-                <TableCell align="right">Pretty</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          <Table label="Largest tables">
+            <THead>
+              <tr>
+                <TH>Table</TH>
+                <TH className="text-right">Bytes</TH>
+                <TH className="text-right">Pretty</TH>
+              </tr>
+            </THead>
+            <TBody>
               {tableSizes.map((t) => (
-                <TableRow key={t.table_name}>
-                  <TableCell sx={{ fontFamily: "monospace" }}>{t.table_name}</TableCell>
-                  <TableCell align="right">{t.total_bytes.toLocaleString()}</TableCell>
-                  <TableCell align="right">{t.total_pretty}</TableCell>
-                </TableRow>
+                <TR key={t.table_name}>
+                  <TD className="font-mono text-sm">{t.table_name}</TD>
+                  <TD className="text-right tabular-nums">{t.total_bytes.toLocaleString()}</TD>
+                  <TD className="text-right tabular-nums">{t.total_pretty}</TD>
+                </TR>
               ))}
-            </TableBody>
+            </TBody>
           </Table>
         )}
-      </Paper>
+      </AdminPanel>
 
-      <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          Per-org logical footprint (counts)
-        </Typography>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Org</TableCell>
-              <TableCell align="right">Assets bytes</TableCell>
-              <TableCell align="right">Members</TableCell>
-              <TableCell align="right">Events</TableCell>
-              <TableCell align="right">Series</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
+      <AdminPanel title="Per-org logical footprint (counts)">
+        <Table label="Per-org logical footprint">
+          <THead>
+            <tr>
+              <TH>Org</TH>
+              <TH className="text-right">Assets bytes</TH>
+              <TH className="text-right">Members</TH>
+              <TH className="text-right">Events</TH>
+              <TH className="text-right">Series</TH>
+            </tr>
+          </THead>
+          <TBody>
             {perOrgCounts.map((o) => (
-              <TableRow key={o.id}>
-                <TableCell sx={{ fontWeight: 650 }}>
-                  {o.name}
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block" }}
-                  >
-                    /{o.slug}
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">
-                  {formatBytes(assetTotals.get(o.id) ?? 0)}
-                </TableCell>
-                <TableCell align="right">{o._count.memberships}</TableCell>
-                <TableCell align="right">{o._count.events}</TableCell>
-                <TableCell align="right">{o._count.eventSeries}</TableCell>
-              </TableRow>
+              <TR key={o.id}>
+                <TD><NameCell href={`/super-admin/orgs/${o.id}`} name={o.name} sub={`/${o.slug}`} /></TD>
+                <TD className="text-right tabular-nums">{formatBytes(assetTotals.get(o.id) ?? 0)}</TD>
+                <TD className="text-right tabular-nums">{o._count.memberships}</TD>
+                <TD className="text-right tabular-nums">{o._count.events}</TD>
+                <TD className="text-right tabular-nums">{o._count.eventSeries}</TD>
+              </TR>
             ))}
-          </TableBody>
+          </TBody>
         </Table>
-      </Paper>
-    </Stack>
+      </AdminPanel>
+    </div>
   );
 }
-

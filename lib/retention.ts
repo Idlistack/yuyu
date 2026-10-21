@@ -12,7 +12,7 @@ export async function purgeExpiredOperationalData(now = new Date()) {
     365,
   );
   const sentBefore = new Date(now.getTime() - outboxRetentionDays * DAY_MS);
-  const [tokens, sessions, organisationInvites, collaboratorInvites, undoSnapshots, sentMessages, failedMessages] = await prisma.$transaction([
+  const [tokens, sessions, organisationInvites, collaboratorInvites, undoSnapshots, sentMessages, failedMessages, mobileSessions] = await prisma.$transaction([
     prisma.verificationToken.deleteMany({ where: { expires: { lt: now } } }),
     prisma.session.deleteMany({ where: { expires: { lt: now } } }),
     prisma.organisationInvite.deleteMany({ where: { usedAt: null, expiresAt: { lt: now } } }),
@@ -24,6 +24,11 @@ export async function purgeExpiredOperationalData(now = new Date()) {
     prisma.outboxMessage.deleteMany({
       where: { status: OutboxStatus.FAILED, createdAt: { lt: sentBefore } },
     }),
+    // Mobile sessions hold only token digests; drop them once they can never
+    // be refreshed again, keeping revoked rows briefly for support.
+    prisma.mobileSession.deleteMany({
+      where: { OR: [{ refreshExpiresAt: { lt: now } }, { revokedAt: { lt: new Date(now.getTime() - 30 * DAY_MS) } }] },
+    }),
   ]);
   return {
     verificationTokens: tokens.count,
@@ -33,5 +38,6 @@ export async function purgeExpiredOperationalData(now = new Date()) {
     undoSnapshots: undoSnapshots.count,
     sentOutboxMessages: sentMessages.count,
     failedOutboxMessages: failedMessages.count,
+    mobileSessions: mobileSessions.count,
   };
 }

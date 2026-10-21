@@ -22,8 +22,13 @@ describe("event browser DTO", () => {
       capacity: null,
       status: EventStatus.PUBLISHED,
       privacyType: EventPrivacyType.PUBLIC,
+      listedPublicly: false,
       registrationClosesAt: null,
       registrationLeadMinutes: null,
+      registrationManuallyClosedAt: new Date("2034-01-01T00:00:00Z"),
+      registrationCutoffBeforeManualClose: null,
+      registrationLeadBeforeManualClose: 90,
+      shortCode: null,
       checkInStationPinHash: "bcrypt-secret",
       checkInStationPinEncrypted: "encrypted-secret",
       checkInStationSecretVersion: 7,
@@ -36,5 +41,7 @@ describe("event browser DTO", () => {
     expect(serialized).not.toContain("encrypted-secret");
     expect(serialized).not.toContain("ticket-secret");
     expect(serialized).not.toContain("checkInStation");
+    expect(serialized).not.toContain("ManualClose");
+    expect(serialized).not.toContain("registrationManuallyClosedAt");
   });
 });

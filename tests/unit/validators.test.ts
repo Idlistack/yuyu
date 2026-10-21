@@ -112,13 +112,16 @@ describe("RSVP validation", () => {
 });
 
 describe("event validation", () => {
+  // Relative to now so the fixture never drifts into the past.
+  const futureStart = new Date(Date.now() + 365 * 24 * 60 * 60_000);
+  const at = (offsetHours: number) => new Date(futureStart.getTime() + offsetHours * 60 * 60_000).toISOString();
   const baseEvent = {
     organisationSlug: "demo",
     title: "Launch night",
     description: "A useful description.",
     aboutHtml: "<p>A useful description.</p>",
-    startDateTime: "2026-10-01T18:00:00.000Z",
-    endDateTime: "2026-10-01T20:00:00.000Z",
+    startDateTime: at(0),
+    endDateTime: at(2),
     timezone: "UTC",
     isOnline: false,
     location: "Main auditorium",
@@ -128,7 +131,7 @@ describe("event validation", () => {
     expect(
       createEventSchema.safeParse({
         ...baseEvent,
-        endDateTime: "2026-10-01T17:00:00.000Z",
+        endDateTime: at(-1),
       }).success,
     ).toBe(false);
   });

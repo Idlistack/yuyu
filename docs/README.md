@@ -6,6 +6,8 @@ This directory is the source of truth for the current product, its operation, an
 
 | Document | Purpose |
 | --- | --- |
+| [Design system](DESIGN.md) | V1 visual design brief: tokens, the dot-sign brand (§2.3), typography, components, motion, page patterns, dark mode, and voice |
+| [Contributing](../CONTRIBUTING.md) | How to report bugs, suggest ideas, and prepare a pull request |
 | [Features](FEATURES.md) | Current user-facing and administrative capabilities |
 | [Architecture](ARCHITECTURE.md) | System boundaries, request flows, data model, and background work |
 | [Local development](DEVELOPMENT.md) | Installation, database setup, and everyday commands |
@@ -13,6 +15,7 @@ This directory is the source of truth for the current product, its operation, an
 | [Routes](ROUTES.md) | Public pages, dashboards, APIs, and protected endpoints |
 | [Security](SECURITY.md) | Authentication, authorization, privacy, abuse protection, and known boundaries |
 | [Machine API v1](API.md) | Server-to-server authentication, scopes, contracts, and credential lifecycle |
+| [Mobile API v1](MOBILE_API.md) | User-authenticated API for the Yuyu mobile apps (Android and iOS), with an [OpenAPI 3.1 spec](mobile-api.openapi.yaml) and [fixtures](mobile-api-fixtures/) |
 | [Testing](TESTING.md) | Test suites, CI checks, coverage, and release verification |
 
 ## Deployment and operations

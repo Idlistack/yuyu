@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Mobile API v1 (`/api/mobile/v1`) for the Yuyu mobile apps (Android and iOS): `MobileSession` with hashed, rotating tokens and refresh-reuse revocation; password and Google ID-token sign-in sharing the web verifiers; own registrations and cancellation; public discovery, search, short links, event pages, feedback forms and RSVP; organiser events, guests, check-in (preview, scan/manual, undo, lookup, stats, offline roster and sync), broadcasts and day-of controls. Server Action logic moved into shared `lib/core/*` functions used by both surfaces. OpenAPI 3.1 contract (`docs/mobile-api.openapi.yaml`), response fixtures and a drift test. `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association`. New optional settings `GOOGLE_MOBILE_CLIENT_IDS`, `ANDROID_APP_SHA256_CERT_FINGERPRINTS` and `APPLE_APP_IDS`.
 - Role-based access control utilities (`requireAuth`, `requireOrgRole`, `canManageEvents`, `canManageMembers`, `canDeleteOrg`)
 - Organisation dashboard (`/dashboard/[orgSlug]`) with stats, event list, and FAB create actions
 - Event management panel (`/dashboard/[orgSlug]/event/[eventId]`) with tabs:

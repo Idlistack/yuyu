@@ -25,6 +25,20 @@ load balancer. Supply these production services separately:
 - a CDN/WAF or reverse proxy that overwrites the configured trusted client-IP
   header.
 
+The application container needs outbound network access to all of these, and
+to the operational alert webhook (for example Mattermost) over HTTPS when
+alerts are enabled in Super admin → Settings. Every application process sends
+email from its in-process outbox worker and posts alerts itself; there is no
+separate worker container. Docker's default bridge network allows this egress;
+check any host firewall or egress proxy.
+
+The live ticket page holds a Server-Sent Events stream at
+`/api/ticket/:token/events`. Configure the reverse proxy not to buffer
+`text/event-stream` responses (nginx: `proxy_buffering off` for
+`/api/ticket/`; the route also sends `X-Accel-Buffering: no`) and to allow idle
+reads of at least 30 seconds. Redis pub/sub carries check-in notifications
+between application replicas.
+
 The application image contains only the application. It does not run
 PostgreSQL, Redis, object storage, TLS termination, or SMTP. Keep the container
 port private and expose it only through the trusted proxy.
@@ -54,7 +68,10 @@ docker build \
 ```
 
 Export `NEXT_PUBLIC_BASE_URL` with the production HTTPS origin before building.
-It is compiled into the image and must match the runtime canonical URL.
+It is compiled into the image and must match the runtime canonical URL. It is
+the only build-visible setting: SMTP, Google SSO, backup posture, and alerts
+saved in Super admin → Settings are read from the database at runtime and never
+require a rebuild or restart.
 
 The Server Actions key is passed through a BuildKit secret mount and is required
 only by the application build. Supply the
@@ -84,8 +101,12 @@ At minimum, verify that:
 - `REDIS_URL` starts with `rediss://`;
 - a custom `S3_ENDPOINT`, when used, starts with `https://`;
 - the S3 bucket is private;
-- `EMAIL_FROM` and an authenticated `SMTP_SERVICE` or `SMTP_HOST` fallback are
-  configured for bootstrap and disaster recovery;
+- `MFA_ENCRYPTION_KEY` is set, stable, and identical for the application and
+  every migrator or one-off container: it decrypts the SMTP, Google, and alert
+  secrets saved in the panel, so reuse the existing value on upgrades;
+- optionally, `EMAIL_FROM` and an authenticated `SMTP_SERVICE` or `SMTP_HOST`
+  fallback for bootstrap and disaster recovery (once SMTP is saved in the
+  panel these variables are ignored entirely);
 - `TRUSTED_PROXY_IP_HEADER` names a header overwritten by the edge; and
 - `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` is exactly the value used for the
   application image build.
@@ -112,8 +133,15 @@ docker run --rm \
   --env-file /secure/path/yuyu.env \
   registry.example.com/yuyu-migrator:${YUYU_VERSION}
 
-node --env-file=/secure/path/yuyu.env scripts/verify-production-schema.mjs
+docker run --rm \
+  --env-file /secure/path/yuyu.env \
+  registry.example.com/yuyu-migrator:${YUYU_VERSION} \
+  node scripts/verify-production-schema.mjs
 ```
+
+The migrator image includes `scripts/verify-production-schema.mjs` and
+`scripts/check-instance-secrets.mjs`, so both can run with exactly the
+application's environment file.
 
 Start the application on a loopback-only port when the reverse proxy runs on
 the host:
@@ -143,10 +171,12 @@ Also call `GET /api/health/db` from the monitoring system with the
 bearer value in a URL.
 
 After the first sign-in, enroll authenticator MFA for the super-admin account,
-then verify or replace the bootstrap SMTP fallback and configure optional
-Google SSO under `/super-admin/settings`. Test email delivery before accepting
-registrations. Keep the environment SMTP credentials in the deployment secret
-store as a disaster-recovery fallback.
+then configure SMTP (replacing any environment fallback), optional Google SSO,
+and optional operational alerts under `/super-admin/settings`. Saved values take
+effect on the next send or sign-in; no restart is needed. Test email delivery
+before accepting registrations. Keeping environment SMTP credentials in the
+deployment secret store as a disaster-recovery fallback is recommended; they
+apply only while the panel has no SMTP configured.
 
 ## Upgrade an existing installation
 
@@ -156,6 +186,10 @@ Use this order for every release:
 2. Take and verify a database backup and record the current application image.
 3. Pull the new application and migrator images.
 4. Run the new migrator image once. A failed migration blocks the rollout.
+   Then run `node scripts/check-instance-secrets.mjs` in the same image and
+   environment; it fails if `MFA_ENCRYPTION_KEY` cannot decrypt the settings
+   saved in the panel (see
+   [Configuration](CONFIGURATION.md#application-secrets)).
 5. Replace the application container with the new immutable image.
 6. Verify liveness, authenticated database readiness, outbox heartbeat, email
    delivery, Redis health, and error rate before completing the deployment.
@@ -193,8 +227,8 @@ monitoring URLs or logs.
 ## Current image-packaging limitations
 
 The `runner` image does not contain the Prisma CLI or operational scripts. The
-`migrator` image contains Prisma migrations but not the storage migration,
-backup, or restore scripts. Consequently:
+`migrator` image contains Prisma migrations and the schema and stored-secret
+checks, but not the storage migration, backup, or restore scripts. Consequently:
 
 - run `npm run storage:migrate` from a trusted checkout when legacy
   database-backed assets still exist; and

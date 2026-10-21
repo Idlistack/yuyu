@@ -4,6 +4,8 @@
 
 Copy `.env.example` to `.env` for local development. Production secrets must come from a secrets manager or the deployment platform, never from a committed file.
 
+Blank values (for example `SMTP_HOST=""` left over from `.env.example`) are treated as unset by the production startup check and by `npm run production:check`, so placeholders for panel-managed settings do not stop the server from starting.
+
 ## Core and authentication
 
 | Variable | Production | Purpose |
@@ -11,10 +13,13 @@ Copy `.env.example` to `.env` for local development. Production secrets must com
 | `DATABASE_URL` | Required | PostgreSQL URL; production requires `sslmode=require`, `verify-ca`, or `verify-full` |
 | `AUTH_SECRET` | Required | Auth.js signing/encryption secret, at least 32 characters |
 | `AUTH_URL` | Required | Canonical Auth.js HTTPS origin |
-| `NEXT_PUBLIC_BASE_URL` | Required | Public link origin; must exactly match `AUTH_URL` |
+| `NEXT_PUBLIC_BASE_URL` | Required | Public link origin; must exactly match `AUTH_URL`. Sent emails also use it to make site-relative images and links (event cover, organisation logo, event page) absolute; without it those are left out of delivered broadcasts, while the dashboard preview still renders them |
 | `AUTH_GOOGLE_ID` | Legacy fallback | Google OAuth client ID; configure new instances in Super admin → Settings |
 | `AUTH_GOOGLE_SECRET` | Legacy fallback | Google OAuth client secret; configure new instances in Super admin → Settings |
 | `SUPER_ADMIN_EMAIL` | Recommended | Sole email allowed into the instance administration area |
+| `GOOGLE_MOBILE_CLIENT_IDS` | Optional | Comma-separated Google OAuth client ids of the Yuyu mobile apps (Android and iOS). Mobile Google sign-in accepts ID tokens whose `aud` is the web Google client id or one of these; when set, a token issued for the web client id must also name one of these as `azp`. Available only when web Google sign-in is configured |
+| `ANDROID_APP_SHA256_CERT_FINGERPRINTS` | Optional | Comma-separated SHA-256 signing-certificate fingerprints (`AA:BB:…`) published in `/.well-known/assetlinks.json` for Android App Links (package `com.twilighty.yuyu`); unset serves `[]` |
+| `APPLE_APP_IDS` | Optional | Comma-separated `TEAMID.bundle.id` values (for example `ABCDE12345.com.twilighty.yuyu`) published in `/.well-known/apple-app-site-association` for iOS Universal Links (tickets, event pages and feedback forms; see [Mobile API](MOBILE_API.md#app-links)); unset serves empty details |
 
 ### Deployment example: `events.dev.idliapps.com`
 
@@ -44,17 +49,25 @@ Keep an HTTPS redirect from the old hostname to the new one for as long as invit
 | Variable | Production | Purpose |
 | --- | --- | --- |
 | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | Required | Stable base64 AES key shared by the build and every replica; 16, 24, or 32 decoded bytes |
-| `MFA_ENCRYPTION_KEY` | Required | Independent base64 key used to encrypt TOTP seeds; exactly 32 decoded bytes |
+| `MFA_ENCRYPTION_KEY` | Required | Independent base64 key used to encrypt TOTP seeds; exactly 32 decoded bytes. A domain-separated subkey also encrypts the SMTP password, Google client secret, and alert webhook URL saved in Super admin → Settings. Must be identical on every replica and job (app pods, migration job, any one-off container) and stable |
 | `CRON_SECRET` | Required | Bearer secret for the outbox scheduler, at least 32 characters |
 | `HEALTHCHECK_SECRET` | Required | Bearer secret for database readiness, at least 32 characters |
 
 Generate independent keys with `openssl rand -base64 32`. Rotating the Server Action key invalidates outstanding action forms. Rotating the MFA key without re-encrypting stored seeds prevents enrolled users from validating TOTP codes.
 
+**`MFA_ENCRYPTION_KEY` mismatch or rotation.** The server validates only the key's format at startup, so a replica with a different key still starts and passes health checks — it does not crash-loop — but on that replica every use of a value encrypted with the original key fails: outbox delivery fails and is retried until the outbox gives up, Google sign-in fails, alerts are not sent, and TOTP verification fails (including the super-admin step-up needed to fix settings). Behind a load balancer this looks intermittent. Detect it with the same environment the application receives:
+
+```bash
+node --env-file=/secure/path/yuyu.env scripts/check-instance-secrets.mjs
+```
+
+It reports which stored values cannot be decrypted, never printing them, and exits non-zero (it is also included in the `migrator` image and can run in the Helm migration job with `migration.checkInstanceSecrets=true`). Fix it by restoring the original key on every replica and job. If the original key is lost, set one new key everywhere, re-enter the SMTP password, Google client secret, and alert webhook in Super admin → Settings, and have enrolled users re-enrol MFA (recovery codes are hashed, not encrypted, and still work).
+
 ## Redis and request trust
 
 | Variable | Production | Purpose |
 | --- | --- | --- |
-| `REDIS_URL` | Required | Distributed rate limiter; production requires `rediss://` |
+| `REDIS_URL` | Required | Distributed rate limiter and pub/sub for live ticket check-in across replicas; production requires `rediss://` |
 | `TRUSTED_PROXY_IP_HEADER` | Required | One of `cf-connecting-ip`, `x-forwarded-for`, or `x-real-ip`; the edge must overwrite it |
 | `ALLOWED_ACTION_ORIGINS` | Optional | Comma-separated trusted proxy/CDN hosts allowed to invoke Server Actions |
 | `ALLOWED_EMBED_ORIGINS` | Optional | Exact HTTPS origins permitted to frame public event embeds; blank disables cross-site framing |
@@ -62,15 +75,28 @@ Generate independent keys with `openssl rand -base64 32`. Rotating the Server Ac
 
 Do not expose the application directly while trusting a client-controlled forwarding header.
 
+Rate-limit windows are defined in code (`lib/rateLimit.ts`), not configured by environment. Recent buckets: `dataExport` (5 personal data exports per user per hour), `ticketStatus` (120 ticket status reads per IP per minute), `ticketEvents` (60 ticket event-stream connections per IP per minute), and `shortLink` (30 short-link lookups per IP per minute). The ticket buckets are generous because attendees at one venue often share a NAT address.
+
+The live ticket stream at `/api/ticket/:token/events` is a long-lived `text/event-stream` response. Any reverse proxy in front of the application must not buffer it (for nginx, `proxy_buffering off`; the route also sends `X-Accel-Buffering: no`) and must allow idle reads of at least 30 seconds.
+
 ## Email and retention
 
 | Variable | Production | Purpose |
 | --- | --- | --- |
-| `EMAIL_FROM` | Legacy fallback | Verified sender identity; configure new instances in Super admin → Settings |
-| `SMTP_*` | Legacy fallback | SMTP settings; configure new instances in Super admin → Settings |
+| `EMAIL_FROM` | Optional fallback | Verified sender identity; configure new instances in Super admin → Settings |
+| `SMTP_*` | Optional fallback | SMTP settings; configure new instances in Super admin → Settings. When `SMTP_SERVICE`/`SMTP_HOST` is set without `SMTP_ALLOW_UNAUTHENTICATED=1`, `production:check` requires `SMTP_USER` and `SMTP_PASSWORD` |
 | `OUTBOX_RETENTION_DAYS` | Optional | Retention for non-capability sent/failed outbox history; defaults to 30 (capability-bearing rows are deleted immediately after delivery or terminal failure) |
 
-Configure SMTP, Google SSO, and backup status under **Super admin → Settings**. SMTP and Google client secrets are encrypted at rest with a domain-separated key derived from `MFA_ENCRYPTION_KEY`, are never displayed after saving, and require the super-admin fresh-TOTP step-up. Environment values remain supported as migration fallbacks. Production SMTP connections require TLS with certificate verification.
+Configure SMTP, Google SSO, backup status, and operational alerts under **Super admin → Settings**. SMTP and Google client secrets and the alert webhook URL are encrypted at rest with a domain-separated key derived from `MFA_ENCRYPTION_KEY`, are never displayed after saving, and require the super-admin fresh-TOTP step-up. Production SMTP connections require TLS with certificate verification.
+
+### Panel settings and environment fallbacks
+
+- **Database overrides environment.** Panel values are read from the database at send and sign-in time on every replica, so a change applies on the next email or sign-in without a restart, redeploy, or rebuild. None of them is build-visible.
+- **SMTP is all-or-nothing.** Once SMTP (a service or a host) is saved in the panel, every `SMTP_*` variable is ignored: service, host, port, TLS, username, password, and the private-relay flag all come from the panel, and no single field falls back to the environment. Clear both Service and Host and save to return to the environment configuration. The sender address falls back on its own: the saved value, then `EMAIL_FROM`, then `Yuyu Events <noreply@localhost>`. **Send test email** sends to your own super-admin address with the saved settings (15-second limit). In production, SMTP must be authenticated unless *Private unauthenticated relay* (or `SMTP_ALLOW_UNAUTHENTICATED=1`) is set; TLS 1.2+ with certificate verification is required except in CI/staging mode (`CI=true` with `ALLOW_INSECURE_PRODUCTION_TESTS=1`, e.g. Mailpit on port 1025).
+- **Google SSO** uses a saved client ID only with the saved secret. If that secret is missing or cannot be decrypted, Google sign-in is off rather than paired with an environment secret, and password sign-in keeps working. With no saved client ID, `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` (or the legacy `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`) apply, and the panel cannot switch those off; remove the variables instead. Register `${AUTH_URL}/api/auth/callback/google` with Google.
+- **Backup posture:** any saved backup field replaces the `BACKUP_*` values together; the last successful backup is entered in UTC.
+- **Not required in the environment.** Neither the startup check nor `npm run production:check` requires `EMAIL_FROM`, `SMTP_*`, or `AUTH_GOOGLE_*`; the preflight only notes when no SMTP fallback exists. Until SMTP is saved in the panel (or provided as a fallback), production email stays queued. Keeping an environment SMTP fallback is still recommended for bootstrap and disaster recovery (for example, a lost `MFA_ENCRYPTION_KEY`).
+- **Operational alerts** are configured only in the panel. Every application process posts them directly to the webhook (for example Mattermost) over outbound HTTPS, so app containers/pods need egress to the webhook host on port 443, in addition to SMTP (typically 465/587), PostgreSQL, Redis, and object storage. Browser crash reports reach the app at `/api/client-errors` and are forwarded the same way.
 
 ## Object storage
 
