@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 try {
-  const [certificateFormColumns, feedbackAnswerColumns, userColumns, feedbackColumns, assetColumns, apiCredentialColumns, featureTables, eventColumns, eventPageColumns, eventSessionColumns, constraints, indexes, triggers] = await Promise.all([
+  const [certificateFormColumns, feedbackAnswerColumns, userColumns, feedbackColumns, assetColumns, apiCredentialColumns, featureTables, eventColumns, eventPageColumns, eventSessionColumns, instanceSettingColumns, constraints, indexes, triggers] = await Promise.all([
     prisma.$queryRaw`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'EventFeedbackForm'`,
     prisma.$queryRaw`
       SELECT column_name, is_nullable
@@ -57,6 +57,11 @@ try {
       WHERE table_schema = 'public' AND table_name = 'EventSession'
     `,
     prisma.$queryRaw`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'InstanceSetting'
+    `,
+    prisma.$queryRaw`
       SELECT conname, confdeltype
       FROM pg_constraint
       WHERE conname IN (
@@ -105,6 +110,7 @@ try {
   const nullableFeedbackColumns = new Set(feedbackColumns.filter((row) => row.is_nullable === "YES").map((row) => row.column_name));
   const feedbackAnswerColumnNames = new Set(feedbackAnswerColumns.map((row) => row.column_name));
   const nullableFeedbackAnswerColumns = new Set(feedbackAnswerColumns.filter((row) => row.is_nullable === "YES").map((row) => row.column_name));
+  const instanceSettingColumnNames = new Set(instanceSettingColumns.map((row) => row.column_name));
   const constraintNames = new Set(constraints.map((row) => row.conname));
   const indexNames = new Set(indexes.map((row) => row.indexname));
   const triggerNames = new Set(triggers.map((row) => row.trigger_name));
@@ -120,6 +126,7 @@ try {
     ...["registrationClosesAt", "registrationLeadMinutes", "checkInStationPinHash", "checkInStationPinEncrypted", "checkInStationSecretVersion"].filter((column) => !eventColumnNames.has(column)),
     ...["isPublished"].filter((column) => !eventPageColumnNames.has(column)),
     ...["delayMinutes"].filter((column) => !eventSessionColumnNames.has(column)),
+    ...["smtpPasswordEncrypted", "googleClientSecretEncrypted", "opsWebhookUrlEncrypted", "opsWebhookEnabled", "opsWebhookIncludeWarnings"].filter((column) => !instanceSettingColumnNames.has(column)).map((column) => `InstanceSetting.${column}`),
     ...["RSVP_exactly_one_target", "CheckInEvent_rsvpId_fkey", "AuditEvent_organisationId_fkey", "ApiClient_organisationId_fkey", "AuditEvent_actorApiClientId_fkey", "ApiCredential_secret_hash_length", "AuditEvent_single_actor", "Event_registration_cutoff_mode", "EventCollaborator_one_target", "EventCollaboratorInvite_one_target", "EventResource_one_parent", "EventResource_one_source", "Event_valid_time_range", "Event_positive_capacity", "EventSeries_positive_duration", "EventInstance_valid_time_range", "EventSession_valid_time_range", "OrganisationInvite_usage_pair", "EventCollaboratorInvite_usage_pair", "CheckInEvent_known_action", "CheckInEvent_known_source", "EventFeedbackAnswer_fieldId_fkey", "EventFeedbackResponse_identity_capability_pair", "EventFeedbackAnswer_typed_value", "OutboxMessage_attempts_nonnegative", "OutboxMessage_state_shape"].filter((name) => !constraintNames.has(name)),
     ...(constraints.some((row) => row.conname === "EventFeedbackAnswer_fieldId_fkey" && row.confdeltype === "n") ? [] : ["EventFeedbackAnswer_fieldId_fkey:ON DELETE SET NULL"]),
     ...["Asset_key_key", "RSVP_event_attendee_unique", "RSVP_instance_attendee_unique", "ApiClient_organisationId_status_idx", "ApiCredential_apiClientId_revokedAt_idx"].filter((name) => !indexNames.has(name)),

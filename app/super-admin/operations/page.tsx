@@ -6,7 +6,7 @@ import { env } from "@/lib/env";
 import { InstanceOperationsControls } from "@/components/super-admin/InstanceOperationsControls";
 import { OUTBOX_SCHEDULER_HEARTBEAT_KEY } from "@/lib/operationalHeartbeat";
 import { redactSensitiveText } from "@/lib/redactSensitiveText";
-import { INSTANCE_SETTINGS_ID } from "@/lib/instanceSettings";
+import { getEmailSettingsStatus, INSTANCE_SETTINGS_ID, resolveBackupPosture } from "@/lib/instanceSettings";
 import { AdminPanel } from "@/components/super-admin/AdminPanel";
 import { Callout, Chip, EmptyState, PageHeader } from "@/components/ui/display";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -35,7 +35,7 @@ export default async function SuperAdminOperationsPage() {
   const heartbeat = (prisma as unknown as {
     operationalHeartbeat?: Pick<typeof prisma.operationalHeartbeat, "findUnique">;
   }).operationalHeartbeat;
-  const [outboxGroups, expiredTokens, lastRestoreDrill, oldestPending, schedulerHeartbeat, failedMessages, instanceSettings] = await Promise.all([
+  const [outboxGroups, expiredTokens, lastRestoreDrill, oldestPending, schedulerHeartbeat, failedMessages, instanceSettings, emailStatus] = await Promise.all([
     prisma.outboxMessage.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.verificationToken.count({ where: { expires: { lt: now } } }),
     prisma.auditEvent.findFirst({
@@ -66,12 +66,19 @@ export default async function SuperAdminOperationsPage() {
       take: 25,
       select: { id: true, kind: true, attempts: true, lastError: true, createdAt: true },
     }),
-    prisma.instanceSetting.findUnique({ where: { id: INSTANCE_SETTINGS_ID } }),
+    prisma.instanceSetting.findUnique({
+      where: { id: INSTANCE_SETTINGS_ID },
+      select: { backupProvider: true, backupLastSuccessAt: true, backupRetentionDays: true },
+    }),
+    getEmailSettingsStatus(),
   ]);
   const outbox = new Map(outboxGroups.map((row) => [row.status, row._count._all]));
-  const backupProvider = instanceSettings?.backupProvider ?? env?.BACKUP_PROVIDER;
-  const backupRetentionDays = instanceSettings?.backupRetentionDays ?? env?.BACKUP_RETENTION_DAYS;
-  const reportedBackupAt = instanceSettings?.backupLastSuccessAt ?? (env?.BACKUP_LAST_SUCCESS_AT ? new Date(env.BACKUP_LAST_SUCCESS_AT) : null);
+  // Saved backup posture replaces the BACKUP_* environment fallback as a whole.
+  const backup = resolveBackupPosture(instanceSettings);
+  const backupProvider = backup.provider;
+  const backupRetentionDays = backup.retentionDays;
+  const reportedBackupAt = backup.lastSuccessAt;
+  const emailSourceLabel = emailStatus.source === "database" ? "saved settings" : "environment";
   const backupFresh = reportedBackupAt != null && now.getTime() - reportedBackupAt.getTime() < 26 * 3_600_000;
   const schedulerFresh = schedulerHeartbeat?.lastSucceededAt != null
     && now.getTime() - schedulerHeartbeat.lastSucceededAt.getTime() < 3 * 60_000;
@@ -100,7 +107,7 @@ export default async function SuperAdminOperationsPage() {
             <StatusChip ok={Boolean(env?.REDIS_URL)} ready="Redis configured" missing="Redis missing — production writes will fail closed" />
             <StatusChip ok={Boolean(process.env.CRON_SECRET)} ready="Outbox scheduler secret configured" missing="Outbox scheduler secret missing" />
             <StatusChip ok={Boolean(process.env.HEALTHCHECK_SECRET)} ready="Readiness probe protected" missing="Readiness probe secret missing" />
-            <StatusChip ok={Boolean(instanceSettings?.smtpHost || instanceSettings?.smtpService || env?.SMTP_HOST || env?.SMTP_SERVICE)} ready="Transactional email configured" missing="Transactional email not configured" />
+            <StatusChip ok={emailStatus.source !== "none"} ready={`Transactional email configured (${emailSourceLabel})`} missing="Transactional email not configured" />
           </div>
         </AdminPanel>
       </div>

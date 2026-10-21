@@ -14,6 +14,11 @@ RUN npm ci
 FROM deps AS migrator
 WORKDIR /app
 COPY prisma ./prisma
+# Post-migration checks that need only Prisma and the runtime environment:
+# `node scripts/verify-production-schema.mjs` (schema contract) and
+# `node scripts/check-instance-secrets.mjs` (MFA_ENCRYPTION_KEY can decrypt the
+# Super admin -> Settings secrets already in the database).
+COPY scripts/verify-production-schema.mjs scripts/check-instance-secrets.mjs ./scripts/
 CMD ["npx", "prisma", "migrate", "deploy"]
 
 # Stage 2: Rebuild the source code

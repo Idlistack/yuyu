@@ -6,9 +6,8 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import { hasVerifiedGoogleEmail } from "@/lib/googleAuth";
-import { getGoogleSsoSettings } from "@/lib/instanceSettings";
 import { verifyPasswordCredentials } from "@/lib/credentialsAuth";
-import { evaluateGoogleSignIn } from "@/lib/googleSignIn";
+import { evaluateGoogleSignIn, loadGoogleSsoSettings } from "@/lib/googleSignIn";
 import { logOpsError } from "@/lib/opsAlerts";
 
 /**
@@ -24,8 +23,12 @@ class EmailVerificationRequiredError extends CredentialsSignin {
   code = "email_verification_required";
 }
 
+// The config callback runs for every Auth.js request, `auth()` call and
+// server-side signIn/signOut, so Google SSO follows the instance settings
+// stored in the database at request time (no restart or rebuild). When Google
+// is removed the provider disappears and its sign-in/callback routes stop.
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
-  const google = await getGoogleSsoSettings();
+  const google = await loadGoogleSsoSettings();
   return {
   adapter: authAdapter,
   // Credentials requires JWT sessions; OAuth accounts are still persisted

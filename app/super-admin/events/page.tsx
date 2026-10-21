@@ -2,24 +2,26 @@ import { requireSuperAdminMfa } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { AdminPager, AdminSearchForm, LinkRow, NameCell, StatusValue } from "@/components/super-admin/AdminPanel";
 import { Chip, PageHeader } from "@/components/ui/display";
+import { readPageParam, readSearchParam } from "@/lib/superAdminInsights";
 import { Input } from "@/components/ui/field";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 type Props = {
-  searchParams: Promise<{ q?: string; org?: string; page?: string }>;
+  searchParams: Promise<{ q?: string | string[]; org?: string | string[]; page?: string | string[] }>;
 };
 
 export default async function SuperAdminEventsPage({ searchParams }: Props) {
   // Layout checks don't re-run on client navigation, so every page checks too.
   await requireSuperAdminMfa();
   const sp = await searchParams;
-  const q = (sp.q ?? "").trim();
-  const org = (sp.org ?? "").trim();
-  const page = Math.max(0, Number.parseInt(sp.page ?? "0", 10) || 0);
+  const q = readSearchParam(sp.q);
+  const org = readSearchParam(sp.org, 64);
+  const page = readPageParam(sp.page);
   const take = 50;
   const skip = page * take;
 
-  const events = await prisma.event.findMany({
+  // One extra row tells the pager whether a next page exists.
+  const rows = await prisma.event.findMany({
     where: {
       ...(org ? { organisationId: org } : {}),
       ...(q
@@ -35,7 +37,7 @@ export default async function SuperAdminEventsPage({ searchParams }: Props) {
         : {}),
     },
     orderBy: { createdAt: "desc" },
-    take,
+    take: take + 1,
     skip,
     select: {
       id: true,
@@ -49,6 +51,7 @@ export default async function SuperAdminEventsPage({ searchParams }: Props) {
       _count: { select: { rsvps: true } },
     },
   });
+  const events = rows.slice(0, take);
 
   const checkedIn = events.length === 0
     ? new Map<string, number>()
@@ -101,7 +104,7 @@ export default async function SuperAdminEventsPage({ searchParams }: Props) {
         </TBody>
       </Table>
 
-      <AdminPager basePath="/super-admin/events" query={q} page={page} extra={`&org=${encodeURIComponent(org)}`} />
+      <AdminPager basePath="/super-admin/events" query={q} page={page} extra={`&org=${encodeURIComponent(org)}`} hasNext={rows.length > take} />
     </div>
   );
 }

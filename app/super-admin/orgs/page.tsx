@@ -2,22 +2,24 @@ import { requireSuperAdminMfa } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { AdminPager, AdminSearchForm, LinkRow } from "@/components/super-admin/AdminPanel";
 import { PageHeader } from "@/components/ui/display";
+import { readPageParam, readSearchParam } from "@/lib/superAdminInsights";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 type Props = {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
 };
 
 export default async function SuperAdminOrgsPage({ searchParams }: Props) {
   // Layout checks don't re-run on client navigation, so every page checks too.
   await requireSuperAdminMfa();
   const sp = await searchParams;
-  const q = (sp.q ?? "").trim();
-  const page = Math.max(0, Number.parseInt(sp.page ?? "0", 10) || 0);
+  const q = readSearchParam(sp.q);
+  const page = readPageParam(sp.page);
   const take = 50;
   const skip = page * take;
 
-  const orgs = await prisma.organisation.findMany({
+  // One extra row tells the pager whether a next page exists.
+  const rows = await prisma.organisation.findMany({
     where: q
       ? {
           OR: [
@@ -27,7 +29,7 @@ export default async function SuperAdminOrgsPage({ searchParams }: Props) {
         }
       : undefined,
     orderBy: { createdAt: "desc" },
-    take,
+    take: take + 1,
     skip,
     select: {
       id: true,
@@ -39,6 +41,7 @@ export default async function SuperAdminOrgsPage({ searchParams }: Props) {
       },
     },
   });
+  const orgs = rows.slice(0, take);
 
   return (
     <div className="flex flex-col gap-6">
@@ -78,7 +81,7 @@ export default async function SuperAdminOrgsPage({ searchParams }: Props) {
         </TBody>
       </Table>
 
-      <AdminPager basePath="/super-admin/orgs" query={q} page={page} />
+      <AdminPager basePath="/super-admin/orgs" query={q} page={page} hasNext={rows.length > take} />
     </div>
   );
 }
