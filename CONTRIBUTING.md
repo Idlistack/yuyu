@@ -49,7 +49,9 @@ Never commit `.env` or real secrets.
    ```
 
    Changes to authorization, mutations, public routes, the API or deployment need
-   the stronger checks in [docs/TESTING.md](docs/TESTING.md).
+   the stronger checks in [docs/TESTING.md](docs/TESTING.md). The integration
+   suite needs `TEST_DATABASE_URL` pointing at a separate, disposable database,
+   never your development one.
 4. UI changes follow [docs/DESIGN.md](docs/DESIGN.md). Check light and dark mode
    and a 360px-wide screen. Don't restyle organiser logos, covers or colours with
    Yuyu's brand.

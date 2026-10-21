@@ -1,5 +1,7 @@
 # Isolated staging deployment
 
+[Documentation index](README.md)
+
 This guide describes the disposable staging/test deployment at
 `https://events.dev.idliapps.com`. The application and all backing services run
 on the same VM under Docker Compose; Nginx remains installed directly on the
@@ -28,7 +30,9 @@ chmod 600 .env.staging
 
 `POSTGRES_PASSWORD` must match the password embedded in `DATABASE_URL`, and
 `REDIS_PASSWORD` must match the password embedded in `REDIS_URL`. Generate the
-three encryption/authentication keys as documented in [Configuration](CONFIGURATION.md).
+five secrets (`AUTH_SECRET`, `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`,
+`MFA_ENCRYPTION_KEY`, `CRON_SECRET`, and `HEALTHCHECK_SECRET`) as documented in
+[Configuration](CONFIGURATION.md).
 
 Both `migrate` and `app` read `.env.staging`, so they share one
 `MFA_ENCRYPTION_KEY`. Keep that value when redeploying or recreating the file:
@@ -113,17 +117,45 @@ server {
 
     # ssl_certificate and ssl_certificate_key are managed by Certbot.
 
+    # Live ticket check-in stream (text/event-stream): never buffer it, and
+    # allow idle reads longer than the route's 25-second heartbeat.
+    location /api/ticket/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 60s;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
+
+The staging template sets `TRUSTED_PROXY_IP_HEADER="x-forwarded-for"`, and
+Yuyu uses the **first** entry of that header as the client address for rate
+limiting (`getClientIpFromHeaders` in `lib/rateLimit.ts`). Nginx must therefore
+overwrite the header with the address it saw (`$remote_addr`), not append to it
+with `$proxy_add_x_forwarded_for`: appending keeps any value the client sent
+first, so a client could choose its own rate-limit identity. Alternatively set
+`TRUSTED_PROXY_IP_HEADER="x-real-ip"` in `.env.staging`, which the block above
+also sets from `$remote_addr`. If a CDN sits in front of Nginx, use the header
+that the CDN overwrites (for example `cf-connecting-ip`) instead.
+
+Without the `/api/ticket/` location, Nginx buffers the live ticket stream and an
+attendee's ticket only tears at its 15-second status check.
 
 Validate and reload any Nginx change:
 

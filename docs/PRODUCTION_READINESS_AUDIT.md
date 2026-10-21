@@ -1,5 +1,7 @@
 # Production readiness audit
 
+> **Historical record.** This audit describes commit `8403b84` on `main` and is not maintained. It predates the V1 redesign, event short links, the mobile API, broadcast designs, the personal data export, and the live ticket stream. See [Security](SECURITY.md) and [Production operations](production-operations.md) for the current state.
+
 ## Audit baseline
 
 - Baseline commit: `8403b84e8d345ef292de9570d23aecc903ed7c3c`

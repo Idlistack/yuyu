@@ -71,7 +71,10 @@ again. Select the intended source commit when doing this.
 
 The server can later pull the two published images without Node.js or a source
 checkout. Keep database migration execution as a separate release step before
-replacing the application container. Follow [Docker deployment](DEPLOYMENT_DOCKER.md)
+replacing the application container. Besides `prisma migrate deploy` (its default
+command), the `yuyu-migrator` image carries `scripts/verify-production-schema.mjs`
+and `scripts/check-instance-secrets.mjs`, so the schema check and the
+`MFA_ENCRYPTION_KEY` check can run from it with the production environment. Follow [Docker deployment](DEPLOYMENT_DOCKER.md)
 for runtime configuration, migration ordering, readiness and rollback.
 
 ## Build secret handling

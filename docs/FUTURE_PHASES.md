@@ -24,14 +24,14 @@ This page contains only work that is not currently implemented. Current behavior
 - Scheduled reminders, delivery preferences, and unsubscribe management for attendee communications.
 - Calendar feeds and external calendar synchronization.
 - Cross-event and organisation-level analytics with privacy-preserving aggregation.
-- Organisation branding and custom domains.
+- Custom domains and organisation-level themes (organisation logos and per-event accent colours already exist).
 - More granular custom roles and per-action permissions.
 - Import/export tools for events and attendee rosters.
 - Extend the machine API only for concrete consumers: recurring series/instances, RSVP workflow data, separately scoped participant contact or registration answers, privacy-preserving feedback reads, and narrow idempotent writes.
 
 ## Scale and reliability
 
-- Dedicated asynchronous workers instead of scheduler-driven HTTP batches.
+- Separate worker processes instead of the in-process outbox worker that each application instance runs.
 - Load and soak testing with documented capacity targets.
 - Queue-depth, latency, object-store, and email-delivery service-level objectives.
 - Multi-region/read-replica planning if real traffic requires it.

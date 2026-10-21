@@ -30,7 +30,7 @@ production topology. Kubernetes operators should use the
 
 ### Recent schema migrations
 
-Apply these with `npm run db:deploy` before rolling out the matching application version. All are additive and safe for existing rows.
+Apply these with `npm run db:deploy` before rolling out the matching application version. All are safe for existing rows; the notes call out the ones that are not purely additive.
 
 | Migration | Change |
 | --- | --- |
@@ -40,7 +40,9 @@ Apply these with `npm run db:deploy` before rolling out the matching application
 | `20261017000000_broadcast_design` | `EventBroadcast.design` (default `classic`) |
 | `20261018000000_rsvp_user_index` | `RSVP(userId, createdAt)` index for account pages and the personal data export. A plain `CREATE INDEX` blocks RSVP writes while it builds, so run it in a quiet window on large installations |
 | `20261019000000_event_short_code` | Nullable `Event.shortCode` with a unique index |
+| `20261020000000_mobile_sessions` | New `MobileSession` table for the mobile API (SHA-256 token digests, each unique; cascades on `User`). Replaces the `CheckInEvent_known_source` CHECK to allow `mobile-scan` and `mobile-manual` (added `NOT VALID`, then `VALIDATE`, which scans `CheckInEvent`). Adds nullable `Event.registrationManuallyClosedAt`, `registrationCutoffBeforeManualClose`, and `registrationLeadBeforeManualClose` with the `Event_manual_close_snapshot_mode` CHECK. Not purely additive because it replaces a constraint; existing rows satisfy the wider list |
 | `20261021000000_ops_alert_webhook` | `InstanceSetting` alert webhook columns (encrypted URL, enabled flag off by default, include-warnings flag); additive only |
+| `20261021010000_realign_event_publication` | Data migration, no schema change. Re-aligns `EventPage.isPublished` with `Event.status = PUBLISHED` (the rule from `20260915000000_unify_event_publication`) and creates a released page row for published events that lack one. It repairs events that were published with the Overview **Publish event** button before the fix and stayed 404 (public page, RSVP, and short link) |
 
 ## Instance-managed services
 
