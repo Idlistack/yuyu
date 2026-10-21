@@ -226,10 +226,6 @@ test("the overview checklist publishes a draft event", async ({ browser }) => {
 });
 
 test("publishing releases the public event page", async ({ browser }) => {
-  // Known bug: publishEvent sets Event.status but never EventPage.isPublished, so
-  // a draft created by the dialog stays 404 after "Publish event". Remove this
-  // marker (and the release workaround below) once publishing releases the page.
-  test.fail();
   const anonymous = await newContext(browser);
   const publicPage = await anonymous.newPage();
   const response = await publicPage.goto(`/${orgSlug}/${eventSlug}`);
@@ -242,9 +238,6 @@ test("publishing releases the public event page", async ({ browser }) => {
 });
 
 test("a guest registers through the event card and reaches their ticket", async ({ browser }) => {
-  // Workaround for the known publish bug above: release the website directly so
-  // the attendee journeys still run. A no-op once publishing does this itself.
-  await prisma.eventPage.update({ where: { eventId }, data: { isPublished: true } });
   await prisma.event.update({ where: { id: eventId }, data: { capacity: 1 } });
   const anonymous = await newContext(browser);
   const publicPage = await anonymous.newPage();
