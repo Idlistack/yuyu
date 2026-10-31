@@ -51,6 +51,11 @@ describe("capability page caching", () => {
       "/reset-password?token=x",
       "/verify-email?token=x",
       "/login",
+      "/oauth/authorize?client_id=x",
+      "/oauth/consent?client_id=x",
+      "/oauth/token",
+      "/oauth/userinfo",
+      "/oauth/revoke",
     ]) {
       const response = await proxy(new NextRequest(`https://events.example.test${path}`));
       expect(response.headers.get("cache-control"), path).toContain("private");

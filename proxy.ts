@@ -49,7 +49,10 @@ function isNoStorePage(pathname: string): boolean {
     || /^\/account\/submissions\/[^/]+\/?$/.test(pathname)
     // Signed-in areas and the remaining capability links: organisation and
     // co-organiser invitations, password reset and email verification.
-    || /^\/(?:dashboard|account|super-admin|super-admin-mfa|join|reset-password|verify-email|login)(?:\/|$)/.test(pathname);
+    || /^\/(?:dashboard|account|super-admin|super-admin-mfa|join|reset-password|verify-email|login)(?:\/|$)/.test(pathname)
+    // OIDC provider (docs/OIDC_PROVIDER.md): the authorization request and
+    // consent screen, and token, userinfo and revocation responses.
+    || /^\/oauth\/(?:authorize|consent|token|userinfo|revoke)\/?$/.test(pathname);
 }
 
 /**
