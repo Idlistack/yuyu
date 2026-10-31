@@ -303,6 +303,17 @@ describe.sequential("People's Gallery integration", () => {
     respond = [500];
     await deliverAll();
     expect(await prisma.pgIntegrationDelivery.findUniqueOrThrow({ where: { id: last.id } })).toMatchObject({ status: WebhookDeliveryStatus.FAILED, attempts: PG_DELIVERY_MAX_ATTEMPTS });
+
+    // A snapshot that cannot pass its strict schema is dead-lettered at once, not retried forever.
+    await prisma.event.update({ where: { id: eventA.id }, data: { location: "Udupi" } });
+    const broken = (await rows({ resourceKey: `event:${eventA.id}:` })).at(-1)!;
+    await prisma.pgIntegrationDelivery.update({ where: { id: broken.id }, data: { snapshot: { id: eventA.id, status: "NOT_A_STATUS" } } });
+    received.length = 0;
+    await deliverAll();
+    expect(received).toHaveLength(0);
+    expect(await prisma.pgIntegrationDelivery.findUniqueOrThrow({ where: { id: broken.id } })).toMatchObject({
+      status: WebhookDeliveryStatus.FAILED, attempts: 1, lastError: "Envelope failed its schema",
+    });
   });
 
   it("issues client-credentials tokens only to first-party clients holding the scope", async () => {

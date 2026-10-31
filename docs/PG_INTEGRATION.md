@@ -142,7 +142,7 @@ The one-minute outbox worker (`lib/outboxWorker.ts`, and `POST /api/internal/out
 - Rows are claimed with `FOR UPDATE SKIP LOCKED` in capture order and finished under a lease; a lease older than 5 minutes returns to the queue. Up to 50 per pass, 5 at a time. Nothing is claimed while the integration is missing or disabled.
 - 10-second timeout, 256 KB body cap, no redirects. Any `2xx` is success.
 - **Retries:** up to 8 attempts on the org-webhook schedule (1 min, 5 min, 30 min, 1 h, 3 h, 6 h, 12 h, each ±20 % jitter; about 22.6 hours). `400` and `413` from PG are permanent (the envelope is malformed) and stop at once.
-- **Dead letter:** a row that fails permanently or exhausts its attempts is `FAILED` with a short, redacted `lastError` (no URL, no secret). `npm run pg:integration -- redrive` re-queues them. There is no automatic disabling: PG's nightly reconciliation through the API closes any gap.
+- **Dead letter:** a row that fails permanently, exhausts its attempts, or whose envelope fails its strict schema ("Envelope failed its schema", never sent) is `FAILED` with a short, redacted `lastError` (no URL, no secret). `npm run pg:integration -- redrive` re-queues them. There is no automatic disabling: PG's nightly reconciliation through the API closes any gap.
 - A row whose organisation no longer exists is skipped (`FAILED`, "Skipped: the organisation no longer exists").
 - Retention: finished deliveries and deleted-resource tombstones are removed after 30 days; queued and leased rows are kept.
 

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Prisma, WebhookDeliveryStatus } from "@prisma/client";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/db";
 import { sqlUtcTimestamp } from "@/lib/sqlTimestamp";
 import { oidcIssuer } from "@/lib/oidc/config";
@@ -339,10 +340,16 @@ export async function deliverPgIntegrationBatch(limit = BATCH_SIZE, options: { d
   const subjectOf = subjectFunction(integration);
   const rows = await claim(Math.min(Math.max(limit, 1), 200), options.deliveryId);
   const outcomes = await runWithConcurrency(rows, CONCURRENCY, (row) =>
-    deliverClaimed(row, integration, subjectOf).catch(async () => {
+    deliverClaimed(row, integration, subjectOf).catch(async (error: unknown) => {
+      // A snapshot or stored envelope that fails its strict schema can never
+      // succeed: dead-letter it at once. Anything else (a database blip while
+      // building) is retried, but never past the attempt cap.
+      const terminal = error instanceof ZodError || row.attempts >= PG_DELIVERY_MAX_ATTEMPTS;
       await prisma.pgIntegrationDelivery.updateMany({
         where: lease(row),
-        data: { status: WebhookDeliveryStatus.PENDING, lockedAt: null, nextAttemptAt: new Date(Date.now() + webhookRetryDelayMs(row.attempts)) },
+        data: terminal
+          ? { status: WebhookDeliveryStatus.FAILED, lockedAt: null, lastError: error instanceof ZodError ? "Envelope failed its schema" : "Delivery failed" }
+          : { status: WebhookDeliveryStatus.PENDING, lockedAt: null, nextAttemptAt: new Date(Date.now() + webhookRetryDelayMs(row.attempts)) },
       }).catch(() => undefined);
       return { id: row.id, ok: false, statusCode: null, error: "Delivery failed" } satisfies PgDeliveryOutcome;
     }),
