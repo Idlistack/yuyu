@@ -148,7 +148,9 @@ export async function proxy(request: NextRequest) {
     "form-action 'self'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
-    "connect-src 'self' https:",
+    // In development People's Gallery usually runs on plain http on this machine
+    // (docs/PG_INTEGRATION.md#selfie-step): let the selfie upload reach it.
+    `connect-src 'self' https:${isDevelopment ? " http://localhost:* http://127.0.0.1:*" : ""}`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""}`,
     // MUI/Emotion emits runtime style tags and attributes. A nonce combined
     // with unsafe-inline causes browsers to ignore unsafe-inline entirely.
