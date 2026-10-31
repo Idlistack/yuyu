@@ -9,8 +9,17 @@ import {
 import { purgeExpiredOperationalData } from "@/lib/retention";
 import { logOpsError } from "@/lib/opsAlerts";
 import { deliverWebhookBatch } from "@/lib/webhooks/delivery";
+import { deliverPgIntegrationBatch } from "@/lib/pgIntegration/delivery";
 
 const OUTBOX_WORKER_INTERVAL_MS = 60_000;
+/**
+ * People's Gallery deliveries also run on their own short tick: publishing,
+ * registrations, consent withdrawals and session revocations must reach PG
+ * well within a minute (docs/PG_INTEGRATION.md#delivery). With nothing queued,
+ * or no integration configured, a pass is one indexed lookup. Row claims use
+ * `FOR UPDATE SKIP LOCKED`, so it overlaps safely with the one-minute pass.
+ */
+export const PG_INTEGRATION_INTERVAL_MS = 10_000;
 /** Messages claimed per batch inside one scheduler pass. */
 export const OUTBOX_DRAIN_BATCH = 50;
 /**
@@ -48,6 +57,8 @@ type OutboxWorkerState = {
   started?: boolean;
   running?: boolean;
   timer?: ReturnType<typeof setInterval>;
+  pgRunning?: boolean;
+  pgTimer?: ReturnType<typeof setInterval>;
 };
 
 function workerState() {
@@ -66,9 +77,14 @@ export async function runOutboxScheduler() {
       logOpsError("[webhooks] delivery pass failed", { level: "error", source: "webhooks", title: "Webhook delivery pass failed", error });
       return { delivered: 0, failed: 0 };
     });
+    // The People's Gallery integration (docs/PG_INTEGRATION.md) likewise.
+    const pgIntegration = await deliverPgIntegrationBatch().catch((error: unknown) => {
+      logOpsError("[pg-integration] delivery pass failed", { level: "error", source: "pg-integration", title: "People's Gallery delivery pass failed", error });
+      return { delivered: 0, failed: 0 };
+    });
     const purged = await purgeExpiredOperationalData();
     await recordOutboxSchedulerSuccess(result).catch(() => undefined);
-    return { ...result, webhooks, purged };
+    return { ...result, webhooks, pgIntegration, purged };
   } catch (error) {
     await recordOutboxSchedulerFailure(error).catch(() => undefined);
     throw error;
@@ -104,4 +120,20 @@ export function startOutboxWorker() {
     void tick();
   }, OUTBOX_WORKER_INTERVAL_MS);
   state.timer.unref?.();
+
+  const pgTick = async () => {
+    if (state.pgRunning) return;
+    state.pgRunning = true;
+    try {
+      await deliverPgIntegrationBatch();
+    } catch (error) {
+      logOpsError("[pg-integration] delivery pass failed", { level: "error", source: "pg-integration", title: "People's Gallery delivery pass failed", error });
+    } finally {
+      state.pgRunning = false;
+    }
+  };
+  state.pgTimer = setInterval(() => {
+    void pgTick();
+  }, PG_INTEGRATION_INTERVAL_MS);
+  state.pgTimer.unref?.();
 }

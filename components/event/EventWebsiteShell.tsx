@@ -66,6 +66,8 @@ type Props = {
    * is live (results published; gallery public after the window closed).
    */
   judging?: { resultsHref: string | null; projectsHref: string | null } | null;
+  /** Photos by People's Gallery is on for the organisation: the ticket offers the selfie step. */
+  pgPhotos?: boolean;
 };
 
 const SECTION_LABELS: Record<string, string> = {
@@ -204,6 +206,7 @@ export function EventWebsiteShell(p: Props) {
               state={{ cancelled: p.event.status === "CANCELLED", open: p.registrationOpen, full: p.registrationFull, approvalRequired: p.approvalRequired }}
               accentColor={p.page.accentColor}
               team={p.team}
+              pgPhotos={p.pgPhotos ?? false}
             />
           </div>
         </aside>

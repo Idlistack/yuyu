@@ -59,9 +59,9 @@ build, the old build on the new schema, and a restore drill).
 
 ### What the upgrade changes
 
-- **Migrations.** 13 forward-only migrations, all dated after production's
+- **Migrations.** 14 forward-only migrations, all dated after production's
   last one, none editing an earlier migration. `bf7a04d` has 56 migrations;
-  after the upgrade there are 69.
+  after the upgrade there are 70.
 
   | Migration | Lock impact |
   | --- | --- |
@@ -78,11 +78,15 @@ build, the old build on the new schema, and a restore drill).
   | `20261028000000_attendance_confirmation` | `ALTER TABLE "Event"`; new table with foreign keys to `RSVP` and `Event` |
   | `20261028010000_hackathon_email_toggles` | `ALTER TABLE "Event"` (constant defaults, no rewrite) |
   | `20261029000000_event_crew` | Adds the `CREW` page section value; `ALTER TABLE "RSVP"` plus a CHECK validated under that lock; new tables |
+  | `20261102000000_pg_ticket_secret` | Nullable `PgIntegration.ticketSecretEncrypted` (metadata only, one-row table). No enum values. The previous release ignores it and keeps signing tickets with the legacy v1 key, which PG refuses once `YUYU_TICKET_SECRET` is set: on a rollback, unset it on PG too (or selfie uploads fail until the new release returns). After deploying, run `pg:integration rotate-ticket-secret` and set PG's `YUYU_TICKET_SECRET` |
+  | `20261101000000_pg_selfie_notifications` | New tables (`PgFaceConsent`, `PgSelfieTicket`, `PgNotificationReceipt`, `UserNotificationPreference`) with foreign keys to `RSVP`/`User` (brief lock, empty tables), nullable `PgIntegration.publicUrl` (metadata only), and a replaced CHECK on the small `PgIntegrationResource` table. No enum values added. The previous release ignores the new tables; the new `pg-photos` outbox kind is listed in `OUTBOX_KINDS_ADDED_AFTER_1_0` and requeued once if the old worker refused it |
+  | `20261031010000_pg_integration` | New tables, `OAuthGrant.subject` (nullable, metadata only) and capture triggers on `Event`, `RSVP`, `Membership`, `EventCollaborator`, `User`, `OAuthGrant` and `OAuthClient` ([People's Gallery integration](PG_INTEGRATION.md)). No enum values added. The previous release keeps working: the triggers only write while an integration is configured, and nothing delivers until the new release returns (queued rows wait) |
+  | `20261031000000_oidc_provider` | New tables and one new enum type only (OIDC provider for People's Gallery); not part of the timings below. No new values on existing enums, so it adds nothing to the image-only rollback check: the old release ignores the OAuth tables and "Sign in with Yuyu" stops until the new release returns |
 
   Details for each are in
   [Recent schema migrations](production-operations.md#recent-schema-migrations).
 - **Measured timings.** On a 51 MB rehearsal database (20,120-registration
-  event, 40,000 answers, 3,000 check-ins) all 13 migrations applied in
+  event, 40,000 answers, 3,000 check-ins) the first 13 migrations applied in
   0.61 s wall time (about 0.07 s of database time). At one million
   registrations they took 3.3 s wall time. The only material step is
   `large_event_indexes`, which blocks registration and check-in writes for

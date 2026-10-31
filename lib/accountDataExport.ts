@@ -53,6 +53,8 @@ export type AccountExportSource = {
     submission?: ExportSubmission | null;
     /** The user's own attendance confirmation reply; its token hash is never read. */
     attendanceCheck?: { sentAt: Date; response: AttendanceResponse | null; respondedAt: Date | null; note: string | null } | null;
+    /** Face matching with People's Gallery: consent and attestation only (Yuyu never holds the selfie). */
+    pgFaceConsent?: { ageAttestation: string; noticeVersion: string | null; grantedAt: Date | null; withdrawnAt: Date | null; selfieState: string } | null;
   }>;
   feedback: Array<{
     submittedAt: Date;
@@ -131,6 +133,15 @@ export function buildAccountDataExport(source: AccountExportSource, generatedAt:
               response: rsvp.attendanceCheck.response,
               respondedAt: iso(rsvp.attendanceCheck.respondedAt),
               note: rsvp.attendanceCheck.note || null,
+            }
+          : null,
+        faceMatching: rsvp.pgFaceConsent
+          ? {
+              ageAttestation: rsvp.pgFaceConsent.ageAttestation === "MINOR" ? "under 18" : "18 or older",
+              noticeVersion: rsvp.pgFaceConsent.noticeVersion,
+              consentGivenAt: iso(rsvp.pgFaceConsent.grantedAt),
+              withdrawnAt: iso(rsvp.pgFaceConsent.withdrawnAt),
+              selfie: rsvp.pgFaceConsent.selfieState,
             }
           : null,
       }];
@@ -231,6 +242,8 @@ export async function loadAccountExportSource(userId: string): Promise<AccountEx
         submission: { select: submissionSelect },
         // The reply, its time and note; the check's token hash is never read.
         attendanceCheck: { select: { sentAt: true, response: true, respondedAt: true, note: true } },
+        // Consent state only; enrollment and ticket ids are never read.
+        pgFaceConsent: { select: { ageAttestation: true, noticeVersion: true, grantedAt: true, withdrawnAt: true, selfieState: true } },
         event: { select: { title: true, startDateTime: true, endDateTime: true, timezone: true, organisation: { select: { name: true } } } },
         eventInstance: { select: { startDateTime: true, endDateTime: true, series: { select: { title: true, timezone: true, organisation: { select: { name: true } } } } } },
         answers: { select: { ...answerSelect, field: { select: { label: true } } }, orderBy: { field: { sortOrder: "asc" } }, take: 200 },

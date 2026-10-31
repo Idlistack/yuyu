@@ -12,6 +12,7 @@ import { flattenZodErrors } from "./utils";
 import type { ActionResult } from "./org";
 import { updateAccountProfileForUser } from "@/lib/core/accountProfile";
 import { revokeUserMobileSessions } from "@/lib/mobileAuth";
+import { revokeUserOAuthSessions } from "@/lib/oidc/provider";
 
 const updatePasswordSchema = z
   .object({
@@ -85,6 +86,7 @@ export async function updateAccountPassword(
     await tx.verificationToken.deleteMany({ where: { identifier: { in: [`reset:${user.email}`, `mfa:${session.user.id}`] } } });
     await tx.session.deleteMany({ where: { userId: session.user.id } });
     await revokeUserMobileSessions(tx, session.user.id);
+    await revokeUserOAuthSessions(tx, session.user.id);
     await tx.auditEvent.create({
       data: {
         action: user.passwordHash

@@ -1,0 +1,85 @@
+Yuyu can act as the sign-in service for other apps you run alongside it, such as **People's Gallery** for event photos. People choose **Continue with Yuyu** in the app, sign in to Yuyu as usual, allow the app once, and are sent back signed in. The app learns their name and profile photo, never their email address or password.
+
+<Callout kind="permission">
+
+The person who runs this Yuyu server, with shell access to the server or its migration job. There's no screen for this in the super-admin area: apps are registered from the command line so that a stolen browser session can never add one.
+
+</Callout>
+
+## Before you start
+
+- The app's operator gives you its **callback address**, for example `https://photos.example.org/api/v2/auth/yuyu/callback`. It must start with `https://`; `http://` is accepted only for `localhost` while developing.
+- Run the commands with the same environment as the Yuyu application, in particular the database address and `MFA_ENCRYPTION_KEY`. Running them inside the migration job or container is the easiest way.
+
+## Register an app
+
+<Steps>
+
+1. Run:
+
+   ```bash
+   npm run oauth:client -- register \
+     --name "People's Gallery" \
+     --redirect-uri https://photos.example.org/api/v2/auth/yuyu/callback \
+     --scopes "openid profile yuyu.events" \
+     --first-party
+   ```
+
+2. Copy the **client_id** and **client_secret** it prints into the app's secret settings straight away. The secret is shown only once; Yuyu keeps just a fingerprint of it.
+3. Give the app Yuyu's address. It finds everything else at `/.well-known/openid-configuration`.
+
+</Steps>
+
+The name you choose is what people see on the permission screen: "People's Gallery wants to: Know who you are · See events you're part of".
+
+<Callout kind="note">
+
+For local development of People's Gallery, register `http://localhost:8080/api/v2/auth/yuyu/callback`.
+
+</Callout>
+
+## Look after a registered app
+
+| Command | What it does |
+| --- | --- |
+| `npm run oauth:client -- list` | Lists apps, their status, permissions and callback addresses. Never shows secrets. |
+| `npm run oauth:client -- rotate-secret --client-id yyc_…` | Creates a new secret, shown once. The old one stops working immediately, so update the app at the same time. |
+| `npm run oauth:client -- set-redirect-uris --client-id yyc_… --redirect-uri https://…` | Replaces the callback addresses. Repeat `--redirect-uri` for more than one (up to 10). |
+| `npm run oauth:client -- disable --client-id yyc_…` | Stops the app signing anyone in and ends every sign-in it holds. `enable` turns it back on. |
+| `npm run oauth:client -- rotate-key` | Starts signing with a new key. Apps keep accepting the old one for 7 days. |
+
+Every command is recorded in the audit log (see [Security and the audit log](/help/instance/security-and-audit)).
+
+## Good to know
+
+- Callback addresses must match exactly, including the path and any trailing slash.
+- Each app sees a different, unchanging identifier for the same person, so two apps can't link their users together.
+- When someone changes or resets their password, changes two-step verification or chooses **Sign out everywhere**, their sign-in to connected apps ends too: apps can no longer refresh it or read their profile. People can disconnect an app themselves under **Account settings** → **Security** → **Connected apps**.
+- The signing keys and per-app identifiers are encrypted with a key derived from `MFA_ENCRYPTION_KEY`. Keep that key unchanged on every server; `node scripts/check-instance-secrets.mjs` confirms it can still read them. If it were lost, every app sign-in would stop working and people would appear as new users in each app.
+
+## Share events with People's Gallery
+
+People's Gallery also needs to know which events exist, who registered and who organises them, so the right people see the right photos. You switch this on per organisation, from the command line, after registering People's Gallery as above.
+
+<Steps>
+
+1. Connect the integration, using the app's **client_id** and the event address People's Gallery gives you:
+
+   ```bash
+   npm run pg:integration -- configure --client-id yyc_… \
+     --endpoint-url https://photos.example.org/api/v2/integrations/yuyu/events
+   ```
+
+   Copy the **signing secret** it prints into People's Gallery straight away; it is shown only once. If both apps run in the same cluster and People's Gallery has only an internal address, add `--allow-internal-target`.
+
+2. Turn it on for each organisation that uses People's Gallery:
+
+   ```bash
+   npm run pg:integration -- enable-org --org your-organisation
+   ```
+
+3. Check it with `npm run pg:integration -- status`, and send a test with `npm run pg:integration -- ping`.
+
+</Steps>
+
+People's Gallery then receives event changes, registrations and organiser roles within about a minute, and catches up on everything else by itself. It never receives email addresses, form answers or tickets: people are identified by the same per-app identifier as their sign-in. `disable-org` stops sharing an organisation, `disable` pauses everything, `rotate-secret` replaces the secret, and `redrive` resends deliveries that failed for too long. The technical reference is `docs/PG_INTEGRATION.md`.

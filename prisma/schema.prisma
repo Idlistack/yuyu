@@ -219,6 +219,11 @@ model User {
   judgeReviews                 JudgeReview[]
   webhookEndpointsCreated WebhookEndpoint[] @relation("WebhookEndpointCreatedBy")
   savedViews              SavedView[]
+  oauthGrants             OAuthGrant[]
+  oauthAuthorizationCodes OAuthAuthorizationCode[]
+  oauthSessions           OAuthSession[]
+  pgFaceConsents          PgFaceConsent[]
+  notificationPreference  UserNotificationPreference?
 }
 
 model Account {
@@ -281,6 +286,160 @@ model MobileSession {
   @@index([refreshExpiresAt])
 }
 
+// ── First-party OpenID Connect provider (docs/OIDC_PROVIDER.md) ─────────
+// Yuyu signs users in to registered first-party apps (People's Gallery) with
+// the authorization code flow and mandatory PKCE S256. Only digests of codes,
+// tokens and client secrets are stored; signing keys and pairwise salts are
+// encrypted at rest under their own HKDF label of MFA_ENCRYPTION_KEY.
+
+enum OAuthClientStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// A registered relying party. Registered by the operator (CLI), never by users.
+model OAuthClient {
+  id                    String            @id @default(cuid())
+  /// Public client identifier sent as `client_id` (`yyc_` + 22 base64url).
+  clientId              String            @unique
+  name                  String
+  /// Hex SHA-256 of the client secret; null for a public (PKCE-only) client.
+  secretHash            String?
+  /// Exact-match redirect URIs. No wildcards, no prefix matching.
+  redirectUris          String[]
+  /// Scopes this client may request; unknown scopes are refused.
+  allowedScopes         String[]
+  /// AES-GCM encrypted random salt for this client's pairwise `sub`.
+  pairwiseSaltEncrypted String
+  /// First-party apps are operated by the instance (still shown the one-time consent screen).
+  firstParty            Boolean           @default(false)
+  status                OAuthClientStatus @default(ACTIVE)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  codes         OAuthAuthorizationCode[]
+  grants        OAuthGrant[]
+  sessions      OAuthSession[]
+  clientTokens  OAuthClientToken[]
+  pgIntegration PgIntegration?
+}
+
+/// Client-credentials access token (`yoi_`, 10 minutes) for machine calls by a
+/// first-party client, e.g. the People's Gallery integration API
+/// (docs/PG_INTEGRATION.md). Only the SHA-256 digest is stored.
+model OAuthClientToken {
+  id        String   @id @default(cuid())
+  clientId  String
+  tokenHash String   @unique
+  scopes    String[]
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([expiresAt])
+}
+
+/// A one-time authorization code (60 seconds, single use).
+model OAuthAuthorizationCode {
+  id                  String    @id @default(cuid())
+  /// Hex SHA-256 of the code. The raw code exists only in the redirect.
+  codeHash            String    @unique
+  clientId            String
+  userId              String
+  /// User sessionVersion at approval; a password reset in between voids the code.
+  sessionVersion      Int
+  redirectUri         String
+  scopes              String[]
+  nonce               String?
+  codeChallenge       String
+  codeChallengeMethod String    @default("S256")
+  authTime            DateTime
+  createdAt           DateTime  @default(now())
+  expiresAt           DateTime
+  usedAt              DateTime?
+
+  client  OAuthClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session OAuthSession?
+
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+/// The user's one-time approval of a client's scopes ("Connected apps").
+model OAuthGrant {
+  id        String    @id @default(cuid())
+  userId    String
+  clientId  String
+  scopes    String[]
+  /// The client's pairwise `sub` for this user, kept so the People's Gallery
+  /// integration API can resolve `/users/{subject}/roles` (docs/PG_INTEGRATION.md).
+  /// Derived, not secret; filled when the grant is approved.
+  subject   String?
+  grantedAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  revokedAt DateTime?
+
+  client   OAuthClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions OAuthSession[]
+
+  @@unique([userId, clientId])
+  @@unique([clientId, subject])
+  @@index([clientId])
+}
+
+/// Tokens issued to a client for one user. Only SHA-256 digests are stored.
+/// Valid only while `sessionVersion` matches the user's and the grant stands,
+/// so password reset, MFA changes and "sign out everywhere" revoke it.
+model OAuthSession {
+  id                       String    @id @default(cuid())
+  userId                   String
+  clientId                 String
+  grantId                  String
+  /// The code this session was minted from; replaying the code revokes it.
+  codeId                   String?   @unique
+  sessionVersion           Int
+  scopes                   String[]
+  authTime                 DateTime
+  accessTokenHash          String    @unique
+  refreshTokenHash         String    @unique
+  previousRefreshTokenHash String?   @unique
+  rotatedAt                DateTime?
+  accessExpiresAt          DateTime
+  refreshExpiresAt         DateTime
+  createdAt                DateTime  @default(now())
+  lastUsedAt               DateTime  @default(now())
+  revokedAt                DateTime?
+
+  user   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client OAuthClient             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  grant  OAuthGrant              @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  code   OAuthAuthorizationCode? @relation(fields: [codeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, revokedAt])
+  @@index([grantId])
+  @@index([refreshExpiresAt])
+}
+
+/// ID-token signing keys. Exactly one key has `retiredAt` null (enforced by a
+/// partial unique index); retired keys stay in the JWKS until `expiresAt`.
+model OAuthSigningKey {
+  id                  String    @id @default(cuid())
+  kid                 String    @unique
+  alg                 String
+  /// Public JWK published at /oauth/jwks.
+  publicJwk           Json
+  /// AES-GCM encrypted private JWK. Never logged, returned, or audited.
+  privateJwkEncrypted String
+  createdAt           DateTime  @default(now())
+  retiredAt           DateTime?
+  /// After this the retired key leaves the JWKS.
+  expiresAt           DateTime?
+}
+
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -307,6 +466,7 @@ model Organisation {
   apiClients        ApiClient[]
   webhookEndpoints  WebhookEndpoint[]
   savedViews        SavedView[]
+  pgIntegration     PgIntegrationOrganisation?
 }
 
 /// A tenant-bound machine identity. It never authenticates through Auth.js.
@@ -962,6 +1122,7 @@ model RSVP {
   submissionLink    SubmissionLink?
   checkInListRecords CheckInListRecord[]
   checkInListEvents  CheckInListEvent[]
+  pgFaceConsent      PgFaceConsent?
   attendanceCheck    AttendanceCheck?
   crewMember         EventCrewMember?
 
@@ -1660,4 +1821,178 @@ model SavedView {
   @@index([eventId, surface])
   @@index([userId])
   @@index([organisationId])
+}
+
+/// The instance's People's Gallery integration (docs/PG_INTEGRATION.md): a
+/// first-party, operator-managed channel, separate from organisation webhooks.
+/// At most one row (id "default"), managed with `npm run pg:integration`.
+model PgIntegration {
+  id                  String    @id @default("default")
+  /// The People's Gallery OAuth client: its pairwise salt gives `subject`, and
+  /// only it may call /api/integrations/pg/v1 (scope `yuyu.integration`).
+  oauthClientId       String    @unique
+  endpointUrl         String
+  /// `whsec_…` signing secret, AES-256-GCM under its own HKDF label. Write-only.
+  secretEncrypted     String
+  /// `ytk_…` enrollment-ticket secret (contract §4.1, key v2), independent of the
+  /// delivery secret; same encryption. Write-only. Null: legacy v1 ticket key
+  /// derived from `secretEncrypted` until `rotate-ticket-secret` runs.
+  ticketSecretEncrypted String?
+  enabled             Boolean   @default(true)
+  /// Operator opt-in for an in-cluster target (http, private addresses, any
+  /// port). Loopback, link-local/metadata and multicast stay blocked.
+  allowInternalTarget Boolean   @default(false)
+  /// PG's public origin (https://photos.example.org): where browsers upload
+  /// selfies and the only origin allowed in notification deep links.
+  publicUrl           String?
+  lastSuccessAt       DateTime?
+  lastFailureAt       DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  oauthClient   OAuthClient                 @relation(fields: [oauthClientId], references: [id], onDelete: Restrict)
+  organisations PgIntegrationOrganisation[]
+}
+
+/// Organisations whose events, registrations and roles are shared with People's Gallery.
+model PgIntegrationOrganisation {
+  organisationId String   @id
+  integrationId  String
+  enabledAt      DateTime @default(now())
+
+  organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  integration  PgIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+}
+
+/// Per-resource version counter and tombstone, written by the capture
+/// triggers in the same transaction as the change. `key` is internal (it may
+/// embed a Yuyu user id) and is never sent; the delivered key uses `subject`.
+model PgIntegrationResource {
+  key            String    @id
+  /// event | registration | access | user
+  kind           String
+  resourceId     String
+  organisationId String?
+  eventId        String?
+  /// Strictly increasing per key: max(previous + 1, epoch ms of the change).
+  version        BigInt
+  deletedAt      DateTime?
+  /// Minimal snapshot of a deleted registration/event for backfill tombstones (no names or contact data).
+  tombstone      Json?
+  updatedAt      DateTime
+
+  @@index([kind, organisationId, updatedAt, key])
+  @@index([kind, eventId, updatedAt, key])
+  @@index([deletedAt])
+}
+
+/// Outbox for the People's Gallery integration. Rows are inserted by database
+/// triggers in the transaction that changed the resource, then signed and
+/// delivered by the one-minute outbox worker (lib/pgIntegration/delivery.ts).
+model PgIntegrationDelivery {
+  /// Envelope id (`evt_` + 32 hex), stable across retries: PG's idempotency key.
+  id              String                @id
+  seq             BigInt                @unique @default(autoincrement())
+  eventType       String
+  organisationId  String?
+  resourceKey     String
+  resourceVersion BigInt
+  /// Internal capture (ids and changed fields) until the envelope is built; then null.
+  snapshot        Json?
+  /// The strict envelope as sent (built once, identical on every retry).
+  payload         Json?
+  status          WebhookDeliveryStatus @default(PENDING)
+  attempts        Int                   @default(0)
+  nextAttemptAt   DateTime              @default(now())
+  lockedAt        DateTime?
+  lastAttemptAt   DateTime?
+  deliveredAt     DateTime?
+  lastStatusCode  Int?
+  /// Short, redacted failure summary.
+  lastError       String?
+  responseTimeMs  Int?
+  createdAt       DateTime              @default(now())
+
+  @@index([status, nextAttemptAt, seq])
+  @@index([createdAt])
+  @@index([resourceKey, resourceVersion])
+}
+
+/// Face matching with People's Gallery for one registration (docs/PG_INTEGRATION.md#selfie-step).
+/// Consent and the age attestation live here; the selfie itself is only ever
+/// stored by People's Gallery (decision D-Selfie): no image bytes, hashes or
+/// embeddings are kept in Yuyu.
+model PgFaceConsent {
+  id              String    @id @default(cuid())
+  rsvpId          String    @unique
+  userId          String
+  eventId         String
+  organisationId  String
+  /// ADULT (18 or older) or MINOR. A MINOR attestation blocks enrollment for this registration (D-12).
+  ageAttestation  String
+  ageAttestedAt   DateTime
+  /// Notice version the person agreed to; null until consent is given.
+  noticeVersion   String?
+  grantedAt       DateTime?
+  withdrawnAt     DateTime?
+  /// NONE | PENDING (ticket issued) | ADDED | REJECTED | REMOVED, as reported by People's Gallery.
+  selfieState     String    @default("NONE")
+  /// People's Gallery's enrollment id (opaque); never an image or a URL.
+  enrollmentId    String?
+  rejectedReason  String?
+  selfieUpdatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  rsvp    RSVP             @relation(fields: [rsvpId], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tickets PgSelfieTicket[]
+
+  @@index([userId])
+  @@index([eventId])
+}
+
+/// A short-lived enrollment ticket minted for an upload straight to People's
+/// Gallery. Only the `jti` and its lifecycle are stored, never the ticket itself.
+model PgSelfieTicket {
+  jti          String    @id
+  consentId    String
+  userId       String
+  issuedAt     DateTime  @default(now())
+  expiresAt    DateTime
+  /// Set when People's Gallery reports the upload this ticket produced (single use).
+  usedAt       DateTime?
+  enrollmentId String?
+
+  consent PgFaceConsent @relation(fields: [consentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, issuedAt])
+  @@index([expiresAt])
+}
+
+/// Idempotency receipt for POST /api/integrations/pg/v1/notifications (kept 7 days).
+model PgNotificationReceipt {
+  idempotencyKey String   @id
+  /// SHA-256 of the canonical request body: a reused key with another body is a conflict.
+  requestHash    String
+  kind           String
+  eventId        String
+  accepted       Int
+  /// The 202 body returned, replayed verbatim for a repeated key (registration ids and reasons only).
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// Per-person notification choices. No row means the defaults.
+model UserNotificationPreference {
+  userId        String   @id
+  /// Email when People's Gallery has photos of the person (sent by Yuyu). Default on.
+  pgPhotosEmail Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -181,6 +181,10 @@ Webhook URLs are entered by tenant admins, so Yuyu only sends to the public inte
 
 `WEBHOOKS_ALLOW_PRIVATE_TARGETS=1` lets development and test environments use `http://` and private or loopback receivers on any port (credentials in the URL are still refused). A production server ignores it, except in the CI-only production-build test mode (`CI=true` with `ALLOW_INSECURE_PRODUCTION_TESTS=1`) that the e2e suite uses, and `npm run production:check` fails when it is set. Never set it on a deployed instance.
 
+## People's Gallery integration
+
+The instance's own People's Gallery channel is not an organisation webhook. It reuses this page's signing scheme, retry schedule, delivery client and target checks, but it is configured by the operator, identifies people by a pairwise subject, adds `resourceVersion` to the envelope and is captured in the mutation's transaction. See [People's Gallery integration](PG_INTEGRATION.md).
+
 ## Operations
 
 - Webhooks need outbound HTTPS (443 and 8443) from every app process to your receivers.

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { pgPhotosEnabledFor } from "@/lib/pgIntegration/selfie";
 import type { Metadata } from "next";
 import { ContentVisibility, EventPageSectionType, EventPrivacyType, RegistrationMode, RsvpStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -151,9 +152,12 @@ export default async function EventPage({ params }: Props) {
       ? prisma.rSVP.count({ where: { eventId: event.id, isCrew: true, status: RsvpStatus.CONFIRMED } })
       : Promise.resolve(null),
   ]);
+  // Photos by People's Gallery: the ticket offers an optional selfie step.
+  const pgPhotos = await pgPhotosEnabledFor(org.id);
   return (
     <EventWebsiteShell
       orgSlug={org.slug}
+      pgPhotos={pgPhotos}
       organisation={{ name: org.name, logoUrl: org.logoUrl }}
       preview={preview}
       event={{

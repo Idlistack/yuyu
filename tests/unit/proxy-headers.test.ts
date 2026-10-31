@@ -51,6 +51,11 @@ describe("capability page caching", () => {
       "/reset-password?token=x",
       "/verify-email?token=x",
       "/login",
+      "/oauth/authorize?client_id=x",
+      "/oauth/consent?client_id=x",
+      "/oauth/token",
+      "/oauth/userinfo",
+      "/oauth/revoke",
     ]) {
       const response = await proxy(new NextRequest(`https://events.example.test${path}`));
       expect(response.headers.get("cache-control"), path).toContain("private");
@@ -65,5 +70,24 @@ describe("capability page caching", () => {
     }
     const other = await proxy(new NextRequest("https://events.example.test/acme/launch", { headers: { cookie: "theme=dark" } }));
     expect(other.headers.get("cache-control")).toBe("no-transform");
+  });
+});
+
+describe("connect-src", () => {
+  it("allows only https and the own origin outside development", async () => {
+    const response = await proxy(new NextRequest("https://events.example.test/ticket/abc123"));
+    const csp = response.headers.get("content-security-policy") ?? "";
+    expect(csp).toContain("connect-src 'self' https:;");
+    expect(csp).not.toContain("http://localhost");
+  });
+
+  it("lets a development server reach a local People's Gallery over http (selfie upload)", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    try {
+      const response = await proxy(new NextRequest("http://localhost:3000/ticket/abc123"));
+      expect(response.headers.get("content-security-policy")).toContain("connect-src 'self' https: http://localhost:* http://127.0.0.1:*;");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

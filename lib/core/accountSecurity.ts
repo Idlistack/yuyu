@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import { revokeUserMobileSessions } from "@/lib/mobileAuth";
+import { revokeUserOAuthSessions } from "@/lib/oidc/provider";
 
 /**
  * "Sign out everywhere": bump the session version (invalidating every web JWT
@@ -16,6 +17,7 @@ export async function revokeAllSessionsForUser(userId: string) {
     await tx.verificationToken.deleteMany({ where: { identifier: `mfa:${userId}` } });
     await tx.session.deleteMany({ where: { userId } });
     await revokeUserMobileSessions(tx, userId);
+    await revokeUserOAuthSessions(tx, userId);
     await tx.auditEvent.create({ data: { action: "SESSIONS_REVOKED", actorUserId: userId, targetType: "User", targetId: userId } });
   });
 }

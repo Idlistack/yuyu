@@ -97,6 +97,21 @@ describe("account data export shaping", () => {
     expect(buildAccountDataExport(pollutedSource()).registrations[0]!.attendanceConfirmation).toBeNull();
   });
 
+  it("exports face-matching consent without enrollment or ticket ids", () => {
+    const source = pollutedSource();
+    (source.registrations[0] as unknown as { pgFaceConsent: unknown }).pgFaceConsent = {
+      ageAttestation: "ADULT", noticeVersion: "pg-face-2026-11-v1", grantedAt: new Date("2030-02-27T09:00:00Z"), withdrawnAt: null, selfieState: "ADDED",
+      enrollmentId: "enr_secret_id", tickets: [{ jti: `yet_${"b".repeat(32)}` }],
+    };
+    const data = buildAccountDataExport(source, new Date("2030-04-01T00:00:00Z"));
+    expect(data.registrations[0]!.faceMatching).toEqual({
+      ageAttestation: "18 or older", noticeVersion: "pg-face-2026-11-v1", consentGivenAt: "2030-02-27T09:00:00.000Z", withdrawnAt: null, selfie: "ADDED",
+    });
+    expect(JSON.stringify(data)).not.toContain("enr_secret_id");
+    expect(JSON.stringify(data)).not.toContain("b".repeat(32));
+    expect(buildAccountDataExport(pollutedSource()).registrations[0]!.faceMatching).toBeNull();
+  });
+
   it("includes the user's own data", () => {
     const data = buildAccountDataExport(pollutedSource(), new Date("2030-04-01T00:00:00Z"));
     expect(data.profile).toEqual({

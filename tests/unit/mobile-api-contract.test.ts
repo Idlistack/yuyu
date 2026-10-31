@@ -240,6 +240,8 @@ describe("mobile API contract", () => {
     ["JudgeSubmissionDetail", dto.judgeSubmissionDetailDtoSchema],
     ["JudgeNext", dto.judgeNextDtoSchema],
     ["JudgeScoresSaved", dto.judgeScoresSavedDtoSchema],
+    ["FaceMatching", dto.faceMatchingDtoSchema],
+    ["SelfieTicket", dto.selfieTicketDtoSchema],
   ];
 
   it("documents every mobile error code", () => {

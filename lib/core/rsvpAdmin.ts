@@ -18,6 +18,7 @@ import { isTeamDeletionSnapshot, restoreTeamDeletionSnapshot, soleMemberTeamSnap
 import { captureSubmissionSnapshotTx, restoreSubmissionSnapshotTx, submissionSnapshotSchema, type SubmissionSnapshot } from "@/lib/core/submissionLifecycle";
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
 import { CHECK_IN_LIST_SOURCES, MAX_CHECK_IN_LISTS } from "@/lib/checkInLists";
+import { markRsvpDeletionAsRemovalTx } from "@/lib/pgIntegration/capture";
 
 const UNDO_TTL_MS = 5 * 60_000;
 
@@ -275,6 +276,8 @@ export async function deleteRsvpForUser(actorUserId: string | null, input: unkno
       },
       select: { id: true },
     });
+    // People's Gallery sees an organiser removal as REMOVED, not CANCELLED.
+    await markRsvpDeletionAsRemovalTx(tx);
     await tx.rSVP.delete({ where: { id: rsvp.id } });
     if (teamEvent && teamId) {
       const settled = await settleTeamAfterMemberLeft(tx, { teamId, eventId: teamEvent, leftRsvpId: rsvp.id });

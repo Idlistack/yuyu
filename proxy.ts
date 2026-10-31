@@ -49,7 +49,10 @@ function isNoStorePage(pathname: string): boolean {
     || /^\/account\/submissions\/[^/]+\/?$/.test(pathname)
     // Signed-in areas and the remaining capability links: organisation and
     // co-organiser invitations, password reset and email verification.
-    || /^\/(?:dashboard|account|super-admin|super-admin-mfa|join|reset-password|verify-email|login)(?:\/|$)/.test(pathname);
+    || /^\/(?:dashboard|account|super-admin|super-admin-mfa|join|reset-password|verify-email|login)(?:\/|$)/.test(pathname)
+    // OIDC provider (docs/OIDC_PROVIDER.md): the authorization request and
+    // consent screen, and token, userinfo and revocation responses.
+    || /^\/oauth\/(?:authorize|consent|token|userinfo|revoke)\/?$/.test(pathname);
 }
 
 /**
@@ -145,7 +148,9 @@ export async function proxy(request: NextRequest) {
     "form-action 'self'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
-    "connect-src 'self' https:",
+    // In development People's Gallery usually runs on plain http on this machine
+    // (docs/PG_INTEGRATION.md#selfie-step): let the selfie upload reach it.
+    `connect-src 'self' https:${isDevelopment ? " http://localhost:* http://127.0.0.1:*" : ""}`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""}`,
     // MUI/Emotion emits runtime style tags and attributes. A nonce combined
     // with unsafe-inline causes browsers to ignore unsafe-inline entirely.

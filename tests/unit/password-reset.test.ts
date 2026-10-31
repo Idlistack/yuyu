@@ -24,6 +24,7 @@ const tx = {
   user: { update: vi.fn() },
   session: { deleteMany: vi.fn() },
   mobileSession: { updateMany: vi.fn() },
+  oAuthSession: { updateMany: vi.fn() },
   auditEvent: { create: vi.fn() },
 };
 

@@ -22,6 +22,8 @@ if (key.length !== 32 || key.toString("base64").replace(/=+$/, "") !== raw.repla
 
 // Must match lib/instanceConfigSecrets.ts (domain-separated subkey) and lib/mfa.ts (raw key).
 const instanceKey = Buffer.from(crypto.hkdfSync("sha256", key, Buffer.alloc(0), "yuyu-instance-service-settings-v1", 32));
+// Must match lib/oidc/secrets.ts (OIDC signing keys and pairwise salts).
+const oidcKey = Buffer.from(crypto.hkdfSync("sha256", key, Buffer.alloc(0), "yuyu-oidc-provider-secrets-v1", 32));
 
 function decrypts(value, aesKey) {
   try {
@@ -58,6 +60,18 @@ try {
   const seeds = await prisma.$queryRaw`SELECT "mfaSecretEncrypted" AS value FROM "User" WHERE "mfaSecretEncrypted" IS NOT NULL`;
   const unreadableSeeds = seeds.filter((row) => !decrypts(row.value, key)).length;
   if (unreadableSeeds > 0) failures.push(`${unreadableSeeds} of ${seeds.length} enrolled authenticator seed(s)`);
+
+  // OIDC provider material (docs/OIDC_PROVIDER.md). to_regclass tolerates a
+  // database that has not applied the migration yet.
+  const [{ present }] = await prisma.$queryRaw`SELECT to_regclass('"OAuthClient"') IS NOT NULL AS present`;
+  if (present) {
+    const salts = await prisma.$queryRaw`SELECT "pairwiseSaltEncrypted" AS value FROM "OAuthClient"`;
+    const keys = await prisma.$queryRaw`SELECT "privateJwkEncrypted" AS value FROM "OAuthSigningKey" WHERE "retiredAt" IS NULL OR "expiresAt" > now()`;
+    const badSalts = salts.filter((row) => !decrypts(row.value, oidcKey)).length;
+    const badKeys = keys.filter((row) => !decrypts(row.value, oidcKey)).length;
+    if (badSalts > 0) failures.push(`${badSalts} of ${salts.length} OAuth client pairwise salt(s) (sign-in subjects would change)`);
+    if (badKeys > 0) failures.push(`${badKeys} of ${keys.length} OIDC signing key(s)`);
+  }
 
   if (failures.length > 0) {
     console.error(

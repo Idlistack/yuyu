@@ -116,7 +116,9 @@ try {
         'audit_fallback_seriesinvite', 'audit_fallback_rsvp',
         'audit_fallback_eventcollaborator',
         'audit_fallback_eventcollaboratorinvite', 'audit_fallback_apiclient',
-        'audit_fallback_apiclientscope', 'audit_fallback_apicredential'
+        'audit_fallback_apiclientscope', 'audit_fallback_apicredential',
+        -- People's Gallery capture triggers (docs/PG_INTEGRATION.md)
+        'pg_integration_event_insert_delete', 'pg_integration_event_update', 'pg_integration_rsvp_insert_delete', 'pg_integration_rsvp_update', 'pg_integration_membership_insert_delete', 'pg_integration_membership_update', 'pg_integration_collaborator_insert_delete', 'pg_integration_collaborator_update', 'pg_integration_user_sessions', 'pg_integration_user_delete', 'pg_integration_grant_revoked', 'pg_integration_client_disabled'
       )
     `,
   ]);
@@ -157,7 +159,7 @@ try {
     ...(constraints.some((row) => row.conname === "Submission_rsvpId_fkey" && row.confdeltype === "c") ? [] : ["Submission_rsvpId_fkey:ON DELETE CASCADE"]),
     ...(constraints.some((row) => row.conname === "EventFeedbackAnswer_fieldId_fkey" && row.confdeltype === "n") ? [] : ["EventFeedbackAnswer_fieldId_fkey:ON DELETE SET NULL"]),
     ...["Asset_key_key", "RSVP_event_attendee_unique", "RSVP_instance_attendee_unique", "ApiClient_organisationId_status_idx", "ApiCredential_apiClientId_revokedAt_idx", "Team_eventId_nameKey_key", "Team_joinToken_key", "Team_manageTokenHash_key", "TeamJoinRequest_one_pending_per_team_rsvp", "Submission_teamId_key", "Submission_rsvpId_key", "SubmissionLink_tokenHash_key", "JudgeScore_submissionId_judgeUserId_criterionId_key", "JudgeReview_submissionId_judgeUserId_key", "JudgeAssignment_judgeUserId_submissionId_key", "EventAwardWinner_awardId_place_key", "EventAwardWinner_awardId_submissionId_key", "CheckInList_eventId_active_name_key", "CheckInListRecord_listId_rsvpId_key", "SavedView_eventId_surface_idx", "RSVP_eventId_createdAt_id_idx", "RSVP_eventId_checkedInAt_id_idx", "Team_eventId_createdAt_id_idx", "Submission_eventId_createdAt_id_idx", "Submission_eventId_status_submittedAt_id_idx", "EventInvite_eventId_createdAt_id_idx", "AttendanceCheck_rsvpId_key", "AttendanceCheck_tokenHash_key", "AttendanceCheck_eventId_response_idx"].filter((name) => !indexNames.has(name)),
-    ...["audit_fallback_organisation", "audit_fallback_membership", "audit_fallback_event", "audit_fallback_eventseries", "audit_fallback_organisationinvite", "audit_fallback_eventinvite", "audit_fallback_seriesinvite", "audit_fallback_rsvp", "audit_fallback_eventcollaborator", "audit_fallback_eventcollaboratorinvite", "audit_fallback_apiclient", "audit_fallback_apiclientscope", "audit_fallback_apicredential"].filter((name) => !triggerNames.has(name)),
+    ...["audit_fallback_organisation", "audit_fallback_membership", "audit_fallback_event", "audit_fallback_eventseries", "audit_fallback_organisationinvite", "audit_fallback_eventinvite", "audit_fallback_seriesinvite", "audit_fallback_rsvp", "audit_fallback_eventcollaborator", "audit_fallback_eventcollaboratorinvite", "audit_fallback_apiclient", "audit_fallback_apiclientscope", "audit_fallback_apicredential", "pg_integration_event_insert_delete", "pg_integration_event_update", "pg_integration_rsvp_insert_delete", "pg_integration_rsvp_update", "pg_integration_membership_insert_delete", "pg_integration_membership_update", "pg_integration_collaborator_insert_delete", "pg_integration_collaborator_update", "pg_integration_user_sessions", "pg_integration_user_delete", "pg_integration_grant_revoked", "pg_integration_client_disabled"].filter((name) => !triggerNames.has(name)),
   ];
   if (missing.length > 0) {
     throw new Error(`Database schema contract failed; missing: ${missing.join(", ")}`);

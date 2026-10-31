@@ -208,6 +208,29 @@ Cancels the caller's own RSVP with the website's cancel rules (refused after
 check-in, promotes the waitlist, queues emails, audited) → `null`.
 `NOT_FOUND` for anyone else's RSVP.
 
+### Face matching with People's Gallery (auth)
+
+The optional selfie step ([People's Gallery integration](PG_INTEGRATION.md#selfie-step)).
+The app never sends the selfie to Yuyu: it uploads it straight to People's
+Gallery with a ticket. Anyone else's RSVP is `NOT_FOUND`.
+
+- `GET /me/registrations/:rsvpId/face-matching` →
+  `{ "available", "reason": "not_enabled|not_confirmed|series|event_over"|null, "notice": { "version", "title", "summary", "points", "consentLabel", "ageLabel" }, "state": { "ageAttestation": "ADULT|MINOR"|null, "active", "withdrawn", "needsNewConsent", "selfieState": "NONE|PENDING|ADDED|REJECTED|REMOVED", "rejectedReason"|null, "selfieUpdatedAt"|null }|null }`.
+  Show `notice` before the camera, with separate checkboxes for `consentLabel` and `ageLabel`.
+- `POST /me/registrations/:rsvpId/face-matching/ticket` with
+  `{ "noticeVersion", "consent": true, "adult": true }` →
+  `{ "ticket", "uploadUrl", "expiresAt", "action": "add|replace" }`. Records
+  consent; the ticket is valid for 10 minutes and one upload. POST the photo
+  to `uploadUrl` as `multipart/form-data` (`ticket`, `file`) or as a raw
+  `image/*` body with `Authorization: Bearer <ticket>`; People's Gallery
+  answers `201 { enrollmentId, state: "ready" }` or `422 { state: "rejected", reason }`.
+  Errors: `CONFLICT` (the notice changed: show it again), `FORBIDDEN`
+  (under-18 attestation), `RATE_LIMITED` (5 tickets per hour).
+- `POST /me/registrations/:rsvpId/face-matching/under-18` → `null`. Face
+  matching stays off for that registration.
+- `DELETE /me/registrations/:rsvpId/face-matching` → `null`. Stops face
+  matching; People's Gallery deletes the selfie and matches.
+
 ## Public (no auth required; a valid bearer, if sent, identifies the attendee; an invalid one is 401)
 
 `EventSummary = { "id", "slug", "title", "coverImageUrl|null", "startDateTime", "endDateTime", "timezone", "location", "mapLinkUrl|null", "isOnline", "accentColor|null", "status", "registrationMode": "INDIVIDUAL|TEAM", "organisation": { "slug", "name", "logoUrl|null" } }`
