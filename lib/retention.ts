@@ -13,7 +13,7 @@ export async function purgeExpiredOperationalData(now = new Date()) {
   );
   const sentBefore = new Date(now.getTime() - outboxRetentionDays * DAY_MS);
   const webhookBefore = new Date(now.getTime() - 30 * DAY_MS);
-  const [tokens, sessions, organisationInvites, collaboratorInvites, undoSnapshots, sentMessages, failedMessages, mobileSessions, webhookDeliveries, oauthCodes, oauthSessions, oauthClientTokens, pgDeliveries, pgTombstones] = await prisma.$transaction([
+  const [tokens, sessions, organisationInvites, collaboratorInvites, undoSnapshots, sentMessages, failedMessages, mobileSessions, webhookDeliveries, oauthCodes, oauthSessions, oauthClientTokens, pgDeliveries, pgTombstones, pgSelfieTickets, pgNotificationReceipts] = await prisma.$transaction([
     prisma.verificationToken.deleteMany({ where: { expires: { lt: now } } }),
     prisma.session.deleteMany({ where: { expires: { lt: now } } }),
     prisma.organisationInvite.deleteMany({ where: { usedAt: null, expiresAt: { lt: now } } }),
@@ -49,6 +49,10 @@ export async function purgeExpiredOperationalData(now = new Date()) {
       where: { createdAt: { lt: webhookBefore }, status: { in: [WebhookDeliveryStatus.SUCCEEDED, WebhookDeliveryStatus.FAILED] } },
     }),
     prisma.pgIntegrationResource.deleteMany({ where: { deletedAt: { lt: webhookBefore } } }),
+    // Selfie tickets live 10 minutes; a day later PG can no longer report them.
+    prisma.pgSelfieTicket.deleteMany({ where: { expiresAt: { lt: new Date(now.getTime() - DAY_MS) } } }),
+    // Notification idempotency receipts: 7 days (contract v1.2).
+    prisma.pgNotificationReceipt.deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 7 * DAY_MS) } } }),
   ]);
   return {
     verificationTokens: tokens.count,
@@ -65,5 +69,7 @@ export async function purgeExpiredOperationalData(now = new Date()) {
     oauthClientTokens: oauthClientTokens.count,
     pgIntegrationDeliveries: pgDeliveries.count,
     pgIntegrationTombstones: pgTombstones.count,
+    pgSelfieTickets: pgSelfieTickets.count,
+    pgNotificationReceipts: pgNotificationReceipts.count,
   };
 }

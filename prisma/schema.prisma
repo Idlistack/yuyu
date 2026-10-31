@@ -222,6 +222,8 @@ model User {
   oauthGrants             OAuthGrant[]
   oauthAuthorizationCodes OAuthAuthorizationCode[]
   oauthSessions           OAuthSession[]
+  pgFaceConsents          PgFaceConsent[]
+  notificationPreference  UserNotificationPreference?
 }
 
 model Account {
@@ -1120,6 +1122,7 @@ model RSVP {
   submissionLink    SubmissionLink?
   checkInListRecords CheckInListRecord[]
   checkInListEvents  CheckInListEvent[]
+  pgFaceConsent      PgFaceConsent?
   attendanceCheck    AttendanceCheck?
   crewMember         EventCrewMember?
 
@@ -1835,6 +1838,9 @@ model PgIntegration {
   /// Operator opt-in for an in-cluster target (http, private addresses, any
   /// port). Loopback, link-local/metadata and multicast stay blocked.
   allowInternalTarget Boolean   @default(false)
+  /// PG's public origin (https://photos.example.org): where browsers upload
+  /// selfies and the only origin allowed in notification deep links.
+  publicUrl           String?
   lastSuccessAt       DateTime?
   lastFailureAt       DateTime?
   createdAt           DateTime  @default(now())
@@ -1908,4 +1914,81 @@ model PgIntegrationDelivery {
   @@index([status, nextAttemptAt, seq])
   @@index([createdAt])
   @@index([resourceKey, resourceVersion])
+}
+
+/// Face matching with People's Gallery for one registration (docs/PG_INTEGRATION.md#selfie-step).
+/// Consent and the age attestation live here; the selfie itself is only ever
+/// stored by People's Gallery (decision D-Selfie): no image bytes, hashes or
+/// embeddings are kept in Yuyu.
+model PgFaceConsent {
+  id              String    @id @default(cuid())
+  rsvpId          String    @unique
+  userId          String
+  eventId         String
+  organisationId  String
+  /// ADULT (18 or older) or MINOR. A MINOR attestation blocks enrollment for this registration (D-12).
+  ageAttestation  String
+  ageAttestedAt   DateTime
+  /// Notice version the person agreed to; null until consent is given.
+  noticeVersion   String?
+  grantedAt       DateTime?
+  withdrawnAt     DateTime?
+  /// NONE | PENDING (ticket issued) | ADDED | REJECTED | REMOVED, as reported by People's Gallery.
+  selfieState     String    @default("NONE")
+  /// People's Gallery's enrollment id (opaque); never an image or a URL.
+  enrollmentId    String?
+  rejectedReason  String?
+  selfieUpdatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  rsvp    RSVP             @relation(fields: [rsvpId], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tickets PgSelfieTicket[]
+
+  @@index([userId])
+  @@index([eventId])
+}
+
+/// A short-lived enrollment ticket minted for an upload straight to People's
+/// Gallery. Only the `jti` and its lifecycle are stored, never the ticket itself.
+model PgSelfieTicket {
+  jti          String    @id
+  consentId    String
+  userId       String
+  issuedAt     DateTime  @default(now())
+  expiresAt    DateTime
+  /// Set when People's Gallery reports the upload this ticket produced (single use).
+  usedAt       DateTime?
+  enrollmentId String?
+
+  consent PgFaceConsent @relation(fields: [consentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, issuedAt])
+  @@index([expiresAt])
+}
+
+/// Idempotency receipt for POST /api/integrations/pg/v1/notifications (kept 7 days).
+model PgNotificationReceipt {
+  idempotencyKey String   @id
+  /// SHA-256 of the canonical request body: a reused key with another body is a conflict.
+  requestHash    String
+  kind           String
+  eventId        String
+  accepted       Int
+  /// The 202 body returned, replayed verbatim for a repeated key (registration ids and reasons only).
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// Per-person notification choices. No row means the defaults.
+model UserNotificationPreference {
+  userId        String   @id
+  /// Email when People's Gallery has photos of the person (sent by Yuyu). Default on.
+  pgPhotosEmail Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
