@@ -8,6 +8,8 @@
  *   npm run pg:integration -- configure --client-id yyc_… \
  *     --endpoint-url http://peoplegallery-api.pg.svc.cluster.local:8000/api/v2/integrations/yuyu/events \
  *     --allow-internal-target
+ *   ... configure ... --public-url https://photos.example.org
+ *                                   (PG's browser origin: selfie uploads and email deep links)
  *   ... status
  *   ... enable-org --org <slug>     (seeds versions so PG's backfill sees every event)
  *   ... disable-org --org <slug>
@@ -69,6 +71,21 @@ export function checkEndpointUrl(value: string, allowInternalTarget: boolean): s
   return null;
 }
 
+/** PG's public origin (selfie uploads, notification deep links): an origin only, https unless internal targets are allowed. */
+export function checkPublicUrl(value: string, allowInternalTarget: boolean): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return "Enter a valid public URL.";
+  }
+  if (url.username || url.password) return "Remove the user name or password from the public URL.";
+  if ((url.pathname !== "/" && url.pathname !== "") || url.search || url.hash) return "The public URL is an origin only, like https://photos.example.org.";
+  if (url.protocol === "https:") return null;
+  if (url.protocol === "http:" && allowInternalTarget) return null;
+  return "Use an https:// public URL.";
+}
+
 const clientIdArg = z.string().regex(/^yyc_[A-Za-z0-9_-]{22}$/, "Unknown client id format.");
 const eventIdArg = z.string().regex(/^evt_[0-9a-f]{32}$/, "Unknown event id format.");
 const slugArg = z.string().trim().min(1).max(100);
@@ -127,6 +144,12 @@ async function main(argv: string[]) {
         const allowInternalTarget = flags.allowInternalTarget === true ? true : flags.publicTargetOnly === true ? false : existing?.allowInternalTarget ?? false;
         const urlError = checkEndpointUrl(endpointUrl, allowInternalTarget);
         if (urlError) fail(urlError);
+        const publicUrlFlag = typeof flags.publicUrl === "string" ? flags.publicUrl.trim() : undefined;
+        if (publicUrlFlag !== undefined) {
+          const publicUrlError = checkPublicUrl(publicUrlFlag, allowInternalTarget);
+          if (publicUrlError) fail(publicUrlError);
+        }
+        const publicUrl = publicUrlFlag === undefined ? undefined : new URL(publicUrlFlag).origin;
         const client = await prisma.oAuthClient.findUnique({ where: { clientId }, select: { id: true, secretHash: true, firstParty: true, allowedScopes: true, status: true } });
         if (!client) fail("No such OAuth client.");
         if (!client.secretHash || !client.firstParty) fail("The client must be confidential (have a secret) and registered with --first-party.");
@@ -138,10 +161,10 @@ async function main(argv: string[]) {
           }
           await tx.pgIntegration.upsert({
             where: { id: "default" },
-            create: { id: "default", oauthClientId: client.id, endpointUrl, allowInternalTarget, secretEncrypted: encryptPgIntegrationSecret(secret!, rawKey) },
-            update: { oauthClientId: client.id, endpointUrl, allowInternalTarget },
+            create: { id: "default", oauthClientId: client.id, endpointUrl, allowInternalTarget, publicUrl: publicUrl ?? null, secretEncrypted: encryptPgIntegrationSecret(secret!, rawKey) },
+            update: { oauthClientId: client.id, endpointUrl, allowInternalTarget, ...(publicUrl !== undefined ? { publicUrl } : {}) },
           });
-          await tx.auditEvent.create({ data: { action: existing ? "PG_INTEGRATION_UPDATED" : "PG_INTEGRATION_CONFIGURED", targetType: "PgIntegration", targetId: "default", metadata: { via: "cli", host: hostLabel(endpointUrl), allowInternalTarget, client: clientId } } });
+          await tx.auditEvent.create({ data: { action: existing ? "PG_INTEGRATION_UPDATED" : "PG_INTEGRATION_CONFIGURED", targetType: "PgIntegration", targetId: "default", metadata: { via: "cli", host: hostLabel(endpointUrl), allowInternalTarget, client: clientId, ...(publicUrl ? { publicHost: hostLabel(publicUrl) } : {}) } } });
         });
         console.log(`People's Gallery integration ${existing ? "updated" : "configured"}: ${hostLabel(endpointUrl)}${allowInternalTarget ? " (internal target allowed)" : ""}.`);
         if (secret) console.log(`signing secret: ${secret}\n\nThe secret is shown once. Give it to People's Gallery (YUYU_WEBHOOK_SECRET) now.`);
@@ -194,7 +217,7 @@ async function main(argv: string[]) {
       case "status": {
         const row = await prisma.pgIntegration.findUnique({
           where: { id: "default" },
-          select: { endpointUrl: true, enabled: true, allowInternalTarget: true, lastSuccessAt: true, lastFailureAt: true, oauthClient: { select: { clientId: true, name: true } }, organisations: { select: { organisation: { select: { slug: true } } } } },
+          select: { endpointUrl: true, publicUrl: true, enabled: true, allowInternalTarget: true, lastSuccessAt: true, lastFailureAt: true, oauthClient: { select: { clientId: true, name: true } }, organisations: { select: { organisation: { select: { slug: true } } } } },
         });
         if (!row) {
           console.log("The integration is not configured.");
@@ -203,6 +226,7 @@ async function main(argv: string[]) {
         const counts = await prisma.pgIntegrationDelivery.groupBy({ by: ["status"], _count: { _all: true } });
         console.log(`${row.enabled ? "ENABLED" : "DISABLED"}  ${hostLabel(row.endpointUrl)}${row.allowInternalTarget ? " (internal target allowed)" : ""}`);
         console.log(`  client: ${row.oauthClient.clientId} (${row.oauthClient.name})`);
+        console.log(`  public URL: ${row.publicUrl ?? "not set (selfie step and notifications are off)"}`);
         console.log(`  organisations: ${row.organisations.map((entry) => entry.organisation.slug).join(", ") || "none"}`);
         console.log(`  last success: ${row.lastSuccessAt?.toISOString() ?? "never"}; last failure: ${row.lastFailureAt?.toISOString() ?? "never"}`);
         console.log(`  deliveries: ${counts.map((count) => `${count.status.toLowerCase()} ${count._count._all}`).join(", ") || "none"}`);

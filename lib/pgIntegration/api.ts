@@ -23,6 +23,7 @@ import {
   absoluteHttpUrl,
   displayNameFor,
   loadPgIntegration,
+  isMinorAttestation,
   registrationDto,
   subjectFunction,
   type LoadedIntegration,
@@ -44,6 +45,8 @@ export type PgApiErrorCode =
   | "RESOURCE_NOT_FOUND"
   | "RATE_LIMITED"
   | "INTEGRATION_DISABLED"
+  | "IDEMPOTENCY_CONFLICT"
+  | "TICKET_USED"
   | "INTERNAL_ERROR";
 
 const MESSAGES: Record<PgApiErrorCode, string> = {
@@ -53,6 +56,8 @@ const MESSAGES: Record<PgApiErrorCode, string> = {
   RESOURCE_NOT_FOUND: "The requested resource was not found.",
   RATE_LIMITED: "Too many requests. Try again later.",
   INTEGRATION_DISABLED: "The People's Gallery integration is not enabled.",
+  IDEMPOTENCY_CONFLICT: "This Idempotency-Key was already used with a different request.",
+  TICKET_USED: "This enrollment ticket was already used for another enrollment.",
   INTERNAL_ERROR: "The request could not be completed.",
 };
 
@@ -66,8 +71,30 @@ export function pgApiError(code: PgApiErrorCode, status: number, retryAfter?: nu
   return NextResponse.json({ error: { code, message: MESSAGES[code] } }, { status, headers });
 }
 
-export function pgApiJson(body: unknown) {
-  return NextResponse.json(body, { headers: NO_STORE });
+export function pgApiJson(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: NO_STORE });
+}
+
+const MAX_BODY_BYTES = 256 * 1024;
+
+/** A bounded, strictly validated JSON body (application/json only), or null. */
+export async function readPgJsonBody<T>(request: Request, schema: z.ZodType<T>): Promise<T | null> {
+  if (!/^application\/json(\s*;|$)/i.test(request.headers.get("content-type") ?? "")) return null;
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+  let text: string;
+  try {
+    text = await request.text();
+  } catch {
+    return null;
+  }
+  if (Buffer.byteLength(text, "utf8") > MAX_BODY_BYTES) return null;
+  try {
+    const parsed = schema.safeParse(JSON.parse(text));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 export type PgApiContext = { integration: LoadedIntegration; subjectOf: (userId: string) => string };
@@ -254,7 +281,7 @@ export async function listPgRegistrations(eventId: string, query: NonNullable<Re
     const page = resources.slice(0, query.limit);
     const rsvps = await tx.rSVP.findMany({
       where: { eventId: event.id, id: { in: page.filter((row) => !row.deletedAt).map((row) => row.resourceId) } },
-      select: { id: true, userId: true, guestName: true, status: true, isCrew: true, createdAt: true, checkedInAt: true, user: { select: { name: true } } },
+      select: { id: true, userId: true, guestName: true, status: true, isCrew: true, createdAt: true, checkedInAt: true, user: { select: { name: true } }, pgFaceConsent: { select: { ageAttestation: true, userId: true } } },
     });
     const byId = new Map(rsvps.map((rsvp) => [rsvp.id, rsvp]));
     const data = page.flatMap((row) => {
@@ -266,6 +293,7 @@ export async function listPgRegistrations(eventId: string, query: NonNullable<Re
             snapshot: { id: rsvp.id, status: rsvp.status, isCrew: rsvp.isCrew, createdAt: rsvp.createdAt.toISOString(), checkedInAt: rsvp.checkedInAt?.toISOString() ?? null },
             subject: rsvp.userId ? subjectOf(rsvp.userId) : null,
             displayName: displayNameFor(rsvp.user?.name, rsvp.guestName),
+            isMinor: isMinorAttestation(rsvp.pgFaceConsent, rsvp.userId),
           }),
         })];
       }

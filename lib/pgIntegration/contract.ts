@@ -29,11 +29,14 @@ export const PG_EVENT_TYPES = [
   "user.sessions_revoked",
   "user.deleted",
   "ping",
+  // P3: the selfie step and face-matching consent (docs/PG_INTEGRATION.md#selfie-step).
+  "selfie.added",
+  "selfie.removed",
+  "consent.granted",
+  "consent.withdrawn",
 ] as const;
-/** Defined so PG can store them; emitted from P3 (selfie step and consent records). */
-export const PG_RESERVED_EVENT_TYPES = ["selfie.added", "selfie.removed", "consent.granted", "consent.withdrawn"] as const;
 export type PgEventType = (typeof PG_EVENT_TYPES)[number];
-export type PgAnyEventType = PgEventType | (typeof PG_RESERVED_EVENT_TYPES)[number];
+export type PgAnyEventType = PgEventType;
 
 const isoDate = z.string().datetime();
 const id = z.string().min(1).max(128);
@@ -69,7 +72,7 @@ export const pgRegistrationSchema = z.object({
   checkedInAt: isoDate.nullable(),
   subject: subjectSchema.nullable(),
   isCrew: z.boolean(),
-  /** Age attestation arrives with the selfie step (P3); false until then. */
+  /** True once the attendee attested to being under 18 in the selfie step (D-12); false otherwise. */
   isMinor: z.boolean(),
 }).strict();
 export type PgRegistrationDto = z.infer<typeof pgRegistrationSchema>;
@@ -100,7 +103,7 @@ export const pgDataSchemas = {
   "user.sessions_revoked": z.object({ subject: subjectSchema, reason: sessionsRevokedReason }).strict(),
   "user.deleted": z.object({ subject: subjectSchema }).strict(),
   ping: z.object({ message: z.string().max(200) }).strict(),
-  // P3 placeholders (plan §3.2). Schemas are fixed now so both sides agree.
+  // P3 (plan §3.2, contract v1.2): the selfie step and face-matching consent.
   "selfie.added": z.object({ registrationId: id, subject: subjectSchema, enrollmentId: id }).strict(),
   "selfie.removed": z.object({ registrationId: id, subject: subjectSchema, enrollmentId: id }).strict(),
   "consent.granted": z.object({
@@ -121,7 +124,7 @@ export const pgDataSchemas = {
 
 export const pgEnvelopeSchema = z.object({
   id: z.string().regex(/^evt_[0-9a-f]{32}$/),
-  type: z.enum([...PG_EVENT_TYPES, ...PG_RESERVED_EVENT_TYPES]),
+  type: z.enum(PG_EVENT_TYPES),
   createdAt: isoDate,
   organisation: z.object({ id, slug: z.string().min(1) }).strict().nullable(),
   resourceVersion: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
@@ -232,3 +235,80 @@ export function pgRoleFor(facts: { orgRole: MembershipRole | null; collaboratorP
   if (facts.orgRole === MembershipRole.MEMBER) return "viewer";
   return null;
 }
+
+// ── P3: selfie step, PG callbacks and attendee notifications (contract v1.2) ──
+
+export const FACE_MATCHING_PURPOSE = "face_matching" as const;
+export const PG_SELFIE_STATES = ["NONE", "PENDING", "ADDED", "REJECTED", "REMOVED"] as const;
+export type PgSelfieState = (typeof PG_SELFIE_STATES)[number];
+export const PG_SELFIE_REJECT_REASONS = ["no_face", "multiple_faces", "face_too_small", "low_quality", "unreadable"] as const;
+
+const enrollmentId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
+export const ticketJtiSchema = z.string().regex(/^yet_[0-9a-f]{32}$/);
+
+/** POST /api/integrations/pg/v1/enrollments/status */
+export const pgEnrollmentStatusSchema = z.discriminatedUnion("state", [
+  z.object({
+    state: z.literal("added"),
+    registrationId: id,
+    subject: subjectSchema,
+    enrollmentId,
+    jti: ticketJtiSchema,
+    reason: z.null().optional(),
+  }).strict(),
+  z.object({
+    state: z.literal("rejected"),
+    registrationId: id,
+    subject: subjectSchema,
+    enrollmentId,
+    jti: ticketJtiSchema,
+    reason: z.enum(PG_SELFIE_REJECT_REASONS),
+  }).strict(),
+  z.object({
+    state: z.literal("removed"),
+    registrationId: id,
+    subject: subjectSchema,
+    enrollmentId,
+    jti: z.null().optional(),
+    reason: z.null().optional(),
+  }).strict(),
+]);
+export type PgEnrollmentStatus = z.infer<typeof pgEnrollmentStatusSchema>;
+
+/** POST /api/integrations/pg/v1/consents/withdraw */
+export const pgConsentWithdrawSchema = z.union([
+  z.object({ subject: subjectSchema, scope: z.literal("event"), registrationId: id }).strict(),
+  z.object({ subject: subjectSchema, scope: z.literal("all"), registrationId: z.null().optional() }).strict(),
+]);
+
+export const PG_NOTIFICATION_KINDS = ["photos_ready", "photos_published"] as const;
+export type PgNotificationKind = (typeof PG_NOTIFICATION_KINDS)[number];
+export const PG_NOTIFICATION_MAX_RECIPIENTS = 500;
+export const PG_NOTIFICATION_SKIP_REASONS = ["not_found", "not_confirmed", "withdrawn", "unsubscribed", "no_email", "duplicate"] as const;
+export type PgNotificationSkipReason = (typeof PG_NOTIFICATION_SKIP_REASONS)[number];
+export const idempotencyKeySchema = z.string().regex(/^pgn_[A-Za-z0-9_-]{8,64}$/);
+
+/** POST /api/integrations/pg/v1/notifications (plan §5.7, decision D-Mail). */
+export const pgNotificationRequestSchema = z.object({
+  eventId: id,
+  occurrenceId: z.null(),
+  kind: z.enum(PG_NOTIFICATION_KINDS),
+  link: z.string().url().max(2048),
+  recipients: z.array(z.object({
+    registrationId: id,
+    subject: subjectSchema,
+    counts: z.object({
+      photosOfYou: z.number().int().min(1).max(100_000),
+      newSinceLast: z.number().int().min(0).max(100_000),
+    }).strict().refine((counts) => counts.newSinceLast <= counts.photosOfYou, { message: "newSinceLast exceeds photosOfYou" }),
+  }).strict()).min(1).max(PG_NOTIFICATION_MAX_RECIPIENTS),
+}).strict();
+export type PgNotificationRequest = z.infer<typeof pgNotificationRequestSchema>;
+
+export const pgNotificationResponseSchema = z.object({
+  data: z.object({
+    accepted: z.number().int().nonnegative(),
+    skipped: z.array(z.object({ registrationId: id, reason: z.enum(PG_NOTIFICATION_SKIP_REASONS) }).strict()),
+  }).strict(),
+}).strict();
+export type PgNotificationResponse = z.infer<typeof pgNotificationResponseSchema>;

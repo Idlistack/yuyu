@@ -17,7 +17,6 @@ vi.mock("@/lib/db", () => ({ prisma: {} }));
 import {
   buildPgEnvelope,
   PG_EVENT_TYPES,
-  PG_RESERVED_EVENT_TYPES,
   pgApiEventItemSchema,
   pgApiEventRoleItemSchema,
   pgApiOrganisationSchema,
@@ -71,7 +70,7 @@ describe("People's Gallery DTOs", () => {
   });
 
   it("covers every event type, including the P3 placeholders", () => {
-    expect(Object.keys(pgDataSchemas).sort()).toEqual([...PG_EVENT_TYPES, ...PG_RESERVED_EVENT_TYPES].sort());
+    expect(Object.keys(pgDataSchemas).sort()).toEqual([...PG_EVENT_TYPES].sort());
   });
 
   const event = {

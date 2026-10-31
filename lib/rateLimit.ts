@@ -38,7 +38,8 @@ export type Bucket =
   | "oauthAuthorize"
   | "oauthToken"
   | "oauthUserinfo"
-  | "pgIntegrationApi";
+  | "pgIntegrationApi"
+  | "pgNotifications";
 
 const limits: Record<Bucket, { max: number; windowMs: number }> = {
   global: { max: 300, windowMs: 60_000 },
@@ -103,6 +104,8 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   // People's Gallery integration API (docs/PG_INTEGRATION.md), per OAuth
   // client: backfill and nightly reconciliation page through every event.
   pgIntegrationApi: { max: 600, windowMs: 60_000 },
+  // Attendee notification calls (up to 500 recipients each), per OAuth client.
+  pgNotifications: { max: 60, windowMs: 60_000 },
 };
 
 // Local fallback store

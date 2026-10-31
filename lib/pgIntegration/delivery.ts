@@ -111,10 +111,16 @@ export function displayNameFor(userName: string | null | undefined, guestName: u
   return (userName?.trim() || text(guestName).trim() || "Participant").slice(0, 200);
 }
 
+/** The under-18 attestation of the registration's current account (decision D-12). */
+export function isMinorAttestation(consent: { ageAttestation: string; userId: string } | null | undefined, rsvpUserId: string | null) {
+  return Boolean(consent && rsvpUserId && consent.userId === rsvpUserId && consent.ageAttestation === "MINOR");
+}
+
 export function registrationDto(params: {
   snapshot: Snapshot;
   subject: string | null;
   displayName: string;
+  isMinor?: boolean;
 }): PgRegistrationDto {
   return {
     id: text(params.snapshot.id),
@@ -124,7 +130,7 @@ export function registrationDto(params: {
     checkedInAt: utcIso(params.snapshot.checkedInAt),
     subject: params.subject,
     isCrew: params.snapshot.isCrew === true,
-    isMinor: false,
+    isMinor: params.isMinor === true,
   };
 }
 
@@ -167,10 +173,14 @@ export async function buildEnvelopeForRow(row: BuildRow, subjectOf: (userId: str
     case "registration.status_changed": {
       const userId = typeof snapshot.userId === "string" ? snapshot.userId : null;
       const user = userId ? await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }) : null;
+      const consent = userId
+        ? await prisma.pgFaceConsent.findUnique({ where: { rsvpId: text(snapshot.id) }, select: { ageAttestation: true, userId: true } })
+        : null;
       const registration = registrationDto({
         snapshot,
         subject: userId ? subjectOf(userId) : null,
         displayName: displayNameFor(user?.name, snapshot.guestName),
+        isMinor: isMinorAttestation(consent, userId),
       });
       data = type === "registration.status_changed"
         ? { event: ref(snapshot.eventId), registration, previousStatus: snapshot.previousStatus ?? null }
@@ -185,6 +195,28 @@ export async function buildEnvelopeForRow(row: BuildRow, subjectOf: (userId: str
       break;
     case "user.deleted":
       data = { subject: subjectOf(text(snapshot.userId)) };
+      break;
+    case "selfie.added":
+    case "selfie.removed":
+      data = { registrationId: text(snapshot.rsvpId), subject: subjectOf(text(snapshot.userId)), enrollmentId: text(snapshot.enrollmentId) };
+      break;
+    case "consent.granted":
+      data = {
+        registrationId: text(snapshot.rsvpId),
+        subject: subjectOf(text(snapshot.userId)),
+        purpose: "face_matching",
+        noticeVersion: text(snapshot.noticeVersion),
+        grantedAt: utcIso(snapshot.grantedAt),
+      };
+      break;
+    case "consent.withdrawn":
+      data = {
+        registrationId: typeof snapshot.rsvpId === "string" ? snapshot.rsvpId : null,
+        subject: subjectOf(text(snapshot.userId)),
+        purpose: "face_matching",
+        scope: snapshot.scope,
+        withdrawnAt: utcIso(snapshot.withdrawnAt),
+      };
       break;
     default:
       data = snapshot;
