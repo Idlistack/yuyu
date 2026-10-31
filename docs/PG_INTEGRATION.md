@@ -147,7 +147,7 @@ Event references are `{ kind: "event", id, occurrenceId: null }`.
 
 ## Delivery
 
-The one-minute outbox worker (`lib/outboxWorker.ts`, and `POST /api/internal/outbox`) runs `deliverPgIntegrationBatch` after organisation webhooks. A failure there never fails the email pass.
+The one-minute outbox worker (`lib/outboxWorker.ts`, and `POST /api/internal/outbox`) runs `deliverPgIntegrationBatch` after organisation webhooks. A failure there never fails the email pass. Each server process also runs a separate **10-second** People's Gallery pass (`PG_INTEGRATION_INTERVAL_MS`), so a publish, a registration, a consent withdrawal or a session revocation reaches PG in seconds rather than up to a minute; it never overlaps itself, and with nothing queued it is one indexed lookup. A deployment that relies only on the external scheduler gets the one-minute cadence.
 
 - Rows are claimed with `FOR UPDATE SKIP LOCKED` in capture order and finished under a lease; a lease older than 5 minutes returns to the queue. Up to 50 per pass, 5 at a time. Nothing is claimed while the integration is missing or disabled.
 - 10-second timeout, 256 KB body cap, no redirects. Any `2xx` is success.
@@ -201,7 +201,7 @@ Contract v1.2 §4.1. A compact JWS, HS256, header exactly `{"alg":"HS256","typ":
 
 The ticket is a bearer capability for one upload: it is returned once to its owner, never logged, audited or stored. Yuyu keeps only its `jti`, expiry and outcome (`PgSelfieTicket`, purged a day after expiry). At most **5 tickets per person per hour**; the Server Actions and the mobile API also apply their usual rate limits.
 
-The browser re-encodes the photo to a JPEG of at most 1,600 px (dropping EXIF/GPS; HEIC is passed through for PG to decode) and POSTs `multipart/form-data` (`ticket`, `file`) to `{publicUrl}/api/v2/integrations/yuyu/selfies` with `credentials: "omit"` and no referrer. PG answers `201 { enrollmentId, state: "ready" }`, or `422 { state: "rejected", reason }` for a photo that fails its quality gate (no face, several faces, face too small, too dark or blurry, unreadable). The CSP already allows `connect-src https:` and `Permissions-Policy` allows `camera=(self)`; an `http://` PG origin (development only) is blocked by the browser.
+The browser re-encodes the photo to a JPEG of at most 1,600 px (dropping EXIF/GPS; HEIC is passed through for PG to decode) and POSTs `multipart/form-data` (`ticket`, `file`) to `{publicUrl}/api/v2/integrations/yuyu/selfies` with `credentials: "omit"` and no referrer. PG answers `201 { enrollmentId, state: "ready" }`, or `422 { state: "rejected", reason }` for a photo that fails its quality gate (no face, several faces, face too small, too dark or blurry, unreadable). The CSP already allows `connect-src https:` and `Permissions-Policy` allows `camera=(self)`. A development server (`next dev`) also allows `http://localhost:*` and `http://127.0.0.1:*`, so a local PG on plain http works; production allows https only.
 
 ### PG callbacks
 
