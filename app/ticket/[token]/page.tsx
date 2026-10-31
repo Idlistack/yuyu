@@ -29,6 +29,8 @@ import {
 import { TicketSeekerPanel, TicketTeamCard } from "@/components/team/TicketTeamSection";
 import { TicketSubmissionCard, type TicketSubmissionMode } from "@/components/submission/TicketSubmissionCard";
 import { TicketJoinTeamForm } from "@/components/team/JoinTeamWithRegistration";
+import { SelfieStep } from "@/components/pg/SelfieStep";
+import { loadFaceMatchingView, pgPhotosEnabledFor } from "@/lib/pgIntegration/selfie";
 
 type Props = {
   params: Promise<{ token: string }>;
@@ -288,6 +290,21 @@ export default async function TicketPage({ params }: Props) {
     submissionSection = <TicketSubmissionCard ticketToken={rsvp.checkInToken} mode={{ kind: "not-live", offline: rsvp.event.status === "HIDDEN" }} />;
   }
 
+  // Photos by People's Gallery (docs/PG_INTEGRATION.md#selfie-step): an
+  // optional selfie step for the account that owns a confirmed registration.
+  // The ticket token alone never grants it; a guest without an account gets
+  // nothing until the registration is claimed (decision D-4).
+  let selfieSection: ReactNode = null;
+  if (confirmed && rsvp.userId && rsvp.event && rsvp.eventId && (await pgPhotosEnabledFor(rsvp.event.organisationId))) {
+    const viewer = viewerId ?? (await auth())?.user?.id ?? null;
+    if (viewer === rsvp.userId) {
+      const view = await loadFaceMatchingView(viewer, rsvp.id);
+      if (view.available) selfieSection = <SelfieStep rsvpId={view.rsvpId} eventTitle={view.eventTitle} initial={view.state} />;
+    } else {
+      selfieSection = <Callout tone="info">Sign in to the account you registered with to find your photos from this event with a selfie.</Callout>;
+    }
+  }
+
   const ticketMain = (
     <>
       <header className="bg-accent px-6 py-5 text-on-accent">
@@ -390,6 +407,8 @@ export default async function TicketPage({ params }: Props) {
         {teamSection}
 
         {submissionSection}
+
+        {selfieSection}
 
         {!isCheckedIn && rsvp.status !== "REJECTED" && !rsvp.teamId && !isCrew ? (
           <HideAfterLiveCheckIn>

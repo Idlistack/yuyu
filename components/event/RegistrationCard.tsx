@@ -75,8 +75,10 @@ export function RegistrationCard(props: {
   accentColor?: string | null;
   /** Team event settings (docs/TEAMS.md): counts become places (one per team or solo entrant). */
   team?: TeamRegistrationConfig | null;
+  /** Photos by People's Gallery: point a confirmed attendee to the optional selfie step on the ticket. */
+  pgPhotos?: boolean;
 }) {
-  const { orgSlug, eventSlug, eventInstanceId, eventTitle, organisation, registrationFields, confirmedCount, crewCount, capacity, state, accentColor, team } = props;
+  const { orgSlug, eventSlug, eventInstanceId, eventTitle, organisation, registrationFields, confirmedCount, crewCount, capacity, state, accentColor, team, pgPhotos = false } = props;
   const storageKey = eventInstanceId ? `yuyu:rsvp:${orgSlug}:i:${eventInstanceId}` : `yuyu:rsvp:${orgSlug}:e:${eventSlug ?? ""}`;
   const router = useRouter();
   const [saved, setSaved] = useSavedRsvp(storageKey);
@@ -140,6 +142,13 @@ export function RegistrationCard(props: {
         ) : null}
         {state.cancelled ? <Callout tone="danger" title="Event cancelled" /> : null}
         {primaryAction}
+        {pgPhotos && saved && (saved.status ?? "CONFIRMED") === "CONFIRMED" && !state.cancelled ? (
+          <p className="-mt-2 text-caption text-ink-muted">
+            Want your photos after the event?{" "}
+            <Link href={`/ticket/${saved.token}#find-your-photos`} className="font-semibold text-ink underline-offset-4 hover:underline">Add an optional selfie</Link>{" "}
+            on your ticket. Only People&apos;s Gallery keeps it, for matching.
+          </p>
+        ) : null}
         {!state.cancelled && !state.open && !saved ? <p className="-mt-2 text-caption text-ink-muted">Registration is closed.</p> : null}
         <Button variant="secondary" fullWidth onClick={share}>
           <Share2 aria-hidden className="size-[18px]" />

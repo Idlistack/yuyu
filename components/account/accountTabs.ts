@@ -8,6 +8,7 @@ export const ACCOUNT_TABS: ReadonlyArray<AccountTab> = [
   { href: "/account/registrations", label: "Registrations" },
   { href: "/account/organisations", label: "Organisations" },
   { href: "/account/security", label: "Security" },
+  { href: "/account/privacy", label: "Privacy" },
 ];
 
 /**
