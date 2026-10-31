@@ -230,4 +230,15 @@ describe("production migration safety contracts", () => {
       expect(script).toContain(`row.conname === "${fk}" && row.confdeltype === "c") ? [] : ["${fk}:ON DELETE CASCADE"]`);
     }
   });
+
+  it("adds the OIDC provider without touching existing tables, with its integrity backstops", () => {
+    const sql = readFileSync(resolve(root, "prisma/migrations/20261031000000_oidc_provider/migration.sql"), "utf8");
+    expect(sql).not.toMatch(/\bDROP\b/i);
+    expect(sql).not.toMatch(/ALTER TABLE "(?!OAuth)/);
+    expect(sql).not.toMatch(/ALTER TYPE/);
+    expect(sql).toContain('"OAuthAuthorizationCode_pkce_s256" CHECK ("codeChallengeMethod" = \'S256\'');
+    expect(sql).toContain("\"expiresAt\" <= \"createdAt\" + interval '60 seconds'");
+    expect(sql).toContain('CREATE UNIQUE INDEX "OAuthSigningKey_one_active" ON "OAuthSigningKey" ((true)) WHERE "retiredAt" IS NULL');
+    expect(sql).toContain('REFERENCES "User"("id") ON DELETE CASCADE');
+  });
 });
