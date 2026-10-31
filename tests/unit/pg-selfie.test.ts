@@ -14,7 +14,9 @@ vi.mock("@/lib/db", () => ({ prisma: {} }));
 
 import {
   mintEnrollmentTicket,
+  newTicketSecret,
   signEnrollmentTicket,
+  ticketKey,
   TICKET_TTL_SECONDS,
   verifyEnrollmentTicket,
   type EnrollmentTicketClaims,
@@ -32,7 +34,7 @@ import { mobileSelfieTicketBodySchema, selfieTicketInputSchema } from "@/lib/pgI
 import { prepareSelfie, uploadSelfieToPg } from "@/components/pg/selfieClient";
 import { buildPgPhotosEmail } from "@/lib/email";
 import { asPgPhotosPayload } from "@/lib/outbox";
-import { checkPublicUrl } from "@/scripts/pg-integration";
+import { checkPublicUrl, newTicketSecret as cliNewTicketSecret } from "@/scripts/pg-integration";
 
 const SECRET = "whsec_MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY";
 const ISSUER = "https://yuyu.example.org";
@@ -46,6 +48,10 @@ const CLAIMS: EnrollmentTicketClaims = {
 const VECTOR = "eyJhbGciOiJIUzI1NiIsInR5cCI6Inl1eXUtcGctZW5yb2xsK2p3dCJ9."
   + "eyJpc3MiOiJodHRwczovL3l1eXUuZXhhbXBsZS5vcmciLCJhdWQiOiJwZW9wbGVzLWdhbGxlcnk6ZW5yb2xsbWVudCIsInN1YiI6InEzWnEzWnEzWnEzWnEzWnEzWnEzWnEzWnEzWnEzWnEzWnEzWnEzWnEzWnEiLCJqdGkiOiJ5ZXRfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJpYXQiOjE3OTI2NTYwMDAsImV4cCI6MTc5MjY1NjYwMCwib3JnIjoiY21vcmcxMjMiLCJldnQiOiJjbWV2ZW50MTIzIiwib2NjIjpudWxsLCJyZWciOiJjbXJzdnAxIiwicHVyIjoiZmFjZV9tYXRjaGluZyIsIm52IjoicGctZmFjZS0yMDI2LTExLXYxIiwiYWdlIjoiYWR1bHQiLCJhY3QiOiJhZGQifQ."
   + "H2Nlb0VugM9GW2w08XXkMwP8SjUTeYOIQrb0ty-2JKA";
+/** Key v2 (security review Y-1): dedicated `ytk_` secret, HKDF-SHA256 info "yuyu-pg-enrollment-ticket-v2"; same claims. Computed independently in Python. */
+const SECRET_V2 = "ytk_MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY";
+const KEY_V2_HEX = "ea5f3630230c5897bbd5ee13979db1cfe5b993d31a1c882ec938dab2911ded95";
+const VECTOR_V2 = VECTOR.slice(0, VECTOR.lastIndexOf(".") + 1) + "0YM9F2mAK78v18VR2xzefwkgKzy64WJ1qgU4GvU1rI8";
 const at = (seconds: number) => new Date(seconds * 1000);
 
 function tamper(token: string, part: 0 | 1, edit: (value: Record<string, unknown>) => Record<string, unknown>) {
@@ -55,6 +61,28 @@ function tamper(token: string, part: 0 | 1, edit: (value: Record<string, unknown
 }
 
 describe("enrollment ticket", () => {
+  it("signs with a dedicated ticket secret (key v2) that the delivery secret cannot forge", () => {
+    expect(ticketKey(SECRET_V2).toString("hex")).toBe(KEY_V2_HEX);
+    expect(signEnrollmentTicket(SECRET_V2, CLAIMS)).toBe(VECTOR_V2);
+    const options = { issuer: ISSUER, now: at(CLAIMS.iat + 1) };
+    expect(verifyEnrollmentTicket(VECTOR_V2, { ...options, secrets: [SECRET_V2] })).toEqual({ ok: true, claims: CLAIMS });
+    // Independent keys: a v1 (delivery-secret) ticket fails against the ticket secret and vice versa.
+    expect(verifyEnrollmentTicket(VECTOR, { ...options, secrets: [SECRET_V2] })).toEqual({ ok: false, error: "bad_signature" });
+    expect(verifyEnrollmentTicket(VECTOR_V2, { ...options, secrets: [SECRET] })).toEqual({ ok: false, error: "bad_signature" });
+    // Rotation: a list of ticket secrets.
+    expect(verifyEnrollmentTicket(VECTOR_V2, { ...options, secrets: [newTicketSecret(), SECRET_V2] })).toMatchObject({ ok: true });
+    expect(newTicketSecret()).toMatch(/^ytk_[A-Za-z0-9_-]{43}$/);
+    expect(cliNewTicketSecret()).toMatch(/^ytk_[A-Za-z0-9_-]{43}$/);
+  });
+
+  it("puts revoked ticket ids (not tickets) in consent.withdrawn", () => {
+    const base = { registrationId: "r", subject: SUBJECT, purpose: "face_matching", scope: "event", withdrawnAt: "2026-11-14T03:30:00.000Z" };
+    expect(pgDataSchemas["consent.withdrawn"].safeParse({ ...base, revokedJtis: ["yet_00000000000000000000000000000001"] }).success).toBe(true);
+    expect(pgDataSchemas["consent.withdrawn"].safeParse({ ...base, revokedJtis: [VECTOR] }).success).toBe(false);
+    expect(pgDataSchemas["consent.withdrawn"].safeParse(base).success).toBe(false);
+    expect(pgDataSchemas["consent.withdrawn"].safeParse({ ...base, revokedJtis: Array.from({ length: 101 }, (_, i) => `yet_${i.toString(16).padStart(32, "0")}`) }).success).toBe(false);
+  });
+
   it("matches the vector shared with People's Gallery", () => {
     expect(signEnrollmentTicket(SECRET, CLAIMS)).toBe(VECTOR);
     expect(verifyEnrollmentTicket(VECTOR, { secrets: [SECRET], issuer: ISSUER, now: at(CLAIMS.iat + 1) })).toEqual({ ok: true, claims: CLAIMS });
@@ -165,7 +193,7 @@ describe("PG callbacks and notification bodies", () => {
   });
 
   it("lists the P3 types among the strict envelope schemas", () => {
-    expect(pgDataSchemas["consent.withdrawn"].safeParse({ registrationId: null, subject: SUBJECT, purpose: "face_matching", scope: "all", withdrawnAt: "2026-11-14T03:30:00.000Z" }).success).toBe(true);
+    expect(pgDataSchemas["consent.withdrawn"].safeParse({ registrationId: null, subject: SUBJECT, purpose: "face_matching", scope: "all", withdrawnAt: "2026-11-14T03:30:00.000Z", revokedJtis: [] }).success).toBe(true);
     expect(pgDataSchemas["selfie.added"].safeParse({ registrationId: "r", subject: SUBJECT, enrollmentId: "e", image: "x" }).success).toBe(false);
   });
 });

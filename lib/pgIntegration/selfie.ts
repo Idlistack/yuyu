@@ -8,7 +8,7 @@ import { FACE_NOTICE_VERSION } from "@/lib/pgIntegration/faceNotice";
 import { decryptPgIntegrationSecret } from "@/lib/pgIntegration/secrets";
 import { loadPgIntegration, subjectFunction, type LoadedIntegration } from "@/lib/pgIntegration/delivery";
 import { mintEnrollmentTicket, TICKET_TTL_SECONDS } from "@/lib/pgIntegration/enrollmentTicket";
-import type { PgEnrollmentStatus, PgSelfieState } from "@/lib/pgIntegration/contract";
+import { PG_MAX_REVOKED_JTIS, type PgEnrollmentStatus, type PgSelfieState } from "@/lib/pgIntegration/contract";
 
 /*
  * The selfie step (docs/PG_INTEGRATION.md#selfie-step, decision D-Selfie).
@@ -178,11 +178,11 @@ function selfieCapture(tx: Tx, type: "selfie.added" | "selfie.removed", consent:
   });
 }
 
-function withdrawnCapture(tx: Tx, consent: ConsentRow, withdrawnAt: Date) {
+function withdrawnCapture(tx: Tx, consent: ConsentRow, withdrawnAt: Date, revokedJtis: string[]) {
   return capturePgEventTx(tx, {
     type: "consent.withdrawn", organisationId: consent.organisationId, kind: "consent", resourceId: consent.rsvpId, eventId: consent.eventId,
     key: `consent:${consent.rsvpId}`,
-    snapshot: { rsvpId: consent.rsvpId, userId: consent.userId, scope: "event", withdrawnAt: withdrawnAt.toISOString() },
+    snapshot: { rsvpId: consent.rsvpId, userId: consent.userId, scope: "event", withdrawnAt: withdrawnAt.toISOString(), revokedJtis },
   });
 }
 
@@ -203,18 +203,31 @@ async function registrationCapture(tx: Tx, rsvpId: string) {
   });
 }
 
-/** Withdraw one consent row inside a transaction; emits consent.withdrawn and selfie.removed. */
+/**
+ * Withdraw one consent row inside a transaction; emits consent.withdrawn and
+ * selfie.removed. Returns whether it changed and the ids of the unexpired,
+ * unused tickets it revoked: they go to PG in consent.withdrawn (`revokedJtis`,
+ * security review Y-2), so a ticket minted just before the withdrawal can no
+ * longer enroll there.
+ */
 async function withdrawConsentTx(tx: Tx, consent: ConsentRow & { grantedAt: Date | null; withdrawnAt: Date | null }, now: Date, emitWithdrawn: boolean) {
-  if (!consent.grantedAt || consent.withdrawnAt) return false;
+  if (!consent.grantedAt || consent.withdrawnAt) return { changed: false, revokedJtis: [] as string[] };
   await tx.pgFaceConsent.update({
     where: { id: consent.id },
     data: { withdrawnAt: now, selfieState: "REMOVED", enrollmentId: null, rejectedReason: null, selfieUpdatedAt: now },
   });
+  const open = await tx.pgSelfieTicket.findMany({
+    where: { consentId: consent.id, usedAt: null, expiresAt: { gt: now } },
+    select: { jti: true },
+    orderBy: { issuedAt: "desc" },
+    take: PG_MAX_REVOKED_JTIS,
+  });
+  const revokedJtis = open.map((ticket) => ticket.jti);
   // Outstanding tickets can no longer confirm a selfie for this consent.
   await tx.pgSelfieTicket.updateMany({ where: { consentId: consent.id, usedAt: null }, data: { usedAt: now } });
-  if (emitWithdrawn) await withdrawnCapture(tx, consent, now);
+  if (emitWithdrawn) await withdrawnCapture(tx, consent, now, revokedJtis);
   if (consent.enrollmentId) await selfieCapture(tx, "selfie.removed", consent, consent.enrollmentId);
-  return true;
+  return { changed: true, revokedJtis };
 }
 
 // ── Attendee actions (Server Actions and the mobile API call these) ──────
@@ -267,7 +280,8 @@ export async function issueSelfieTicket(userId: string, rsvpId: string, input: {
   const subject = subjectFunction(integration)(userId);
   let secret: string;
   try {
-    secret = decryptPgIntegrationSecret(integration.secretEncrypted);
+    // Key v2: the dedicated ticket secret; legacy v1 (delivery secret) until one is set.
+    secret = decryptPgIntegrationSecret(integration.ticketSecretEncrypted ?? integration.secretEncrypted);
   } catch {
     return { ok: false, error: "not_enabled" };
   }
@@ -343,7 +357,7 @@ export async function withdrawFaceMatching(userId: string, rsvpId: string): Prom
   return prisma.$transaction(async (tx) => {
     const consent = await tx.pgFaceConsent.findFirst({ where: { rsvpId, userId } });
     if (!consent) return { ok: false };
-    const changed = await withdrawConsentTx(tx, consent, now, true);
+    const { changed } = await withdrawConsentTx(tx, consent, now, true);
     if (changed) {
       await recordAuditEvent({
         client: tx, action: "PG_FACE_CONSENT_WITHDRAWN", actorUserId: userId, organisationId: consent.organisationId,
@@ -359,12 +373,13 @@ export async function withdrawAllFaceMatching(userId: string, via: "yuyu" | "pg"
   const now = new Date();
   return prisma.$transaction(async (tx) => {
     const consents = await tx.pgFaceConsent.findMany({ where: { userId, grantedAt: { not: null }, withdrawnAt: null } });
-    for (const consent of consents) await withdrawConsentTx(tx, consent, now, false);
+    const revokedJtis: string[] = [];
+    for (const consent of consents) revokedJtis.push(...(await withdrawConsentTx(tx, consent, now, false)).revokedJtis);
     // Sent even when nothing is active here, so PG purges anything it still holds.
     await capturePgEventTx(tx, {
       type: "consent.withdrawn", organisationId: null, kind: "consent", resourceId: userId, eventId: null,
       key: `consent:user:${userId}`,
-      snapshot: { rsvpId: null, userId, scope: "all", withdrawnAt: now.toISOString() },
+      snapshot: { rsvpId: null, userId, scope: "all", withdrawnAt: now.toISOString(), revokedJtis: revokedJtis.slice(0, PG_MAX_REVOKED_JTIS) },
     });
     await recordAuditEvent({
       client: tx, action: "PG_FACE_CONSENT_WITHDRAWN", actorUserId: userId, targetType: "User", targetId: userId,
@@ -449,7 +464,7 @@ export async function applyPgWithdrawal(
     return prisma.$transaction(async (tx) => {
       const consent = await consentForSubject(tx, registrationId, body.subject, subjectOf);
       if (!consent) return { status: 404 as const };
-      const changed = await withdrawConsentTx(tx, consent, now, true);
+      const { changed } = await withdrawConsentTx(tx, consent, now, true);
       if (changed) {
         await recordAuditEvent({
           client: tx, action: "PG_FACE_CONSENT_WITHDRAWN", organisationId: consent.organisationId, targetType: "RSVP", targetId: registrationId,

@@ -54,7 +54,7 @@ import { purgeExpiredOperationalData } from "@/lib/retention";
 import { pairwiseSubject } from "@/lib/oidc/primitives";
 import { decryptOidcSecret } from "@/lib/oidc/secrets";
 import { buildClient, registerArgsSchema } from "@/scripts/oauth-register-client";
-import { encryptPgIntegrationSecret as cliEncrypt, newSigningSecret } from "@/scripts/pg-integration";
+import { encryptPgIntegrationSecret as cliEncrypt, newSigningSecret, newTicketSecret } from "@/scripts/pg-integration";
 
 const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
 const ISSUER = "https://yuyu.test";
@@ -67,6 +67,8 @@ const users = { adult: "", second: "", teen: "", waiting: "", stranger: "", busy
 const ids = { orgA: "", orgB: "", eventA: "", eventB: "", adultRsvp: "", secondRsvp: "", teenRsvp: "", waitingRsvp: "", strangerB: "", busyRsvp: "", guestRsvp: "" };
 let client = { id: "", clientId: "", secret: "", salt: "" };
 let secret = "";
+/** The dedicated enrollment-ticket secret (key v2, security review Y-1). */
+let ticketSecret = "";
 let bearer = "";
 let server: http.Server;
 const received: string[] = [];
@@ -114,7 +116,7 @@ async function ticketFor(userId: string, rsvpId: string) {
   await prisma.pgSelfieTicket.updateMany({ where: { userId }, data: { issuedAt: new Date(Date.now() - 2 * HOUR) } });
   const result = await issueSelfieTicket(userId, rsvpId, { noticeVersion: FACE_NOTICE_VERSION });
   if (!result.ok) throw new Error(`ticket refused: ${result.error}`);
-  const verified = verifyEnrollmentTicket(result.ticket, { secrets: [secret], issuer: ISSUER });
+  const verified = verifyEnrollmentTicket(result.ticket, { secrets: [ticketSecret], issuer: ISSUER });
   if (!verified.ok) throw new Error(`ticket invalid: ${verified.error}`);
   return { ...result, claims: verified.claims };
 }
@@ -165,8 +167,12 @@ describe.sequential("People's Gallery selfie step and notifications", () => {
     }
 
     secret = newSigningSecret();
+    ticketSecret = newTicketSecret();
     await prisma.pgIntegration.create({
-      data: { oauthClientId: client.id, endpointUrl: sinkUrl, allowInternalTarget: true, publicUrl: PG_PUBLIC, secretEncrypted: cliEncrypt(secret, process.env.MFA_ENCRYPTION_KEY) },
+      data: {
+        oauthClientId: client.id, endpointUrl: sinkUrl, allowInternalTarget: true, publicUrl: PG_PUBLIC,
+        secretEncrypted: cliEncrypt(secret, process.env.MFA_ENCRYPTION_KEY), ticketSecretEncrypted: cliEncrypt(ticketSecret, process.env.MFA_ENCRYPTION_KEY),
+      },
     });
     await prisma.pgIntegrationOrganisation.create({ data: { organisationId: ids.orgA, integrationId: "default" } });
 
@@ -247,8 +253,10 @@ describe.sequential("People's Gallery selfie step and notifications", () => {
     const data = result.ok ? result.data! : null;
     expect(data?.uploadUrl).toBe(`${PG_PUBLIC}/api/v2/integrations/yuyu/selfies`);
     expect(data?.action).toBe("add");
-    const verified = verifyEnrollmentTicket(data!.ticket, { secrets: [secret], issuer: ISSUER });
+    const verified = verifyEnrollmentTicket(data!.ticket, { secrets: [ticketSecret], issuer: ISSUER });
     expect(verified.ok).toBe(true);
+    // Key v2: the delivery signing secret cannot verify (or forge) a ticket.
+    expect(verifyEnrollmentTicket(data!.ticket, { secrets: [secret], issuer: ISSUER })).toEqual({ ok: false, error: "bad_signature" });
     if (!verified.ok) return;
     expect(verified.claims).toMatchObject({
       sub: subjectOf(users.adult), org: ids.orgA, evt: ids.eventA, reg: ids.adultRsvp, occ: null,
@@ -256,7 +264,7 @@ describe.sequential("People's Gallery selfie step and notifications", () => {
     });
     expect(verified.claims.exp - verified.claims.iat).toBe(600);
     // Another integration secret cannot verify it.
-    expect(verifyEnrollmentTicket(data!.ticket, { secrets: [newSigningSecret()], issuer: ISSUER })).toEqual({ ok: false, error: "bad_signature" });
+    expect(verifyEnrollmentTicket(data!.ticket, { secrets: [newTicketSecret()], issuer: ISSUER })).toEqual({ ok: false, error: "bad_signature" });
 
     const consent = await prisma.pgFaceConsent.findUniqueOrThrow({ where: { rsvpId: ids.adultRsvp } });
     expect(consent).toMatchObject({ userId: users.adult, ageAttestation: "ADULT", noticeVersion: FACE_NOTICE_VERSION, withdrawnAt: null, selfieState: "PENDING", enrollmentId: null });
@@ -323,6 +331,19 @@ describe.sequential("People's Gallery selfie step and notifications", () => {
     expect(await issueSelfieTicket(users.busy, ids.busyRsvp, { noticeVersion: FACE_NOTICE_VERSION })).toEqual({ ok: false, error: "rate_limited" });
   });
 
+  it("signs with the legacy v1 key (delivery secret) only while no ticket secret is set", async () => {
+    await prisma.pgIntegration.update({ where: { id: "default" }, data: { ticketSecretEncrypted: null } });
+    try {
+      await prisma.pgSelfieTicket.updateMany({ where: { userId: users.adult }, data: { issuedAt: new Date(Date.now() - 2 * HOUR) } });
+      const result = await issueSelfieTicket(users.adult, ids.adultRsvp, { noticeVersion: FACE_NOTICE_VERSION });
+      if (!result.ok) throw new Error(result.error);
+      expect(verifyEnrollmentTicket(result.ticket, { secrets: [secret], issuer: ISSUER })).toMatchObject({ ok: true });
+      expect(verifyEnrollmentTicket(result.ticket, { secrets: [ticketSecret], issuer: ISSUER })).toEqual({ ok: false, error: "bad_signature" });
+    } finally {
+      await prisma.pgIntegration.update({ where: { id: "default" }, data: { ticketSecretEncrypted: cliEncrypt(ticketSecret, process.env.MFA_ENCRYPTION_KEY) } });
+    }
+  });
+
   it("withdraws from the ticket: consent.withdrawn and selfie.removed, and late uploads are dropped", async () => {
     const pending = await ticketFor(users.adult, ids.adultRsvp);
     identity.id = users.second;
@@ -332,7 +353,13 @@ describe.sequential("People's Gallery selfie step and notifications", () => {
     expect(await prisma.pgFaceConsent.findUniqueOrThrow({ where: { rsvpId: ids.adultRsvp } })).toMatchObject({ selfieState: "REMOVED", enrollmentId: null, withdrawnAt: expect.any(Date) });
     const envelopes = await deliverAll();
     expect(summary(envelopes, ids.adultRsvp)).toEqual([["consent.withdrawn", null], ["selfie.removed", "enr_two"]]);
-    expect(envelopes.find((envelope) => envelope.type === "consent.withdrawn")!.data).toMatchObject({ registrationId: ids.adultRsvp, scope: "event", purpose: "face_matching" });
+    // Y-2: the outstanding ticket goes to PG as revoked, so it can never enroll there.
+    const withdrawnData = envelopes.find((envelope) => envelope.type === "consent.withdrawn")!.data as { revokedJtis: string[] };
+    expect(withdrawnData).toMatchObject({ registrationId: ids.adultRsvp, scope: "event", purpose: "face_matching" });
+    // Every unexpired, unused ticket of this consent (earlier scenarios left some), but never a used one.
+    expect(withdrawnData.revokedJtis).toContain(pending.claims.jti);
+    const used = await prisma.pgSelfieTicket.findMany({ where: { enrollmentId: { not: null } }, select: { jti: true } });
+    expect(withdrawnData.revokedJtis.filter((jti) => used.some((ticket) => ticket.jti === jti))).toEqual([]);
 
     // PG accepted an upload with a ticket issued before the withdrawal: Yuyu asks it to drop it.
     const late = await statusRoute(api("/enrollments/status", { state: "added", registrationId: ids.adultRsvp, subject: subjectOf(users.adult), enrollmentId: "enr_late", jti: pending.claims.jti }));
@@ -378,7 +405,7 @@ describe.sequential("People's Gallery selfie step and notifications", () => {
     expect(ticket.status).toBe(200);
     const ticketBody = (await ticket.json()) as { data: { ticket: string; uploadUrl: string; action: string } };
     expect(ticketBody.data.uploadUrl).toBe(`${PG_PUBLIC}/api/v2/integrations/yuyu/selfies`);
-    expect(verifyEnrollmentTicket(ticketBody.data.ticket, { secrets: [secret], issuer: ISSUER })).toMatchObject({ ok: true, claims: { reg: ids.secondRsvp, sub: subjectOf(users.second) } });
+    expect(verifyEnrollmentTicket(ticketBody.data.ticket, { secrets: [ticketSecret], issuer: ISSUER })).toMatchObject({ ok: true, claims: { reg: ids.secondRsvp, sub: subjectOf(users.second) } });
 
     expect((await mobileStop(mobile(path, token, "DELETE"), params({ rsvpId: ids.secondRsvp }))).status).toBe(200);
     expect(await prisma.pgFaceConsent.findUniqueOrThrow({ where: { rsvpId: ids.secondRsvp } })).toMatchObject({ withdrawnAt: expect.any(Date) });
@@ -396,13 +423,13 @@ describe.sequential("People's Gallery selfie step and notifications", () => {
     // Repeated: idempotent.
     expect(await (await withdrawRoute(api("/consents/withdraw", { subject: subjectOf(users.adult), scope: "event", registrationId: ids.adultRsvp }))).json()).toEqual({ data: { withdrawn: 0 } });
 
-    await ticketFor(users.adult, ids.adultRsvp);
+    const outstanding = await ticketFor(users.adult, ids.adultRsvp);
     await deliverAll();
     const all = await withdrawRoute(api("/consents/withdraw", { subject: subjectOf(users.adult), scope: "all", registrationId: null }));
     expect(await all.json()).toEqual({ data: { withdrawn: 1 } });
     const envelopes = await deliverAll();
     const everywhere = envelopes.find((envelope) => envelope.type === "consent.withdrawn");
-    expect(everywhere).toMatchObject({ organisation: null, data: { registrationId: null, scope: "all", subject: subjectOf(users.adult) } });
+    expect(everywhere).toMatchObject({ organisation: null, data: { registrationId: null, scope: "all", subject: subjectOf(users.adult), revokedJtis: expect.arrayContaining([outstanding.claims.jti]) } });
     expect(await prisma.auditEvent.count({ where: { action: "PG_FACE_CONSENT_WITHDRAWN", targetId: users.adult } })).toBe(1);
 
     // Account → Privacy lists own rows only.

@@ -14,12 +14,14 @@
  *   ... enable-org --org <slug>     (seeds versions so PG's backfill sees every event)
  *   ... disable-org --org <slug>
  *   ... enable | disable            (the whole integration; queued deliveries wait)
- *   ... rotate-secret               (prints the new secret once)
+ *   ... rotate-secret               (prints the new delivery signing secret once)
+ *   ... rotate-ticket-secret        (prints a new enrollment-ticket secret once; key v2)
  *   ... ping                        (queues a signed `ping` delivery)
  *   ... redrive [--event-id evt_…]  (dead-lettered deliveries go back to the queue)
  *
- * `configure` (first time) and `rotate-secret` print the signing secret ONCE;
- * it is stored only encrypted. `configure` also adds the machine scope
+ * `configure` (first time) prints the signing secret and the enrollment-ticket
+ * secret ONCE, `rotate-secret` / `rotate-ticket-secret` print the new one once;
+ * they are stored only encrypted. The two are independent (security review Y-1). `configure` also adds the machine scope
  * `yuyu.integration` to the OAuth client, which must be confidential and first
  * party. Every change writes an audit event; nothing prints a user identifier.
  *
@@ -51,6 +53,8 @@ export function encryptPgIntegrationSecret(value: string, rawKey: string | undef
 
 /** Same shape as generateWebhookSecret in lib/webhooks/signature.ts. */
 export const newSigningSecret = () => `whsec_${crypto.randomBytes(32).toString("base64url")}`;
+/** Same shape as newTicketSecret in lib/pgIntegration/enrollmentTicket.ts (key v2). */
+export const newTicketSecret = () => `ytk_${crypto.randomBytes(32).toString("base64url")}`;
 
 /**
  * Offline URL check. Without --allow-internal-target only public https is
@@ -154,6 +158,7 @@ async function main(argv: string[]) {
         if (!client) fail("No such OAuth client.");
         if (!client.secretHash || !client.firstParty) fail("The client must be confidential (have a secret) and registered with --first-party.");
         const secret = existing ? null : newSigningSecret();
+        const ticketSecret = existing ? null : newTicketSecret();
         await prisma.$transaction(async (tx) => {
           if (!client.allowedScopes.includes(PG_INTEGRATION_SCOPE)) {
             await tx.oAuthClient.update({ where: { id: client.id }, data: { allowedScopes: [...client.allowedScopes, PG_INTEGRATION_SCOPE] } });
@@ -161,13 +166,26 @@ async function main(argv: string[]) {
           }
           await tx.pgIntegration.upsert({
             where: { id: "default" },
-            create: { id: "default", oauthClientId: client.id, endpointUrl, allowInternalTarget, publicUrl: publicUrl ?? null, secretEncrypted: encryptPgIntegrationSecret(secret!, rawKey) },
+            create: { id: "default", oauthClientId: client.id, endpointUrl, allowInternalTarget, publicUrl: publicUrl ?? null, secretEncrypted: encryptPgIntegrationSecret(secret!, rawKey), ticketSecretEncrypted: encryptPgIntegrationSecret(ticketSecret!, rawKey) },
             update: { oauthClientId: client.id, endpointUrl, allowInternalTarget, ...(publicUrl !== undefined ? { publicUrl } : {}) },
           });
           await tx.auditEvent.create({ data: { action: existing ? "PG_INTEGRATION_UPDATED" : "PG_INTEGRATION_CONFIGURED", targetType: "PgIntegration", targetId: "default", metadata: { via: "cli", host: hostLabel(endpointUrl), allowInternalTarget, client: clientId, ...(publicUrl ? { publicHost: hostLabel(publicUrl) } : {}) } } });
         });
         console.log(`People's Gallery integration ${existing ? "updated" : "configured"}: ${hostLabel(endpointUrl)}${allowInternalTarget ? " (internal target allowed)" : ""}.`);
-        if (secret) console.log(`signing secret: ${secret}\n\nThe secret is shown once. Give it to People's Gallery (YUYU_WEBHOOK_SECRET) now.`);
+        if (secret) {
+          console.log(`signing secret: ${secret}`);
+          console.log(`ticket secret: ${ticketSecret}\n\nBoth are shown once. Give them to People's Gallery now (YUYU_WEBHOOK_SECRET and YUYU_TICKET_SECRET).`);
+        }
+        break;
+      }
+      case "rotate-ticket-secret": {
+        if (!(await integration())) fail("The integration is not configured.");
+        const ticketSecret = newTicketSecret();
+        await prisma.$transaction([
+          prisma.pgIntegration.update({ where: { id: "default" }, data: { ticketSecretEncrypted: encryptPgIntegrationSecret(ticketSecret, rawKey) } }),
+          audit("PG_INTEGRATION_TICKET_SECRET_ROTATED", "PgIntegration", "default"),
+        ]);
+        console.log(`ticket secret: ${ticketSecret}\n\nNew selfie tickets are signed with it now. Set People's Gallery's YUYU_TICKET_SECRET right away (it accepts a space-separated list during rotation); until then PG refuses new selfie uploads with "The upload link expired".`);
         break;
       }
       case "rotate-secret": {
@@ -217,7 +235,7 @@ async function main(argv: string[]) {
       case "status": {
         const row = await prisma.pgIntegration.findUnique({
           where: { id: "default" },
-          select: { endpointUrl: true, publicUrl: true, enabled: true, allowInternalTarget: true, lastSuccessAt: true, lastFailureAt: true, oauthClient: { select: { clientId: true, name: true } }, organisations: { select: { organisation: { select: { slug: true } } } } },
+          select: { endpointUrl: true, publicUrl: true, ticketSecretEncrypted: true, enabled: true, allowInternalTarget: true, lastSuccessAt: true, lastFailureAt: true, oauthClient: { select: { clientId: true, name: true } }, organisations: { select: { organisation: { select: { slug: true } } } } },
         });
         if (!row) {
           console.log("The integration is not configured.");
@@ -227,6 +245,7 @@ async function main(argv: string[]) {
         console.log(`${row.enabled ? "ENABLED" : "DISABLED"}  ${hostLabel(row.endpointUrl)}${row.allowInternalTarget ? " (internal target allowed)" : ""}`);
         console.log(`  client: ${row.oauthClient.clientId} (${row.oauthClient.name})`);
         console.log(`  public URL: ${row.publicUrl ?? "not set (selfie step and notifications are off)"}`);
+        console.log(`  enrollment tickets: ${row.ticketSecretEncrypted ? "dedicated ticket secret (key v2)" : "legacy key from the signing secret (v1); run rotate-ticket-secret"}`);
         console.log(`  organisations: ${row.organisations.map((entry) => entry.organisation.slug).join(", ") || "none"}`);
         console.log(`  last success: ${row.lastSuccessAt?.toISOString() ?? "never"}; last failure: ${row.lastFailureAt?.toISOString() ?? "never"}`);
         console.log(`  deliveries: ${counts.map((count) => `${count.status.toLowerCase()} ${count._count._all}`).join(", ") || "none"}`);
@@ -252,7 +271,7 @@ async function main(argv: string[]) {
         break;
       }
       default:
-        fail("Usage: scripts/pg-integration.ts <configure|status|enable|disable|enable-org|disable-org|rotate-secret|ping|redrive> [flags]");
+        fail("Usage: scripts/pg-integration.ts <configure|status|enable|disable|enable-org|disable-org|rotate-secret|rotate-ticket-secret|ping|redrive> [flags]");
     }
   } finally {
     await prisma.$disconnect();

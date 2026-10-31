@@ -1834,6 +1834,10 @@ model PgIntegration {
   endpointUrl         String
   /// `whsec_…` signing secret, AES-256-GCM under its own HKDF label. Write-only.
   secretEncrypted     String
+  /// `ytk_…` enrollment-ticket secret (contract §4.1, key v2), independent of the
+  /// delivery secret; same encryption. Write-only. Null: legacy v1 ticket key
+  /// derived from `secretEncrypted` until `rotate-ticket-secret` runs.
+  ticketSecretEncrypted String?
   enabled             Boolean   @default(true)
   /// Operator opt-in for an in-cluster target (http, private addresses, any
   /// port). Loopback, link-local/metadata and multicast stay blocked.

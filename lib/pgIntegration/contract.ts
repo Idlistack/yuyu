@@ -42,6 +42,10 @@ const isoDate = z.string().datetime();
 const id = z.string().min(1).max(128);
 /** base64url(HMAC-SHA256) without padding: always 43 characters. */
 export const subjectSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+/** Enrollment-ticket id (`yet_` + 32 hex). An identifier, not a credential. */
+export const ticketJtiSchema = z.string().regex(/^yet_[0-9a-f]{32}$/);
+/** Outstanding ticket ids a withdrawal revokes; at most 5 per person per hour can exist. */
+export const PG_MAX_REVOKED_JTIS = 100;
 
 export const pgEventSchema = z.object({
   kind: z.literal("event"),
@@ -119,6 +123,9 @@ export const pgDataSchemas = {
     purpose: z.literal("face_matching"),
     scope: z.enum(["event", "all"]),
     withdrawnAt: isoDate,
+    // Security review Y-2: unexpired tickets minted before the withdrawal and
+    // not yet used; PG records them as spent so they can never enroll.
+    revokedJtis: z.array(ticketJtiSchema).max(PG_MAX_REVOKED_JTIS),
   }).strict(),
 } as const satisfies Record<PgAnyEventType, z.ZodTypeAny>;
 
@@ -244,7 +251,6 @@ export type PgSelfieState = (typeof PG_SELFIE_STATES)[number];
 export const PG_SELFIE_REJECT_REASONS = ["no_face", "multiple_faces", "face_too_small", "low_quality", "unreadable"] as const;
 
 const enrollmentId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
-export const ticketJtiSchema = z.string().regex(/^yet_[0-9a-f]{32}$/);
 
 /** POST /api/integrations/pg/v1/enrollments/status */
 export const pgEnrollmentStatusSchema = z.discriminatedUnion("state", [

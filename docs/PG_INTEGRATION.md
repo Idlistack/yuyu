@@ -21,7 +21,8 @@ npm run oauth:client -- register --name "People's Gallery" \
   --redirect-uri https://photos.example.org/api/v2/auth/yuyu/callback \
   --scopes "openid profile yuyu.events" --first-party
 
-# 2. The integration: endpoint and signing secret (printed once). Adds the scope yuyu.integration to the client.
+# 2. The integration: endpoint, delivery signing secret and enrollment-ticket secret
+#    (both printed once). Adds the scope yuyu.integration to the client.
 npm run pg:integration -- configure --client-id yyc_… \
   --endpoint-url https://photos.example.org/api/v2/integrations/yuyu/events
 
@@ -48,10 +49,11 @@ npm run pg:integration -- configure --client-id yyc_… \
 | `enable-org --org <slug>` / `disable-org --org <slug>` | Shares an organisation (or stops sharing it). Enabling seeds a fresh version for every existing event and registration so PG's backfill lists them all. Audited |
 | `enable` / `disable` | Switches the whole integration. While disabled nothing new is captured and queued deliveries wait; nothing is lost |
 | `rotate-secret` | New signing secret, printed once; the next delivery uses it. PG accepts a list of secrets during rotation |
+| `rotate-ticket-secret` | New enrollment-ticket secret (`ytk_…`), printed once; new selfie tickets use it at once (key v2). PG's `YUYU_TICKET_SECRET` accepts a list during rotation. An integration configured before this command existed has none and signs tickets with the legacy v1 key: run it once, then set PG right away (see [Enrollment ticket](#enrollment-ticket)) |
 | `ping` | Queues a signed `ping` envelope |
 | `redrive [--event-id evt_…]` | Puts dead-lettered deliveries back in the queue |
 
-The signing secret is 32 random bytes (`whsec_` + base64url), stored only as AES-256-GCM ciphertext under a key derived from `MFA_ENCRYPTION_KEY` with its own HKDF label (`yuyu-pg-integration-signing-secret-v1`). It is never shown again, logged or written to audit metadata. If `MFA_ENCRYPTION_KEY` changes, deliveries fail with "Signing secret unreadable"; rotate the secret.
+The signing secret is 32 random bytes (`whsec_` + base64url), stored only as AES-256-GCM ciphertext under a key derived from `MFA_ENCRYPTION_KEY` with its own HKDF label (`yuyu-pg-integration-signing-secret-v1`). It is never shown again, logged or written to audit metadata. If `MFA_ENCRYPTION_KEY` changes, deliveries fail with "Signing secret unreadable"; rotate the secret. The enrollment-ticket secret (`ytk_` + 32 random bytes, base64url; `PgIntegration.ticketSecretEncrypted`) is stored the same way and is independent of the signing secret: a leak of one does not expose the other, and they rotate separately. `status` says which ticket key is in use.
 
 ### Target rules
 
@@ -128,7 +130,7 @@ Event references are `{ kind: "event", id, occurrenceId: null }`.
 | `user.deleted` | `{ subject }` |
 | `ping` | `{ message }` |
 | `consent.granted` | `{ registrationId, subject, purpose: "face_matching", noticeVersion, grantedAt }`: a selfie ticket was minted with a new grant or a new notice version. Key `consent:{registrationId}` |
-| `consent.withdrawn` | `{ registrationId, subject, purpose, scope: "event" \| "all", withdrawnAt }`. `scope: "all"` has `registrationId: null` and `organisation: null` ("Stop face matching everywhere", or a withdrawal made in PG). PG purges the selfie and matches |
+| `consent.withdrawn` | `{ registrationId, subject, purpose, scope: "event" \| "all", withdrawnAt, revokedJtis }` (`revokedJtis`: ids of unexpired tickets the withdrawal spent, at most 100; PG refuses them). `scope: "all"` has `registrationId: null` and `organisation: null` ("Stop face matching everywhere", or a withdrawal made in PG). PG purges the selfie and matches |
 | `selfie.added` | `{ registrationId, subject, enrollmentId }`: PG reported an accepted selfie (confirmation; PG stores it as informational). Key `selfie:{registrationId}` |
 | `selfie.removed` | same shape: the selfie must go (withdrawal, a replaced enrollment, or an upload that arrived after the person withdrew). PG purges it if it is the current one |
 
@@ -171,7 +173,7 @@ grant_type=client_credentials&scope=yuyu.integration
 
 `client_credentials` is granted only to a confidential, first-party client that lists a machine scope (`yuyu.integration`). The token is opaque, lives 10 minutes, is stored as a SHA-256 digest (`OAuthClientToken`), carries no user and is refused by `/oauth/userinfo`. The API also requires that the token's client **is** the integration's client: another client with the scope gets `403`.
 
-Responses are strict DTOs, `Cache-Control: no-store`. Only organisations enabled for the integration are visible; anything else answers `404`. Each client is limited to 600 requests per minute (`pgIntegrationApi`), on top of the global per-address API limit. Lists use opaque keyset cursors: `?cursor=&limit=` (default 50, maximum 100) → `{ "data": [...], "pagination": { "nextCursor": string | null } }`. Repeated or unknown query parameters are `400`.
+Responses are strict DTOs, `Cache-Control: no-store`. Only organisations enabled for the integration are visible; anything else answers `404`. Each client is limited to 600 requests per minute (`pgIntegrationApi`), on top of the global per-address API limit. The token endpoint has its own 600 per minute per client (`oauthToken`), shared by PG's sign-ins, refreshes and machine tokens: if several PG instances share one client, watch for `429` there and give each instance its own client. Lists use opaque keyset cursors: `?cursor=&limit=` (default 50, maximum 100) → `{ "data": [...], "pagination": { "nextCursor": string | null } }`. Repeated or unknown query parameters are `400`.
 
 | Route | Returns |
 | --- | --- |
@@ -197,7 +199,12 @@ Decision D-Selfie (plan §4): the attendee adds an optional selfie **in Yuyu**, 
 
 ### Enrollment ticket
 
-Contract v1.2 §4.1. A compact JWS, HS256, header exactly `{"alg":"HS256","typ":"yuyu-pg-enroll+jwt"}`. The key is `HMAC-SHA256(key = the integration signing secret "whsec_…" as UTF-8, msg = "yuyu-pg-enrollment-ticket-v1")`, so the delivery signature and the ticket never share a key; PG tries each configured secret during a rotation. Claims: `iss` (Yuyu's issuer, as for OIDC), `aud: "peoples-gallery:enrollment"`, `sub` (pairwise subject), `jti` (`yet_` + 32 hex), `iat`, `exp = iat + 600`, `org`, `evt`, `occ: null`, `reg`, `pur: "face_matching"`, `nv` (notice version), `age: "adult"`, `act` (`add` or `replace`). `lib/pgIntegration/enrollmentTicket.ts` holds the reference signer and verifier; the shared vector is pinned in `tests/unit/pg-selfie.test.ts` and in the contract.
+Contract §4.1. A compact JWS, HS256, header exactly `{"alg":"HS256","typ":"yuyu-pg-enroll+jwt"}`. The key depends on the secret:
+
+- **Key v2** (current): the dedicated ticket secret `ytk_…`; key = `HKDF-SHA256(ikm = secret as UTF-8, no salt, info = "yuyu-pg-enrollment-ticket-v2", 32 bytes)`. PG holds it as `YUYU_TICKET_SECRET` and then accepts **only** v2 tickets, so the delivery secret can no longer forge one.
+- **Key v1** (legacy, only while `ticketSecretEncrypted` is empty): `HMAC-SHA256(key = the delivery secret "whsec_…" as UTF-8, msg = "yuyu-pg-enrollment-ticket-v1")`. PG uses it only while `YUYU_TICKET_SECRET` is unset.
+
+Switching an existing installation: run `pg:integration rotate-ticket-secret`, then set PG's `YUYU_TICKET_SECRET` and restart it at once. Uploads in between are refused as `401 INVALID_TICKET` (the ticket is not spent) and the attendee simply tries again. PG tries each configured secret during a rotation. Claims: `iss` (Yuyu's issuer, as for OIDC), `aud: "peoples-gallery:enrollment"`, `sub` (pairwise subject), `jti` (`yet_` + 32 hex), `iat`, `exp = iat + 600`, `org`, `evt`, `occ: null`, `reg`, `pur: "face_matching"`, `nv` (notice version), `age: "adult"`, `act` (`add` or `replace`). `lib/pgIntegration/enrollmentTicket.ts` holds the reference signer and verifier; the shared vector is pinned in `tests/unit/pg-selfie.test.ts` and in the contract.
 
 The ticket is a bearer capability for one upload: it is returned once to its owner, never logged, audited or stored. Yuyu keeps only its `jti`, expiry and outcome (`PgSelfieTicket`, purged a day after expiry). At most **5 tickets per person per hour**; the Server Actions and the mobile API also apply their usual rate limits.
 
@@ -214,7 +221,7 @@ Through the integration API (Bearer `yoi_`, as above):
 
 Bodies are strict JSON (`application/json`, at most 256 KB); unknown fields or a query string are `400`.
 
-**Withdrawal in Yuyu.** "Stop face matching" (ticket page, Account → Privacy, or `DELETE` in the app) marks the consent withdrawn, spends outstanding tickets and emits `consent.withdrawn` (+ `selfie.removed` when an enrollment exists) in the same transaction. "Stop face matching everywhere" withdraws every registration and emits one `consent.withdrawn` with `scope: "all"`. PG purges the selfie and matches (plan §4.4). Registrations that leave `CONFIRMED` are purged by PG from the `registration.*` events; deleting the account removes the consent rows (`user.deleted`).
+**Withdrawal in Yuyu.** "Stop face matching" (ticket page, Account → Privacy, or `DELETE` in the app) marks the consent withdrawn, spends outstanding tickets and emits `consent.withdrawn` (+ `selfie.removed` when an enrollment exists) in the same transaction. `consent.withdrawn` lists the ids (`jti`, never the tickets) of the unexpired tickets it spent as `revokedJtis`; PG records them as used, so a ticket minted just before the withdrawal cannot enroll afterwards. If such an upload reaches PG before the withdrawal does, the existing safety net applies: PG reports `added` and Yuyu answers with `selfie.removed`. "Stop face matching everywhere" withdraws every registration and emits one `consent.withdrawn` with `scope: "all"`. PG purges the selfie and matches (plan §4.4). Registrations that leave `CONFIRMED` are purged by PG from the `registration.*` events; deleting the account removes the consent rows (`user.deleted`).
 
 ## Attendee notifications
 

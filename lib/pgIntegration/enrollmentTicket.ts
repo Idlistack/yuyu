@@ -12,8 +12,13 @@ import { FACE_MATCHING_PURPOSE, subjectSchema, ticketJtiSchema } from "@/lib/pgI
  * once.
  *
  * Format: compact JWS, HS256, header exactly {"alg":"HS256","typ":"yuyu-pg-enroll+jwt"}.
- * Key: HMAC-SHA256(key = the full "whsec_…" secret as UTF-8, msg = TICKET_KEY_LABEL),
- * so the delivery signature and the ticket never share a key.
+ * Key (contract §4.1), chosen by the secret's prefix:
+ *  - v2 (current): a dedicated `ytk_…` ticket secret, independent of the
+ *    delivery secret (security review Y-1): one leaked secret no longer breaks
+ *    both channels, and they rotate separately.
+ *    key = HKDF-SHA256(ikm = secret as UTF-8, salt = none, info = TICKET_KEY_INFO_V2, 32 bytes).
+ *  - v1 (legacy, until the operator runs `pg:integration rotate-ticket-secret`):
+ *    key = HMAC-SHA256(key = the "whsec_…" delivery secret as UTF-8, msg = TICKET_KEY_LABEL).
  *
  * This module is pure (node:crypto only) so the shared test vectors run
  * anywhere; `verifyEnrollmentTicket` is the reference PG implements.
@@ -22,6 +27,9 @@ import { FACE_MATCHING_PURPOSE, subjectSchema, ticketJtiSchema } from "@/lib/pgI
 export const TICKET_TYP = "yuyu-pg-enroll+jwt";
 export const TICKET_AUDIENCE = "peoples-gallery:enrollment";
 export const TICKET_KEY_LABEL = "yuyu-pg-enrollment-ticket-v1";
+export const TICKET_KEY_INFO_V2 = "yuyu-pg-enrollment-ticket-v2";
+/** Prefix of a dedicated (v2) ticket secret. */
+export const TICKET_SECRET_PREFIX = "ytk_";
 export const TICKET_TTL_SECONDS = 600;
 /** Clock skew allowed on `iat` only; `exp` is never extended. */
 export const TICKET_IAT_SKEW_SECONDS = 60;
@@ -47,7 +55,15 @@ export const enrollmentTicketClaimsSchema = z.object({
 export type EnrollmentTicketClaims = z.infer<typeof enrollmentTicketClaimsSchema>;
 
 export function ticketKey(secret: string): Buffer {
+  if (secret.startsWith(TICKET_SECRET_PREFIX)) {
+    return Buffer.from(crypto.hkdfSync("sha256", Buffer.from(secret, "utf8"), Buffer.alloc(0), TICKET_KEY_INFO_V2, 32));
+  }
   return crypto.createHmac("sha256", Buffer.from(secret, "utf8")).update(TICKET_KEY_LABEL).digest();
+}
+
+/** A new dedicated ticket secret: `ytk_` + 32 random bytes, base64url. */
+export function newTicketSecret() {
+  return `${TICKET_SECRET_PREFIX}${crypto.randomBytes(32).toString("base64url")}`;
 }
 
 function b64url(value: Buffer | string) {

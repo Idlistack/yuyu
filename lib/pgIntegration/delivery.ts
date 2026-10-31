@@ -44,6 +44,7 @@ export type LoadedIntegration = {
   id: string;
   endpointUrl: string;
   secretEncrypted: string;
+  ticketSecretEncrypted: string | null;
   enabled: boolean;
   allowInternalTarget: boolean;
   oauthClient: { id: string; pairwiseSaltEncrypted: string };
@@ -52,7 +53,7 @@ export type LoadedIntegration = {
 export async function loadPgIntegration(): Promise<LoadedIntegration | null> {
   return prisma.pgIntegration.findFirst({
     select: {
-      id: true, endpointUrl: true, secretEncrypted: true, enabled: true, allowInternalTarget: true,
+      id: true, endpointUrl: true, secretEncrypted: true, ticketSecretEncrypted: true, enabled: true, allowInternalTarget: true,
       oauthClient: { select: { id: true, pairwiseSaltEncrypted: true } },
     },
   });
@@ -216,6 +217,8 @@ export async function buildEnvelopeForRow(row: BuildRow, subjectOf: (userId: str
         purpose: "face_matching",
         scope: snapshot.scope,
         withdrawnAt: utcIso(snapshot.withdrawnAt),
+        // Rows captured before Y-2 have no list.
+        revokedJtis: Array.isArray(snapshot.revokedJtis) ? snapshot.revokedJtis : [],
       };
       break;
     default:
