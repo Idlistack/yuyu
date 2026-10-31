@@ -20,6 +20,7 @@ This directory is the source of truth for the current product, its operation, an
 | [Permissions](PERMISSIONS.md) | Event and series dashboard matrix: every control, its server check, and what owners, admins, members and each co-organiser grant see |
 | [Machine API v1](API.md) | Server-to-server authentication, scopes, contracts, and credential lifecycle |
 | [Organisation webhooks](WEBHOOKS.md) | Outgoing signed webhooks: event types, payloads, signature verification, retries, auto-disable, and SSRF rules |
+| [OpenID Connect provider](OIDC_PROVIDER.md) | "Sign in with Yuyu" for operator-registered apps such as People's Gallery: endpoints, PKCE and code rules, pairwise subjects, consent, revocation, key rotation, and the client registration CLI |
 | [Mobile API v1](MOBILE_API.md) | User-authenticated API for the Yuyu mobile apps (Android and iOS), with an [OpenAPI 3.1 spec](mobile-api.openapi.yaml) and [fixtures](mobile-api-fixtures/) |
 | [Testing](TESTING.md) | Test suites, CI checks, coverage, and release verification |
 | [Performance](PERFORMANCE.md) | Large-event load test: data set, query measurements, indexes, and the before/after results |

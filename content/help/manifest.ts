@@ -48,7 +48,7 @@ export const helpSections = [
       { slug: "account/sign-up-and-sign-in", title: "Creating an account and signing in", summary: "Sign up with email or Google, verify your address, and sign in." },
       { slug: "account/forgotten-password", title: "Forgotten your password?", summary: "Reset your password with an emailed link." },
       { slug: "account/two-step-verification", title: "Two-step verification", summary: "Protect your account with an authenticator app and recovery codes." },
-      { slug: "account/profile-and-security", title: "Profile, appearance and security", summary: "Change your name, photo and theme, see recent security activity, and sign out everywhere." },
+      { slug: "account/profile-and-security", title: "Profile, appearance and security", summary: "Change your name, photo and theme, see recent security activity, manage connected apps, and sign out everywhere." },
       { slug: "account/your-data", title: "Your data and memberships", summary: "Download your personal data and leave organisations you no longer help run." },
     ],
   },
@@ -196,6 +196,7 @@ export const helpSections = [
       { slug: "instance/settings", title: "Instance settings", summary: "Sign-ups, email delivery, Google sign-in, alerts and backup posture." },
       { slug: "instance/email-delivery", title: "Email delivery", summary: "How the outbox sends email, and what to do when it fails." },
       { slug: "instance/security-and-audit", title: "Security and the audit log", summary: "MFA adoption, API clients and the searchable record of important actions." },
+      { slug: "instance/sign-in-with-yuyu", title: "Sign in with Yuyu for other apps", summary: "Register an app such as People's Gallery so people can sign in with their Yuyu account." },
     ],
   },
   {

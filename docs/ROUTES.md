@@ -39,11 +39,12 @@ Dynamic segments are shown as `:name` for readability.
 | `/verify-email` | Consume a one-time email-verification link and activate a password account |
 | `/reset-password` | Password-reset request and completion |
 | `/account` | Authenticated account profile settings |
-| `/account/security` | Authenticated password, MFA, recovery-code, and session controls |
+| `/account/security` | Authenticated password, MFA, recovery-code, and session controls, and **Connected apps** (apps allowed to sign in with Yuyu, with Disconnect) |
 | `/account/registrations` | Authenticated list of the signed-in user's own registrations, tickets, certificates, and personal data download |
 | `/account/teams/:teamId` | Authenticated team page for the team's signed-in leader (linked from `/account/registrations`); a 404 for anyone else. Same controls as `/team/:token` except resetting the management link; `noindex`, private cache |
 | `/account/submissions/:eventId` | Authenticated project page for a signed-in entrant (any member of a team, or the owner of a solo registration), linked from `/account/registrations` and the ticket. A 404 for anyone without a registration on the event; `noindex`, `no-referrer` |
 | `/account/organisations` | Authenticated list of the user's memberships and roles, event co-organiser roles, pending co-organiser invites, and leave-organisation control (blocked for the sole owner) |
+| `/oauth/consent` | The one-time authorisation screen of the [OpenID Connect provider](OIDC_PROVIDER.md) ("People's Gallery wants to: know who you are, see events you're part of"), reached from `/oauth/authorize`. Re-validates the whole authorization request; an unknown client or unregistered redirect URI shows an error and never redirects. Signed out: Yuyu sign-in first. `noindex`, `no-referrer`, never cached |
 
 ## User and organisation dashboard
 
@@ -99,6 +100,12 @@ Every super-admin page additionally requires a current TOTP verification, and ea
 | `GET /api/v1/events/:eventId` | Machine bearer credential + `events:read` | Tenant-scoped event metadata |
 | `GET /api/v1/events/:eventId/participants` | Machine bearer credential + `participants:read` | Paginated minimal confirmed-participant roster, with attendance filtering; `include=attendance` also requires `participants:attendance:read` |
 | `/api/mobile/v1/*` | Mobile session bearer (user identity); `auth/login`, `auth/google`, `auth/refresh`, `auth/config` and `public/*`/`rsvp` work without one | Yuyu mobile apps (Android and iOS): sign-in and token refresh, own registrations and team, public events, organiser guests, teams, check-in, emails, the programme with speakers and day-of controls, and the judge's scoring workspace. Same permission checks and core functions as the website; unknown paths answer the JSON `NOT_FOUND` envelope; see [Mobile API](MOBILE_API.md) |
+| `GET /.well-known/openid-configuration` | Public | OpenID Provider metadata for the [first-party OIDC provider](OIDC_PROVIDER.md); the issuer comes from `NEXT_PUBLIC_BASE_URL` only |
+| `GET /oauth/jwks` | Public | ES256 ID-token verification keys: the active key and keys retired in the last 7 days |
+| `GET /oauth/authorize` | Yuyu session (signed out → `/login`, or `login_required` with `prompt=none`) | OAuth authorization code endpoint: `response_type=code`, registered `client_id`, exact `redirect_uri`, `state`, `nonce`, PKCE `S256` required. A standing grant returns `code`, `state` and `iss` at once; otherwise `/oauth/consent`. Rate limited per IP (`oauthAuthorize`, 60/min); `no-store` |
+| `POST /oauth/token` | Client authentication (`client_secret_basic`, `client_secret_post`, or `none` for a public client) | `authorization_code` (60-second single-use code, PKCE verified, a replay revokes what it issued) and `refresh_token` (rotating, reuse detection). Returns an opaque 10-minute access token, a 30-day refresh token and a 5-minute ES256 ID token; RFC 6749 errors; `no-store`; rate limited per client (`oauthToken`, 600/min) |
+| `GET`, `POST /oauth/userinfo` | Bearer access token (header only) | Pairwise `sub`, and with `profile` the `name` and `picture`; never an email. `no-store`; rate limited per session (`oauthUserinfo`, 120/min) |
+| `POST /oauth/revoke` | Client authentication | RFC 7009: revokes the client's own access or refresh token (the whole session); unknown tokens get the same empty `200` |
 | `GET /.well-known/assetlinks.json` | Public | Android App Links statement from `ANDROID_APP_SHA256_CERT_FINGERPRINTS` (`[]` when unset) |
 | `GET /.well-known/apple-app-site-association` | Public | iOS Universal Links association (JSON, no extension) from `APPLE_APP_IDS` (empty details when unset) |
 
@@ -109,7 +116,7 @@ Opaque ticket, certificate, team join, team management, submission, and crew sig
 | Route | Purpose |
 | --- | --- |
 | `/manifest.webmanifest` | PWA manifest (`app/manifest.ts`): name "Yuyu", `id` `/`, start URL `/dashboard` |
-| `/robots.txt` | Crawler rules (`app/robots.ts`); disallows `/dashboard/`, `/super-admin/`, `/ticket/`, `/team/`, `/{org}/{event}/team/`, `/submit/`, `/attend/`, `/join/`, and `/crew/` |
+| `/robots.txt` | Crawler rules (`app/robots.ts`); disallows `/dashboard/`, `/super-admin/`, `/ticket/`, `/team/`, `/{org}/{event}/team/`, `/submit/`, `/attend/`, `/join/`, `/crew/`, and `/oauth/` |
 | `/sitemap.xml` | Public sitemap (`app/sitemap.ts`) |
 | `/:orgSlug/:eventSlug/opengraph-image`, `/:orgSlug/i/:instanceId/opengraph-image` | Generated social share cards for events and occurrences |
 

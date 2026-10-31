@@ -12,7 +12,7 @@
 - Redis for distributed rate limiting and realtime ticket check-in pub/sub
 - S3-compatible private object storage
 - Nodemailer-backed transactional email
-- sharp for image processing and certificate rendering, pdf-lib for post-event reports, and jose for mobile Google ID-token verification
+- sharp for image processing and certificate rendering, pdf-lib for post-event reports, and jose for mobile Google ID-token verification and for signing the OIDC provider's ES256 ID tokens
 - Vitest and Playwright
 
 ## Repository layout
@@ -24,6 +24,7 @@
 | `lib/` | Authentication, authorization, validation, RSVP logic, storage, email, rate limiting, and shared services |
 | `lib/core/` | Mutation cores (check-in, RSVP lifecycle/admin/cancel, team registration, event crew, hackathon judging, broadcasts, attendance confirmation, programme delays, feedback settings, registration window, account profile and security) shared by Server Actions and `/api/mobile/v1` |
 | `lib/mobile/` | Mobile API tokens, sessions, permissions, Zod schemas, and DTOs |
+| `lib/oidc/` | First-party OpenID Connect provider ("Sign in with Yuyu"): PKCE, codes, grants, rotating tokens, pairwise subjects, signing keys, strict DTOs ([OIDC provider](OIDC_PROVIDER.md)) |
 | `prisma/` | Data model and ordered production migrations |
 | `scripts/` | Environment, schema, asset migration, and standalone-build helpers |
 | `tests/` | Unit, PostgreSQL integration, and browser suites |
@@ -54,6 +55,8 @@ Server Actions are used for authenticated dashboard mutations. Public RSVP and f
 
 The Yuyu mobile apps call `/api/mobile/v1` as ordinary users. Bearer tokens are looked up by SHA-256 digest in `MobileSession` (`lib/mobileAuth.ts`), bound to the user's `sessionVersion`, and every mutation calls the same `lib/core/*` function as the matching Server Action, so permission checks, transactions, rate limits, and audit are shared. Responses are strict DTOs; `docs/mobile-api.openapi.yaml` and its fixtures are checked against the Zod schemas and routes by `tests/unit/mobile-api-contract.test.ts`. See [Mobile API](MOBILE_API.md).
 
+Companion apps registered by the operator, first of all People's Gallery, sign people in through Yuyu's minimal OpenID Connect provider (`/oauth/*`, `lib/oidc/`): the authorization code flow with mandatory PKCE, a one-time authorisation screen recorded as an `OAuthGrant`, pairwise subjects, ES256 ID tokens from encrypted `OAuthSigningKey` rows, and `OAuthSession` tokens stored as digests and bound to `sessionVersion`, like mobile sessions. See [OIDC provider](OIDC_PROVIDER.md).
+
 External applications authenticate under `/api/v1` with tenant-bound `ApiClient` credentials rather than Auth.js sessions. A route wrapper resolves the client organisation and scopes, then passes that context to explicit domain readers. Queries include the organisation predicate and responses are mapped through validated API DTOs rather than serialized Prisma models.
 
 ## Multi-tenancy and authorization
@@ -64,7 +67,7 @@ The super-admin boundary is separate: access requires an authenticated email mat
 
 ## Main data areas
 
-- Identity: `User`, `Account`, `Session`, `VerificationToken`, and `MobileSession` (hashed mobile access and refresh tokens).
+- Identity: `User`, `Account`, `Session`, `VerificationToken`, and `MobileSession` (hashed mobile access and refresh tokens); for the OIDC provider `OAuthClient`, `OAuthAuthorizationCode`, `OAuthGrant`, `OAuthSession`, and `OAuthSigningKey`.
 - Tenancy: `Organisation`, `Membership`, and `OrganisationInvite`; per-event `EventCollaborator` and `EventCollaboratorInvite` with exact `EventPermission` grants.
 - Events: `Event` (including `listedPublicly` for listed approval-required events, an optional unique `shortCode`, the venue check-in station PIN fields, and the manual sign-up close snapshot `registrationManuallyClosedAt`/`registrationCutoffBeforeManualClose`/`registrationLeadBeforeManualClose`), `EventInvite`, `EventSeries`, `SeriesInvite`, and `EventInstance`.
 - Event websites: `EventPage` (release flag `isPublished`, tagline, logo, accent) with `EventPageSection`, `EventHighlight`, `EventVenue`/`EventVenueRoom`, `EventScheduleTrack`, `EventSession`, `EventSpeaker`/`EventSessionSpeaker`, `EventSponsor`, `EventFaq`, `EventResource`, and `EventScheduleItem`.

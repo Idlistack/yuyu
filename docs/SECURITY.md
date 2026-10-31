@@ -18,6 +18,17 @@ This page documents implemented controls and security boundaries. It is not a su
 - Super-admins with a fresh TOTP proof can disable new password and Google account creation; existing users can continue to sign in.
 - External applications use high-entropy, tenant-bound API credentials under `/api/v1`; raw secrets are displayed once and only SHA-256 digests are stored.
 
+## Sign in with Yuyu (OpenID Connect provider)
+
+- Yuyu is a minimal first-party OpenID Connect provider for operator-registered apps such as People's Gallery ([OIDC provider](OIDC_PROVIDER.md)). Clients are registered only with the operator CLI (`scripts/oauth-register-client.ts`), never from the web; every client change and key rotation is audited.
+- Only the authorization code flow is supported, with PKCE `S256` mandatory (`plain` refused, also by a database CHECK), required `state` and `nonce`, and redirect URIs matched byte for byte. An unknown client or unregistered redirect URI is shown as an error on Yuyu and never redirected; other errors return to the registered URI with `iss` (RFC 9207).
+- Codes live 60 seconds (database CHECK), are single use and bound to the client, redirect URI, PKCE challenge, nonce and the user's `sessionVersion`; a second redemption revokes the tokens the code issued. Codes, access tokens (10 minutes), refresh tokens (30 days, rotated, reuse-detected as for mobile sessions) and client secrets are stored only as SHA-256 digests and never logged or audited.
+- The first sign-in to each app shows a one-time authorisation screen; approval is an `OAuthGrant` the person can revoke under **Account → Security → Connected apps**, which also revokes the app's tokens.
+- The subject is pairwise per client (HMAC with a random per-client salt), so apps cannot correlate people or learn Yuyu user ids. ID tokens and UserInfo carry only `sub`, `name` and `picture`: never an email address, user id, membership or role. Pictures are never Gravatars.
+- ID tokens are ES256 with a `kid`; signing keys and pairwise salts are AES-256-GCM encrypted under their own HKDF label of `MFA_ENCRYPTION_KEY` and checked by `scripts/check-instance-secrets.mjs`. One key is active (partial unique index); retired keys stay in the JWKS for 7 days.
+- OAuth sessions are bound to `sessionVersion`: password change/reset, MFA changes and "sign out everywhere" mark them revoked in the same transaction (`revokeUserOAuthSessions`), and tokens are refused at use time once the version moves. A disabled client's tokens stop working.
+- The issuer comes from configuration (`NEXT_PUBLIC_BASE_URL`), never from request headers. Authorization, token, UserInfo and revocation responses are `no-store`; `/oauth/` is disallowed in `robots.txt`; the endpoints are rate limited (`oauthAuthorize`, `oauthToken`, `oauthUserinfo`).
+
 ## Mobile sessions
 
 - The Yuyu mobile apps (Android and iOS) authenticate as ordinary users under `/api/mobile/v1`; they are never machine clients and never receive organisation-wide credentials.
@@ -69,7 +80,7 @@ This page documents implemented controls and security boundaries. It is not a su
 ## Abuse protection
 
 - Password login applies account and IP limits inside the credential verifier, in addition to proxy limits. Missing and OAuth-only identities perform dummy bcrypt work; signup returns the same response for existing and newly created accounts. Auth.js errors are logged without exception payloads.
-- Redis-backed limits cover organisation webhook changes (`webhookManage`, 30 per minute) and test sends/redeliveries (`webhookTest`, 20 per hour), APIs, authentication mutations, RSVP, feedback, search/discovery, uploads, Server Actions, object creation, invitations, broadcasts, attendance confirmation sends and reminders (`attendanceCheckSend`, 10 per hour per user and address, shared by both), links shared by hand (`attendanceCheckLink`, 60 per 10 minutes per user) and replies (`attendanceCheckReply`, 10 per minute per link and per address), check-in, personal data exports (per user), public ticket status and event streams (per IP), short-link lookups (per IP), mobile token refresh (`mobileAuth`, per IP) and mobile API traffic (`mobileApi`, per user), and browser crash reports (`clientError`, per IP). Bucket sizes live in `lib/rateLimit.ts`.
+- Redis-backed limits cover organisation webhook changes (`webhookManage`, 30 per minute) and test sends/redeliveries (`webhookTest`, 20 per hour), APIs, authentication mutations, RSVP, feedback, search/discovery, uploads, Server Actions, object creation, invitations, broadcasts, attendance confirmation sends and reminders (`attendanceCheckSend`, 10 per hour per user and address, shared by both), links shared by hand (`attendanceCheckLink`, 60 per 10 minutes per user) and replies (`attendanceCheckReply`, 10 per minute per link and per address), check-in, personal data exports (per user), public ticket status and event streams (per IP), short-link lookups (per IP), mobile token refresh (`mobileAuth`, per IP) and mobile API traffic (`mobileApi`, per user), the OIDC provider (`oauthAuthorize` per IP, `oauthToken` per client, `oauthUserinfo` per session), and browser crash reports (`clientError`, per IP). Bucket sizes live in `lib/rateLimit.ts`.
 - Machine API traffic has an additional per-client limit so credential rotation cannot multiply request capacity.
 - Security-sensitive production traffic fails closed when Redis is unavailable.
 - Process-local fallback exists for development and an explicit CI-only production-build test mode.
@@ -105,7 +116,7 @@ This page documents implemented controls and security boundaries. It is not a su
   and retries use a stable non-sensitive Message-ID under lease-owned state
   transitions. Protected scheduler/readiness routes require one exact bearer.
 - Retention cleanup covers expired sessions, expired or long-revoked mobile
-  sessions, unused expired organisation and collaborator invitations,
+  and OAuth sessions, expired OAuth authorization codes, unused expired organisation and collaborator invitations,
   verification tokens, undo snapshots, old sent/failed non-capability
   outbox records, and webhook delivery history older than 30 days. Deployment
   operators must define broader legal retention and deletion procedures.
