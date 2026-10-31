@@ -9,6 +9,7 @@ import { isActionRateLimited } from "@/lib/actionRateLimit";
 import type { ActionResult } from "./org";
 import { revokeAllSessionsForUser } from "@/lib/core/accountSecurity";
 import { revokeUserMobileSessions } from "@/lib/mobileAuth";
+import { revokeUserOAuthSessions } from "@/lib/oidc/provider";
 
 const codeSchema = z.object({ code: z.string().trim().min(6).max(32) });
 
@@ -71,6 +72,7 @@ export async function confirmMfaEnrollment(input: unknown): Promise<ActionResult
     if (updated.count !== 1) return false;
     await tx.verificationToken.deleteMany({ where: { identifier: `mfa:${session.user.id}` } });
     await revokeUserMobileSessions(tx, session.user.id);
+    await revokeUserOAuthSessions(tx, session.user.id);
     await tx.auditEvent.create({ data: { action: "MFA_ENABLED", actorUserId: session.user.id, targetType: "User", targetId: session.user.id } });
     return true;
   });
@@ -97,6 +99,7 @@ export async function disableMfa(input: unknown): Promise<ActionResult> {
     if (updated.count !== 1) return false;
     await tx.verificationToken.deleteMany({ where: { identifier: `mfa:${session.user.id}` } });
     await revokeUserMobileSessions(tx, session.user.id);
+    await revokeUserOAuthSessions(tx, session.user.id);
     await tx.auditEvent.create({ data: { action: "MFA_DISABLED", actorUserId: session.user.id, targetType: "User", targetId: session.user.id } });
     return true;
   });

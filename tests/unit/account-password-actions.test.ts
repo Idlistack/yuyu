@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requireAuth: vi.fn(),
   mobileRevoke: vi.fn(),
+  oauthRevoke: vi.fn(),
   recent: vi.fn(),
   rateLimit: vi.fn(),
   compare: vi.fn(),
@@ -25,7 +26,7 @@ const tx = {
   user: { update: mocks.userUpdate, updateMany: mocks.userUpdate },
   verificationToken: { deleteMany: vi.fn() },
   session: { deleteMany: mocks.sessionDelete },
-  mobileSession: { updateMany: mocks.mobileRevoke },
+  mobileSession: { updateMany: mocks.mobileRevoke }, oAuthSession: { updateMany: mocks.oauthRevoke },
   auditEvent: { create: mocks.auditCreate },
 };
 vi.mock("@/lib/db", () => ({
@@ -56,6 +57,7 @@ describe("account password actions", () => {
     expect(mocks.userUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ passwordHash: "new-hash", sessionVersion: { increment: 1 } }) }));
     expect(mocks.sessionDelete).toHaveBeenCalledWith({ where: { userId: "user_1" } });
     expect(mocks.mobileRevoke).toHaveBeenCalledWith({ where: { userId: "user_1", revokedAt: null }, data: { revokedAt: expect.any(Date) } });
+    expect(mocks.oauthRevoke).toHaveBeenCalledWith({ where: { userId: "user_1", revokedAt: null }, data: { revokedAt: expect.any(Date) } });
   });
 
   it("lets a recently authenticated Google-only user add a password", async () => {
