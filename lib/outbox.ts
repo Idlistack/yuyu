@@ -2,7 +2,7 @@ import "server-only";
 
 import { EventStatus, OutboxStatus, Prisma, RsvpStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { sendApprovalNotification, sendAttendanceCheckEmail, sendCollaboratorInvitation, sendEventBroadcast, sendEventInvitation, sendResultsPublishedEmail, sendRSVPConfirmation, sendSubmissionLinkEmail, sendSubmissionReceivedEmail, sendTeamCreatedEmail, sendTeamMemberAddedEmail } from "@/lib/email";
+import { sendApprovalNotification, sendAttendanceCheckEmail, sendPgPhotosEmail, sendCollaboratorInvitation, sendEventBroadcast, sendEventInvitation, sendResultsPublishedEmail, sendRSVPConfirmation, sendSubmissionLinkEmail, sendSubmissionReceivedEmail, sendTeamCreatedEmail, sendTeamMemberAddedEmail } from "@/lib/email";
 import { hashSubmissionLinkToken, isSubmissionTokenShape, resultsPath, submissionLinkPath } from "@/lib/submissionToken";
 import { hashTeamManageToken, isTeamTokenShape, teamJoinPath, teamManagePath } from "@/lib/teamToken";
 import { attendancePath, hashAttendanceToken, isAttendanceTokenShape } from "@/lib/attendanceToken";
@@ -14,6 +14,7 @@ import { sendPasswordResetEmail } from "@/lib/email/passwordReset";
 import { sendEmailVerificationEmail } from "@/lib/email/emailVerification";
 import { describeOperationalError } from "@/lib/redactSensitiveText";
 import { reportOpsAlert } from "@/lib/opsAlerts";
+import { PG_PHOTOS_OUTBOX_KIND, pgPhotosSubject, type PgPhotosPayload } from "@/lib/pgIntegration/notifications";
 
 type OutboxClient = Prisma.TransactionClient | typeof prisma;
 
@@ -328,6 +329,19 @@ export function asAttendanceCheckPayload(value: Prisma.JsonValue): AttendanceChe
   return payload as AttendanceCheckPayload;
 }
 
+export function asPgPhotosPayload(payload: Prisma.JsonValue): PgPhotosPayload | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const value = payload as Record<string, unknown>;
+  const int = (item: unknown) => typeof item === "number" && Number.isInteger(item) && item >= 0;
+  if (typeof value.userId !== "string" || typeof value.rsvpId !== "string" || typeof value.eventId !== "string") return null;
+  if (value.kind !== "photos_ready" && value.kind !== "photos_published") return null;
+  if (!int(value.photosOfYou) || !int(value.newSinceLast) || typeof value.link !== "string" || !/^https?:\/\//.test(value.link)) return null;
+  return {
+    userId: value.userId, rsvpId: value.rsvpId, eventId: value.eventId, kind: value.kind,
+    photosOfYou: value.photosOfYou as number, newSinceLast: value.newSinceLast as number, link: value.link,
+  };
+}
+
 export function asResultsPublishedPayload(value: Prisma.JsonValue): ResultsPublishedPayload | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const payload = value as Record<string, unknown>;
@@ -481,7 +495,7 @@ function asCollaboratorInvitePayload(value: Prisma.JsonValue): CollaboratorInvit
  * one click). They wait behind every other kind, so a large send never delays
  * a password reset, verification, ticket, or team email queued after it.
  */
-export const BULK_OUTBOX_KINDS: readonly string[] = ["event-broadcast", "attendance-check", "results-published", "event-invite"];
+export const BULK_OUTBOX_KINDS: readonly string[] = ["event-broadcast", "attendance-check", "results-published", "event-invite", "pg-photos"];
 
 /** Due messages, oldest first: transactional kinds before bulk ones. */
 async function dueMessages(take: number) {
@@ -510,7 +524,7 @@ async function dueMessages(take: number) {
  * the requeue changes `lastError`, and a second failure leaves `attempts` at
  * 2, so a genuinely undeliverable message is never retried in a loop.
  */
-export const OUTBOX_KINDS_ADDED_AFTER_1_0: readonly string[] = ["team-created", "team-member-added", "submission-received", "submission-link", "results-published", "attendance-check"];
+export const OUTBOX_KINDS_ADDED_AFTER_1_0: readonly string[] = ["team-created", "team-member-added", "submission-received", "submission-link", "results-published", "attendance-check", "pg-photos"];
 const OLDER_RELEASE_REQUEUE_WINDOW_MS = 7 * 86_400_000;
 
 async function requeueKindsRejectedByOlderRelease() {
@@ -717,6 +731,40 @@ export async function deliverOutboxBatchWithCount(limit = 20) {
           eventTitle: event.title,
           resultsPath: resultsPath(event.organisation.slug, event.slug),
           recipientName: payload.recipientName,
+          messageId: stableMessageId,
+        });
+      } else if (message.kind === PG_PHOTOS_OUTBOX_KIND) {
+        // People's Gallery photos (docs/PG_INTEGRATION.md#attendee-notifications).
+        // Re-checked at send time: a person who switched the email off, stopped
+        // face matching or left the event meanwhile gets nothing.
+        const payload = asPgPhotosPayload(message.payload);
+        if (!payload) throw new PermanentOutboxError();
+        const rsvp = await prisma.rSVP.findUnique({
+          where: { id: payload.rsvpId },
+          select: {
+            userId: true, status: true, eventId: true,
+            event: { select: { title: true } },
+            user: { select: { email: true, name: true, notificationPreference: { select: { pgPhotosEmail: true } } } },
+            pgFaceConsent: { select: { userId: true, grantedAt: true, withdrawnAt: true } },
+          },
+        });
+        const consent = rsvp?.pgFaceConsent;
+        const deliverable = rsvp?.event && rsvp.userId === payload.userId && rsvp.eventId === payload.eventId && rsvp.status === RsvpStatus.CONFIRMED
+          && rsvp.user?.email && rsvp.user.notificationPreference?.pgPhotosEmail !== false
+          && consent?.userId === payload.userId && consent.grantedAt && !consent.withdrawnAt;
+        if (!deliverable || !rsvp?.event || !rsvp.user?.email) {
+          await prisma.outboxMessage.deleteMany({ where: { id: message.id, status: OutboxStatus.PROCESSING, lockedAt: claimTime } });
+          continue;
+        }
+        await sendPgPhotosEmail({
+          to: rsvp.user.email,
+          subject: pgPhotosSubject(payload.kind, rsvp.event.title, payload.photosOfYou, payload.newSinceLast),
+          eventTitle: rsvp.event.title,
+          photosOfYou: payload.photosOfYou,
+          newSinceLast: payload.newSinceLast,
+          ready: payload.kind === "photos_ready",
+          link: payload.link,
+          recipientName: rsvp.user.name?.trim() || undefined,
           messageId: stableMessageId,
         });
       } else if (message.kind === "attendance-check") {

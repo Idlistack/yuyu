@@ -678,3 +678,46 @@ export async function sendEventBroadcast(params: {
 
   await transporter.sendMail({ messageId: params.messageId, from, to: params.to, subject, text, html });
 }
+
+/** "Your photos are ready", sent by Yuyu on behalf of People's Gallery (decision D-Mail). Exported for tests. */
+export type PgPhotosEmailParams = {
+  subject: string;
+  eventTitle: string;
+  photosOfYou: number;
+  newSinceLast: number;
+  ready: boolean;
+  /** Absolute People's Gallery link, already checked against PG's public origin. */
+  link: string;
+  recipientName?: string;
+  /** Absolute Yuyu base for the preferences link; defaults to NEXT_PUBLIC_BASE_URL. */
+  baseUrl?: string;
+};
+
+export function buildPgPhotosEmail(params: PgPhotosEmailParams): { subject: string; html: string; text: string } {
+  const subject = headerText(params.subject);
+  const salutation = greeting(params.recipientName);
+  const count = params.ready ? params.photosOfYou : Math.max(params.newSinceLast, 1);
+  const noun = count === 1 ? "photo" : "photos";
+  const lead = params.ready
+    ? `People's Gallery found ${count} ${noun} of you from`
+    : `People's Gallery has ${count} new ${noun} of you from`;
+  const preferencesUrl = `${(params.baseUrl ?? getBaseUrl()).replace(/\/$/, "")}/account/privacy`;
+  const html = teamEmailShell(subject, `
+          <h2 style="margin-top:0; color:#18181B; font-size:20px;">${params.ready ? "Your photos are ready" : "New photos of you"}</h2>
+          <p>${salutation.html}<br><br>${lead} <strong>${escapeHtml(params.eventTitle)}</strong>, matched with the selfie you added.</p>
+          ${teamButton(params.link, "See your photos")}
+          <p style="font-size:13px; color:#666;">Sent by Yuyu on behalf of People's Gallery. People's Gallery does not have your email address.
+          To stop these emails or stop face matching, go to <a href="${escapeHtml(preferencesUrl)}">Account → Privacy</a>.</p>`);
+  const text = `${subject}\n\n${salutation.text}\n\n${lead} "${params.eventTitle}", matched with the selfie you added.\n\n${params.link}\n\nSent by Yuyu on behalf of People's Gallery. People's Gallery does not have your email address.\nTo stop these emails or stop face matching: ${preferencesUrl}\n\nBest regards,\nYuyu Events`;
+  return { subject, html, text };
+}
+
+export async function sendPgPhotosEmail(params: PgPhotosEmailParams & { to: string; messageId?: string }): Promise<void> {
+  const { transporter, from } = await getEmailTransport();
+  const { subject, html, text } = buildPgPhotosEmail(params);
+  if (!transporter) {
+    console.log("[EMAIL MOCK] photos-ready email queued");
+    return;
+  }
+  await transporter.sendMail({ messageId: params.messageId, from, to: params.to, subject, text, html });
+}
