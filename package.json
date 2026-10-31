@@ -26,6 +26,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "production:check": "node scripts/check-production-env.mjs",
+    "oauth:client": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/oauth-register-client.ts",
     "brand:generate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-brand-assets.ts"
   },
   "dependencies": {

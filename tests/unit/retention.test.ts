@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   outbox: vi.fn(),
   mobileSession: vi.fn(),
   webhookDelivery: vi.fn(),
+  oauthCode: vi.fn(),
+  oauthSession: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ prisma: {
@@ -23,6 +25,8 @@ vi.mock("@/lib/db", () => ({ prisma: {
   outboxMessage: { deleteMany: mocks.outbox },
   mobileSession: { deleteMany: mocks.mobileSession },
   webhookDelivery: { deleteMany: mocks.webhookDelivery },
+  oAuthAuthorizationCode: { deleteMany: mocks.oauthCode },
+  oAuthSession: { deleteMany: mocks.oauthSession },
 } }));
 
 import { purgeExpiredOperationalData } from "@/lib/retention";
@@ -33,7 +37,7 @@ describe("operational retention", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OUTBOX_RETENTION_DAYS = "30";
-    for (const mock of [mocks.verification, mocks.session, mocks.orgInvite, mocks.collaboratorInvite, mocks.undo, mocks.outbox, mocks.mobileSession, mocks.webhookDelivery]) {
+    for (const mock of [mocks.verification, mocks.session, mocks.orgInvite, mocks.collaboratorInvite, mocks.undo, mocks.outbox, mocks.mobileSession, mocks.webhookDelivery, mocks.oauthCode, mocks.oauthSession]) {
       mock.mockResolvedValue({ count: 1 });
     }
     mocks.transaction.mockImplementation((operations: Array<Promise<unknown>>) => Promise.all(operations));
@@ -56,6 +60,8 @@ describe("operational retention", () => {
       failedOutboxMessages: 1,
       mobileSessions: 1,
       webhookDeliveries: 1,
+      oauthAuthorizationCodes: 1,
+      oauthSessions: 1,
     });
     expect(mocks.orgInvite).toHaveBeenCalledWith({ where: { usedAt: null, expiresAt: { lt: now } } });
     expect(mocks.collaboratorInvite).toHaveBeenCalledWith({ where: { usedAt: null, expiresAt: { lt: now } } });
@@ -63,5 +69,8 @@ describe("operational retention", () => {
     expect(mocks.outbox).toHaveBeenNthCalledWith(2, { where: { status: OutboxStatus.FAILED, createdAt: { lt: new Date("2030-01-30T00:00:00.000Z") } } });
     // Webhook delivery history is kept for 30 days whatever OUTBOX_RETENTION_DAYS says; live leases are never purged.
     expect(mocks.webhookDelivery).toHaveBeenCalledWith({ where: { createdAt: { lt: new Date("2030-01-30T00:00:00.000Z") }, status: { not: "PROCESSING" } } });
+    // OIDC codes a day after expiry; OAuth sessions once unrefreshable or revoked 30 days ago.
+    expect(mocks.oauthCode).toHaveBeenCalledWith({ where: { expiresAt: { lt: new Date("2030-02-28T00:00:00.000Z") } } });
+    expect(mocks.oauthSession).toHaveBeenCalledWith({ where: { OR: [{ refreshExpiresAt: { lt: now } }, { revokedAt: { lt: new Date("2030-01-30T00:00:00.000Z") } }] } });
   });
 });

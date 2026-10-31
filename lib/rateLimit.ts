@@ -34,7 +34,10 @@ export type Bucket =
   | "attendanceCheckSend"
   | "attendanceCheckSettings"
   | "attendanceCheckLink"
-  | "attendanceCheckReply";
+  | "attendanceCheckReply"
+  | "oauthAuthorize"
+  | "oauthToken"
+  | "oauthUserinfo";
 
 const limits: Record<Bucket, { max: number; windowMs: number }> = {
   global: { max: 300, windowMs: 60_000 },
@@ -88,6 +91,14 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   attendanceCheckLink: { max: 60, windowMs: 10 * 60_000 },
   // Public replies on /attend/{token}, per link and per client address.
   attendanceCheckReply: { max: 10, windowMs: 60_000 },
+  // OIDC provider (docs/OIDC_PROVIDER.md). Authorization requests and consent
+  // decisions per client address, like the web sign-in pages.
+  oauthAuthorize: { max: 60, windowMs: 60_000 },
+  // Token and revocation calls per relying-party client: People's Gallery's
+  // backend calls from one address on behalf of every attendee signing in.
+  oauthToken: { max: 600, windowMs: 60_000 },
+  // userinfo per OAuth session (and per address for unauthenticated calls).
+  oauthUserinfo: { max: 120, windowMs: 60_000 },
 };
 
 // Local fallback store

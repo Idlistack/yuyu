@@ -13,7 +13,7 @@ export async function purgeExpiredOperationalData(now = new Date()) {
   );
   const sentBefore = new Date(now.getTime() - outboxRetentionDays * DAY_MS);
   const webhookBefore = new Date(now.getTime() - 30 * DAY_MS);
-  const [tokens, sessions, organisationInvites, collaboratorInvites, undoSnapshots, sentMessages, failedMessages, mobileSessions, webhookDeliveries] = await prisma.$transaction([
+  const [tokens, sessions, organisationInvites, collaboratorInvites, undoSnapshots, sentMessages, failedMessages, mobileSessions, webhookDeliveries, oauthCodes, oauthSessions] = await prisma.$transaction([
     prisma.verificationToken.deleteMany({ where: { expires: { lt: now } } }),
     prisma.session.deleteMany({ where: { expires: { lt: now } } }),
     prisma.organisationInvite.deleteMany({ where: { usedAt: null, expiresAt: { lt: now } } }),
@@ -35,6 +35,12 @@ export async function purgeExpiredOperationalData(now = new Date()) {
     prisma.webhookDelivery.deleteMany({
       where: { createdAt: { lt: webhookBefore }, status: { not: WebhookDeliveryStatus.PROCESSING } },
     }),
+    // OIDC provider (docs/OIDC_PROVIDER.md): codes live 60 seconds; a day
+    // later nothing can replay them. Sessions follow the mobile rule.
+    prisma.oAuthAuthorizationCode.deleteMany({ where: { expiresAt: { lt: new Date(now.getTime() - DAY_MS) } } }),
+    prisma.oAuthSession.deleteMany({
+      where: { OR: [{ refreshExpiresAt: { lt: now } }, { revokedAt: { lt: new Date(now.getTime() - 30 * DAY_MS) } }] },
+    }),
   ]);
   return {
     verificationTokens: tokens.count,
@@ -46,5 +52,7 @@ export async function purgeExpiredOperationalData(now = new Date()) {
     failedOutboxMessages: failedMessages.count,
     mobileSessions: mobileSessions.count,
     webhookDeliveries: webhookDeliveries.count,
+    oauthAuthorizationCodes: oauthCodes.count,
+    oauthSessions: oauthSessions.count,
   };
 }
