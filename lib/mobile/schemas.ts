@@ -512,3 +512,33 @@ export type RegistrationFieldDto = z.infer<typeof registrationFieldSchema>;
 export type MyTeamDto = z.infer<typeof myTeamSchema>;
 export type OrganiserTeamMobileDto = z.infer<typeof organiserTeamSchema>;
 export type JudgeSubmissionMobileDto = z.infer<typeof judgeSubmissionSchema>;
+
+// Face matching with People's Gallery (docs/PG_INTEGRATION.md#selfie-step). No image data ever passes through these.
+export const faceMatchingDtoSchema = z.object({
+  available: z.boolean(),
+  reason: z.enum(["not_found", "not_enabled", "not_confirmed", "series", "event_over"]).nullable(),
+  notice: z.object({
+    version: z.string(),
+    title: z.string(),
+    summary: z.string(),
+    points: z.array(z.string()),
+    consentLabel: z.string(),
+    ageLabel: z.string(),
+  }).strict(),
+  state: z.object({
+    ageAttestation: z.enum(["ADULT", "MINOR"]).nullable(),
+    active: z.boolean(),
+    withdrawn: z.boolean(),
+    needsNewConsent: z.boolean(),
+    selfieState: z.enum(["NONE", "PENDING", "ADDED", "REJECTED", "REMOVED"]),
+    rejectedReason: z.string().nullable(),
+    selfieUpdatedAt: z.string().nullable(),
+  }).strict().nullable(),
+}).strict();
+
+export const selfieTicketDtoSchema = z.object({
+  ticket: z.string(),
+  uploadUrl: z.string().url(),
+  expiresAt: z.string(),
+  action: z.enum(["add", "replace"]),
+}).strict();

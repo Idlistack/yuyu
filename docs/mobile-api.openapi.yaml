@@ -201,6 +201,83 @@ paths:
         "404": { $ref: "#/components/responses/Error" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/mobile/v1/me/registrations/{rsvpId}/face-matching:
+    get:
+      tags: [Me]
+      summary: Face matching with People's Gallery for one of the caller's own registrations
+      description: |
+        The versioned notice to show before the camera and the current state
+        (docs/PG_INTEGRATION.md#selfie-step). `available: false` with a
+        `reason` when the organisation does not use People's Gallery, the
+        registration is not confirmed, the event is a series or its photos
+        are no longer kept. Anyone else's RSVP is `NOT_FOUND`. No image data
+        ever passes through Yuyu.
+      parameters: [{ $ref: "#/components/parameters/rsvpId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/FaceMatchingResponse" } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [Me]
+      summary: Stop face matching for one of the caller's own registrations
+      description: People's Gallery deletes the selfie and the matches for that event (`consent.withdrawn`).
+      parameters: [{ $ref: "#/components/parameters/rsvpId" }]
+      responses:
+        "200": { $ref: "#/components/responses/NullData" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/mobile/v1/me/registrations/{rsvpId}/face-matching/ticket:
+    post:
+      tags: [Me]
+      summary: Agree to the face-matching notice and get a 10-minute selfie upload ticket
+      description: |
+        Records consent to the current notice and the 18+ attestation (both
+        must be `true` in this request), then returns a single-use ticket.
+        The app POSTs the photo straight to `uploadUrl` (People's Gallery)
+        as `multipart/form-data` with fields `ticket` and `file`, or as a raw
+        `image/*` body with `Authorization: Bearer <ticket>`. Yuyu never
+        receives the image. At most 5 tickets per person per hour
+        (`RATE_LIMITED`). An outdated `noticeVersion` is `CONFLICT`: show the
+        current notice again. An under-18 attestation is `FORBIDDEN`.
+      parameters: [{ $ref: "#/components/parameters/rsvpId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [noticeVersion, consent, adult]
+              properties:
+                noticeVersion: { type: string, maxLength: 40 }
+                consent: { const: true }
+                adult: { const: true }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SelfieTicketResponse" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/mobile/v1/me/registrations/{rsvpId}/face-matching/under-18:
+    post:
+      tags: [Me]
+      summary: Record that the caller is under 18 for this registration
+      description: Face matching then stays off for that registration (decision D-12); the registration itself is unaffected.
+      parameters: [{ $ref: "#/components/parameters/rsvpId" }]
+      responses:
+        "200": { $ref: "#/components/responses/NullData" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/mobile/v1/public/discover:
     get:
       tags: [Public]
@@ -1262,6 +1339,58 @@ components:
               displayName: { type: string, description: First name and last initial. }
               isLeader: { type: boolean }
 
+    FaceMatching:
+      type: object
+      additionalProperties: false
+      required: [available, reason, notice, state]
+      properties:
+        available: { type: boolean }
+        reason:
+          oneOf:
+            - { type: string, enum: [not_found, not_enabled, not_confirmed, series, event_over] }
+            - { type: "null" }
+        notice:
+          type: object
+          additionalProperties: false
+          required: [version, title, summary, points, consentLabel, ageLabel]
+          properties:
+            version: { type: string }
+            title: { type: string }
+            summary: { type: string }
+            points: { type: array, items: { type: string } }
+            consentLabel: { type: string }
+            ageLabel: { type: string }
+        state:
+          oneOf:
+            - { $ref: "#/components/schemas/FaceMatchingState" }
+            - { type: "null" }
+
+    FaceMatchingState:
+      type: object
+      additionalProperties: false
+      required: [ageAttestation, active, withdrawn, needsNewConsent, selfieState, rejectedReason, selfieUpdatedAt]
+      properties:
+        ageAttestation:
+          oneOf:
+            - { type: string, enum: [ADULT, MINOR] }
+            - { type: "null" }
+        active: { type: boolean, description: Consent given to the current notice and not withdrawn. }
+        withdrawn: { type: boolean }
+        needsNewConsent: { type: boolean, description: Agreed to an older notice; show the current one before the next selfie. }
+        selfieState: { type: string, enum: [NONE, PENDING, ADDED, REJECTED, REMOVED] }
+        rejectedReason: { type: [string, "null"], description: "no_face, multiple_faces, face_too_small, low_quality or unreadable" }
+        selfieUpdatedAt: { type: [string, "null"], format: date-time }
+
+    SelfieTicket:
+      type: object
+      additionalProperties: false
+      required: [ticket, uploadUrl, expiresAt, action]
+      properties:
+        ticket: { type: string, description: Single-use bearer capability for one upload to People's Gallery. Never log or store it. }
+        uploadUrl: { type: string, format: uri }
+        expiresAt: { type: string, format: date-time }
+        action: { type: string, enum: [add, replace] }
+
     MyTeamResult:
       type: object
       additionalProperties: false
@@ -1947,6 +2076,8 @@ components:
         registrationClosedReason: { type: [string, "null"], description: UI-safe reason when registration is closed. }
         registrationManuallyClosed: { type: boolean }
     RegistrationStateResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { $ref: "#/components/schemas/RegistrationState" } } }
+    FaceMatchingResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { $ref: "#/components/schemas/FaceMatching" } } }
+    SelfieTicketResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { $ref: "#/components/schemas/SelfieTicket" } } }
     MyTeamResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { $ref: "#/components/schemas/MyTeamResult" } } }
     TeamListResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { $ref: "#/components/schemas/TeamList" } } }
     TeamResponse: { type: object, additionalProperties: false, required: [ok, data], properties: { ok: { const: true }, data: { $ref: "#/components/schemas/OrganiserTeam" } } }
