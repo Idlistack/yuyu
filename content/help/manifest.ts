@@ -196,7 +196,7 @@ export const helpSections = [
       { slug: "instance/settings", title: "Instance settings", summary: "Sign-ups, email delivery, Google sign-in, alerts and backup posture." },
       { slug: "instance/email-delivery", title: "Email delivery", summary: "How the outbox sends email, and what to do when it fails." },
       { slug: "instance/security-and-audit", title: "Security and the audit log", summary: "MFA adoption, API clients and the searchable record of important actions." },
-      { slug: "instance/sign-in-with-yuyu", title: "Sign in with Yuyu for other apps", summary: "Register an app such as People's Gallery so people can sign in with their Yuyu account." },
+      { slug: "instance/sign-in-with-yuyu", title: "Sign in with Yuyu for other apps", summary: "Register an app such as People's Gallery so people can sign in with their Yuyu account, and share organisations' events with it." },
     ],
   },
   {

@@ -13,6 +13,8 @@ export const CLIENT_SECRET_PATTERN = /^yys_[A-Za-z0-9_-]{43}$/;
 export const CODE_PATTERN = /^yoc_[A-Za-z0-9_-]{43}$/;
 export const ACCESS_TOKEN_PATTERN = /^yoa_[A-Za-z0-9_-]{43}$/;
 export const REFRESH_TOKEN_PATTERN = /^yor_[A-Za-z0-9_-]{43}$/;
+/** Client-credentials (machine) access token; never accepted where a user token is expected. */
+export const CLIENT_TOKEN_PATTERN = /^yoi_[A-Za-z0-9_-]{43}$/;
 /** RFC 7636 §4.1: 43–128 unreserved characters. */
 export const CODE_VERIFIER_PATTERN = /^[A-Za-z0-9\-._~]{43,128}$/;
 /** base64url(SHA-256) without padding is always 43 characters. */
@@ -31,6 +33,7 @@ export const generateClientSecret = () => random("yys_");
 export const generateAuthorizationCode = () => random("yoc_");
 export const generateAccessToken = () => random("yoa_");
 export const generateRefreshToken = () => random("yor_");
+export const generateClientToken = () => random("yoi_");
 export const generatePairwiseSalt = () => crypto.randomBytes(32).toString("base64url");
 
 /** Constant-time comparison of two hex digests of equal, known length. */

@@ -13,7 +13,7 @@ export async function purgeExpiredOperationalData(now = new Date()) {
   );
   const sentBefore = new Date(now.getTime() - outboxRetentionDays * DAY_MS);
   const webhookBefore = new Date(now.getTime() - 30 * DAY_MS);
-  const [tokens, sessions, organisationInvites, collaboratorInvites, undoSnapshots, sentMessages, failedMessages, mobileSessions, webhookDeliveries, oauthCodes, oauthSessions] = await prisma.$transaction([
+  const [tokens, sessions, organisationInvites, collaboratorInvites, undoSnapshots, sentMessages, failedMessages, mobileSessions, webhookDeliveries, oauthCodes, oauthSessions, oauthClientTokens, pgDeliveries, pgTombstones] = await prisma.$transaction([
     prisma.verificationToken.deleteMany({ where: { expires: { lt: now } } }),
     prisma.session.deleteMany({ where: { expires: { lt: now } } }),
     prisma.organisationInvite.deleteMany({ where: { usedAt: null, expiresAt: { lt: now } } }),
@@ -41,6 +41,14 @@ export async function purgeExpiredOperationalData(now = new Date()) {
     prisma.oAuthSession.deleteMany({
       where: { OR: [{ refreshExpiresAt: { lt: now } }, { revokedAt: { lt: new Date(now.getTime() - 30 * DAY_MS) } }] },
     }),
+    // Client-credentials tokens live 10 minutes.
+    prisma.oAuthClientToken.deleteMany({ where: { expiresAt: { lt: now } } }),
+    // People's Gallery integration (docs/PG_INTEGRATION.md): delivery log and
+    // deleted-resource tombstones, 30 days. Pending and leased rows are kept.
+    prisma.pgIntegrationDelivery.deleteMany({
+      where: { createdAt: { lt: webhookBefore }, status: { in: [WebhookDeliveryStatus.SUCCEEDED, WebhookDeliveryStatus.FAILED] } },
+    }),
+    prisma.pgIntegrationResource.deleteMany({ where: { deletedAt: { lt: webhookBefore } } }),
   ]);
   return {
     verificationTokens: tokens.count,
@@ -54,5 +62,8 @@ export async function purgeExpiredOperationalData(now = new Date()) {
     webhookDeliveries: webhookDeliveries.count,
     oauthAuthorizationCodes: oauthCodes.count,
     oauthSessions: oauthSessions.count,
+    oauthClientTokens: oauthClientTokens.count,
+    pgIntegrationDeliveries: pgDeliveries.count,
+    pgIntegrationTombstones: pgTombstones.count,
   };
 }

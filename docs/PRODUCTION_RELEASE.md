@@ -78,6 +78,7 @@ build, the old build on the new schema, and a restore drill).
   | `20261028000000_attendance_confirmation` | `ALTER TABLE "Event"`; new table with foreign keys to `RSVP` and `Event` |
   | `20261028010000_hackathon_email_toggles` | `ALTER TABLE "Event"` (constant defaults, no rewrite) |
   | `20261029000000_event_crew` | Adds the `CREW` page section value; `ALTER TABLE "RSVP"` plus a CHECK validated under that lock; new tables |
+  | `20261031010000_pg_integration` | New tables, `OAuthGrant.subject` (nullable, metadata only) and capture triggers on `Event`, `RSVP`, `Membership`, `EventCollaborator`, `User`, `OAuthGrant` and `OAuthClient` ([People's Gallery integration](PG_INTEGRATION.md)). No enum values added. The previous release keeps working: the triggers only write while an integration is configured, and nothing delivers until the new release returns (queued rows wait) |
   | `20261031000000_oidc_provider` | New tables and one new enum type only (OIDC provider for People's Gallery); not part of the timings below. No new values on existing enums, so it adds nothing to the image-only rollback check: the old release ignores the OAuth tables and "Sign in with Yuyu" stops until the new release returns |
 
   Details for each are in

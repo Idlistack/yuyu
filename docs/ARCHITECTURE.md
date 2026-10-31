@@ -25,6 +25,7 @@
 | `lib/core/` | Mutation cores (check-in, RSVP lifecycle/admin/cancel, team registration, event crew, hackathon judging, broadcasts, attendance confirmation, programme delays, feedback settings, registration window, account profile and security) shared by Server Actions and `/api/mobile/v1` |
 | `lib/mobile/` | Mobile API tokens, sessions, permissions, Zod schemas, and DTOs |
 | `lib/oidc/` | First-party OpenID Connect provider ("Sign in with Yuyu"): PKCE, codes, grants, rotating tokens, pairwise subjects, signing keys, strict DTOs ([OIDC provider](OIDC_PROVIDER.md)) |
+| `lib/pgIntegration/` | People's Gallery integration: contract DTOs and D-2 role mapping, signed outbox delivery, internal-target rules, and the backfill API ([People's Gallery integration](PG_INTEGRATION.md)) |
 | `prisma/` | Data model and ordered production migrations |
 | `scripts/` | Environment, schema, asset migration, and standalone-build helpers |
 | `tests/` | Unit, PostgreSQL integration, and browser suites |

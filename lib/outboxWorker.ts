@@ -9,6 +9,7 @@ import {
 import { purgeExpiredOperationalData } from "@/lib/retention";
 import { logOpsError } from "@/lib/opsAlerts";
 import { deliverWebhookBatch } from "@/lib/webhooks/delivery";
+import { deliverPgIntegrationBatch } from "@/lib/pgIntegration/delivery";
 
 const OUTBOX_WORKER_INTERVAL_MS = 60_000;
 /** Messages claimed per batch inside one scheduler pass. */
@@ -66,9 +67,14 @@ export async function runOutboxScheduler() {
       logOpsError("[webhooks] delivery pass failed", { level: "error", source: "webhooks", title: "Webhook delivery pass failed", error });
       return { delivered: 0, failed: 0 };
     });
+    // The People's Gallery integration (docs/PG_INTEGRATION.md) likewise.
+    const pgIntegration = await deliverPgIntegrationBatch().catch((error: unknown) => {
+      logOpsError("[pg-integration] delivery pass failed", { level: "error", source: "pg-integration", title: "People's Gallery delivery pass failed", error });
+      return { delivered: 0, failed: 0 };
+    });
     const purged = await purgeExpiredOperationalData();
     await recordOutboxSchedulerSuccess(result).catch(() => undefined);
-    return { ...result, webhooks, purged };
+    return { ...result, webhooks, pgIntegration, purged };
   } catch (error) {
     await recordOutboxSchedulerFailure(error).catch(() => undefined);
     throw error;

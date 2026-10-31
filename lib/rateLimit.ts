@@ -37,7 +37,8 @@ export type Bucket =
   | "attendanceCheckReply"
   | "oauthAuthorize"
   | "oauthToken"
-  | "oauthUserinfo";
+  | "oauthUserinfo"
+  | "pgIntegrationApi";
 
 const limits: Record<Bucket, { max: number; windowMs: number }> = {
   global: { max: 300, windowMs: 60_000 },
@@ -99,6 +100,9 @@ const limits: Record<Bucket, { max: number; windowMs: number }> = {
   oauthToken: { max: 600, windowMs: 60_000 },
   // userinfo per OAuth session (and per address for unauthenticated calls).
   oauthUserinfo: { max: 120, windowMs: 60_000 },
+  // People's Gallery integration API (docs/PG_INTEGRATION.md), per OAuth
+  // client: backfill and nightly reconciliation page through every event.
+  pgIntegrationApi: { max: 600, windowMs: 60_000 },
 };
 
 // Local fallback store

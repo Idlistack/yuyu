@@ -38,6 +38,10 @@ export const tokenRequestSchema = z.discriminatedUnion("grant_type", [
     refresh_token: z.string().min(1).max(256),
     scope: z.string().min(1).max(200).optional(),
   }),
+  z.object({
+    grant_type: z.literal("client_credentials"),
+    scope: z.string().min(1).max(200).optional(),
+  }),
 ]);
 
 export const revokeRequestSchema = z.object({
@@ -51,6 +55,14 @@ export const tokenResponseSchema = z.object({
   expires_in: z.number().int().positive(),
   refresh_token: z.string(),
   id_token: z.string(),
+  scope: z.string(),
+}).strict();
+
+/** client_credentials: an access token only (no refresh or ID token: there is no user). */
+export const clientCredentialsResponseSchema = z.object({
+  access_token: z.string(),
+  token_type: z.literal("Bearer"),
+  expires_in: z.number().int().positive(),
   scope: z.string(),
 }).strict();
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { markRsvpDeletionAsRemovalTx } from "@/lib/pgIntegration/capture";
 
 import {
   EventPrivacyType,
@@ -1054,6 +1055,8 @@ export async function organiserDeleteTeam(ctx: OrganiserEventContext, teamId: st
         select: { id: true },
       })
       : null;
+    // People's Gallery sees an organiser removal as REMOVED, not CANCELLED.
+    await markRsvpDeletionAsRemovalTx(tx);
     const removed = await tx.rSVP.deleteMany({ where: { teamId: team.id, eventId: event.id } });
     await tx.team.delete({ where: { id: team.id } });
     for (const member of team.members) {

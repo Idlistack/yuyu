@@ -315,9 +315,28 @@ model OAuthClient {
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
-  codes    OAuthAuthorizationCode[]
-  grants   OAuthGrant[]
-  sessions OAuthSession[]
+  codes         OAuthAuthorizationCode[]
+  grants        OAuthGrant[]
+  sessions      OAuthSession[]
+  clientTokens  OAuthClientToken[]
+  pgIntegration PgIntegration?
+}
+
+/// Client-credentials access token (`yoi_`, 10 minutes) for machine calls by a
+/// first-party client, e.g. the People's Gallery integration API
+/// (docs/PG_INTEGRATION.md). Only the SHA-256 digest is stored.
+model OAuthClientToken {
+  id        String   @id @default(cuid())
+  clientId  String
+  tokenHash String   @unique
+  scopes    String[]
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([expiresAt])
 }
 
 /// A one-time authorization code (60 seconds, single use).
@@ -353,6 +372,10 @@ model OAuthGrant {
   userId    String
   clientId  String
   scopes    String[]
+  /// The client's pairwise `sub` for this user, kept so the People's Gallery
+  /// integration API can resolve `/users/{subject}/roles` (docs/PG_INTEGRATION.md).
+  /// Derived, not secret; filled when the grant is approved.
+  subject   String?
   grantedAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   revokedAt DateTime?
@@ -362,6 +385,7 @@ model OAuthGrant {
   sessions OAuthSession[]
 
   @@unique([userId, clientId])
+  @@unique([clientId, subject])
   @@index([clientId])
 }
 
@@ -440,6 +464,7 @@ model Organisation {
   apiClients        ApiClient[]
   webhookEndpoints  WebhookEndpoint[]
   savedViews        SavedView[]
+  pgIntegration     PgIntegrationOrganisation?
 }
 
 /// A tenant-bound machine identity. It never authenticates through Auth.js.
@@ -1793,4 +1818,94 @@ model SavedView {
   @@index([eventId, surface])
   @@index([userId])
   @@index([organisationId])
+}
+
+/// The instance's People's Gallery integration (docs/PG_INTEGRATION.md): a
+/// first-party, operator-managed channel, separate from organisation webhooks.
+/// At most one row (id "default"), managed with `npm run pg:integration`.
+model PgIntegration {
+  id                  String    @id @default("default")
+  /// The People's Gallery OAuth client: its pairwise salt gives `subject`, and
+  /// only it may call /api/integrations/pg/v1 (scope `yuyu.integration`).
+  oauthClientId       String    @unique
+  endpointUrl         String
+  /// `whsec_…` signing secret, AES-256-GCM under its own HKDF label. Write-only.
+  secretEncrypted     String
+  enabled             Boolean   @default(true)
+  /// Operator opt-in for an in-cluster target (http, private addresses, any
+  /// port). Loopback, link-local/metadata and multicast stay blocked.
+  allowInternalTarget Boolean   @default(false)
+  lastSuccessAt       DateTime?
+  lastFailureAt       DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  oauthClient   OAuthClient                 @relation(fields: [oauthClientId], references: [id], onDelete: Restrict)
+  organisations PgIntegrationOrganisation[]
+}
+
+/// Organisations whose events, registrations and roles are shared with People's Gallery.
+model PgIntegrationOrganisation {
+  organisationId String   @id
+  integrationId  String
+  enabledAt      DateTime @default(now())
+
+  organisation Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  integration  PgIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+}
+
+/// Per-resource version counter and tombstone, written by the capture
+/// triggers in the same transaction as the change. `key` is internal (it may
+/// embed a Yuyu user id) and is never sent; the delivered key uses `subject`.
+model PgIntegrationResource {
+  key            String    @id
+  /// event | registration | access | user
+  kind           String
+  resourceId     String
+  organisationId String?
+  eventId        String?
+  /// Strictly increasing per key: max(previous + 1, epoch ms of the change).
+  version        BigInt
+  deletedAt      DateTime?
+  /// Minimal snapshot of a deleted registration/event for backfill tombstones (no names or contact data).
+  tombstone      Json?
+  updatedAt      DateTime
+
+  @@index([kind, organisationId, updatedAt, key])
+  @@index([kind, eventId, updatedAt, key])
+  @@index([deletedAt])
+}
+
+/// Outbox for the People's Gallery integration. Rows are inserted by database
+/// triggers in the transaction that changed the resource, then signed and
+/// delivered by the one-minute outbox worker (lib/pgIntegration/delivery.ts).
+model PgIntegrationDelivery {
+  /// Envelope id (`evt_` + 32 hex), stable across retries: PG's idempotency key.
+  id              String                @id
+  seq             BigInt                @unique @default(autoincrement())
+  eventType       String
+  organisationId  String?
+  resourceKey     String
+  resourceVersion BigInt
+  /// Internal capture (ids and changed fields) until the envelope is built; then null.
+  snapshot        Json?
+  /// The strict envelope as sent (built once, identical on every retry).
+  payload         Json?
+  status          WebhookDeliveryStatus @default(PENDING)
+  attempts        Int                   @default(0)
+  nextAttemptAt   DateTime              @default(now())
+  lockedAt        DateTime?
+  lastAttemptAt   DateTime?
+  deliveredAt     DateTime?
+  lastStatusCode  Int?
+  /// Short, redacted failure summary.
+  lastError       String?
+  responseTimeMs  Int?
+  createdAt       DateTime              @default(now())
+
+  @@index([status, nextAttemptAt, seq])
+  @@index([createdAt])
+  @@index([resourceKey, resourceVersion])
 }

@@ -12,7 +12,7 @@ export function discoveryDocument(issuer = oidcIssuer()) {
     scopes_supported: [...OIDC_SCOPES],
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
-    grant_types_supported: ["authorization_code", "refresh_token"],
+    grant_types_supported: ["authorization_code", "refresh_token", "client_credentials"],
     subject_types_supported: ["pairwise"],
     id_token_signing_alg_values_supported: [ID_TOKEN_ALG],
     token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post", "none"],

@@ -6,9 +6,10 @@ Yuyu is a minimal, first-party OpenID Connect provider so that companion apps
 run by the same operator, first of all **People's Gallery** (event photos),
 can sign people in with their Yuyu account. It implements only what those
 apps need: the authorization code flow with mandatory PKCE, refresh tokens,
-UserInfo, revocation, discovery and a JWKS. There is no dynamic client
-registration, implicit or hybrid flow, client-credentials grant, or email
-claim.
+UserInfo, revocation, discovery and a JWKS, plus a client-credentials grant
+for first-party machine scopes (the [People's Gallery integration
+API](PG_INTEGRATION.md)). There is no dynamic client registration, implicit or
+hybrid flow, or email claim.
 
 Relying parties are registered by the operator with a command-line tool;
 nobody can register a client from the web.
@@ -25,7 +26,7 @@ comes from request headers.
 | `GET /oauth/jwks` | Public | ID-token verification keys (ES256): the active key and keys retired in the last 7 days |
 | `GET /oauth/authorize` | Yuyu session (redirects to `/login` when signed out) | Authorization endpoint (code flow only) |
 | `GET /oauth/consent` | Yuyu session | The one-time authorisation screen; Allow and Cancel are Server Actions |
-| `POST /oauth/token` | Client authentication | `authorization_code` and `refresh_token` grants |
+| `POST /oauth/token` | Client authentication | `authorization_code` and `refresh_token` grants; `client_credentials` for machine scopes |
 | `GET`/`POST /oauth/userinfo` | Bearer access token (header only) | `sub`, `name`, `picture` |
 | `POST /oauth/revoke` | Client authentication | RFC 7009 revocation of an access or refresh token |
 
@@ -69,6 +70,15 @@ GET /oauth/authorize?response_type=code
 | `openid` (required) | "Know who you are" | Pairwise `sub` |
 | `profile` | "Know who you are" | `name`, `picture` |
 | `yuyu.events` | "See events you're part of" | Reserved for the People's Gallery integration API (event roles and registrations by pairwise `sub`); grants nothing on these endpoints by itself |
+
+**Machine scope `yuyu.integration`.** Not a user scope: it is never accepted
+at `/oauth/authorize` and never shown on the consent screen. A confidential,
+first-party client whose allowed scopes include it (added by `npm run
+pg:integration -- configure`) can call `POST /oauth/token` with
+`grant_type=client_credentials` and receives only an opaque 10-minute access
+token (`yoi_…`, stored as a SHA-256 digest in `OAuthClientToken`): no refresh
+token, no ID token, no user. UserInfo refuses it. Other clients get
+`unauthorized_client`. See [People's Gallery integration](PG_INTEGRATION.md).
 
 The screen reads "People's Gallery wants to: Know who you are · See events
 you're part of" and states that the app never sees the email address.
@@ -141,10 +151,12 @@ was issued, the grant is not revoked, and the client is `ACTIVE`.
 | Client disabled (CLI) | All its sessions revoked; its tokens and authorization requests refused |
 | Account deleted | Cascades |
 
-People's Gallery keeps its own session after sign-in. When the PG
-integration outbox lands (plan §3, phase P1), the same transactions will
-also emit `user.sessions_revoked { subject }` so PG ends its session at
-once; until then PG notices at its next refresh or UserInfo call.
+People's Gallery keeps its own session after sign-in. Each event above also
+queues `user.sessions_revoked { subject, reason }` for PG in the same
+transaction (database triggers on `User.sessionVersion`, `OAuthGrant.revokedAt`
+and `OAuthClient.status`; [People's Gallery integration](PG_INTEGRATION.md)),
+so PG ends its session within a minute; account deletion queues
+`user.deleted`. PG also notices at its next refresh or UserInfo call.
 
 ## Storage
 

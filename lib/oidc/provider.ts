@@ -7,6 +7,8 @@ import { recordAuditEvent } from "@/lib/audit";
 import {
   ACCESS_TOKEN_TTL_MS,
   AUTHORIZATION_CODE_TTL_MS,
+  CLIENT_CREDENTIALS_SCOPES,
+  CLIENT_TOKEN_TTL_MS,
   ID_TOKEN_ALG,
   ID_TOKEN_TTL_SECONDS,
   REFRESH_REUSE_GRACE_MS,
@@ -21,12 +23,14 @@ import { getActiveSigningKey } from "@/lib/oidc/keys";
 import {
   ACCESS_TOKEN_PATTERN,
   CLIENT_ID_PATTERN,
+  CLIENT_TOKEN_PATTERN,
   CLIENT_SECRET_PATTERN,
   CODE_PATTERN,
   REFRESH_TOKEN_PATTERN,
   digestsEqual,
   generateAccessToken,
   generateAuthorizationCode,
+  generateClientToken,
   generateRefreshToken,
   pairwiseSubject,
   redirectUriMatches,
@@ -189,10 +193,11 @@ export async function issueAuthorizationCode(params: {
     });
     if (params.approve) {
       const merged = existing && !existing.revokedAt ? Array.from(new Set([...existing.scopes, ...request.scopes])) : [...request.scopes];
+      const subject = subjectFor(request.client, userId);
       const grant = await tx.oAuthGrant.upsert({
         where: { userId_clientId: { userId, clientId: request.client.id } },
-        create: { userId, clientId: request.client.id, scopes: merged },
-        update: { scopes: merged, revokedAt: null, grantedAt: existing?.revokedAt ? now : undefined },
+        create: { userId, clientId: request.client.id, scopes: merged, subject },
+        update: { scopes: merged, subject, revokedAt: null, grantedAt: existing?.revokedAt ? now : undefined },
         select: { id: true },
       });
       if (!existing || existing.revokedAt || !scopesCovered(request.scopes, existing.scopes)) {
@@ -562,6 +567,52 @@ export async function revokeToken(client: OAuthClientRecord, token: string, now 
  */
 export function revokeUserOAuthSessions(client: Prisma.TransactionClient, userId: string) {
   return client.oAuthSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+}
+
+// ── Client credentials (machine tokens) ──────────────────────────────────
+
+export type ClientTokenSuccess = { access_token: string; token_type: "Bearer"; expires_in: number; scope: string };
+
+/**
+ * `grant_type=client_credentials` for a confidential first-party client whose
+ * allowed scopes include a machine scope (CLIENT_CREDENTIALS_SCOPES). The token
+ * is opaque (`yoi_`), lives 10 minutes, carries no user and is stored as a
+ * digest. It is never accepted by /oauth/userinfo.
+ */
+export async function issueClientCredentialsToken(params: {
+  client: OAuthClientRecord;
+  scope?: string;
+  now?: Date;
+}): Promise<ClientTokenSuccess | { error: "unauthorized_client" | "invalid_scope"; description: string }> {
+  const now = params.now ?? new Date();
+  const allowed = CLIENT_CREDENTIALS_SCOPES.filter((scope) => params.client.allowedScopes.includes(scope));
+  if (!params.client.secretHash || !params.client.firstParty || allowed.length === 0) {
+    return { error: "unauthorized_client", description: "This client may not use client_credentials." };
+  }
+  let scopes: string[] = [...allowed];
+  if (params.scope !== undefined) {
+    const requested = params.scope.split(" ").filter(Boolean);
+    if (requested.length === 0 || new Set(requested).size !== requested.length || !requested.every((scope) => (allowed as string[]).includes(scope))) {
+      return { error: "invalid_scope", description: "The requested scope is not allowed." };
+    }
+    scopes = requested;
+  }
+  const token = generateClientToken();
+  await prisma.oAuthClientToken.create({
+    data: { clientId: params.client.id, tokenHash: sha256Hex(token), scopes, expiresAt: new Date(now.getTime() + CLIENT_TOKEN_TTL_MS), createdAt: now },
+  });
+  return { access_token: token, token_type: "Bearer", expires_in: Math.floor(CLIENT_TOKEN_TTL_MS / 1000), scope: scopes.join(" ") };
+}
+
+/** Resolve a `yoi_` bearer token: unexpired, issued to a still-active client. */
+export async function authenticateClientToken(token: string, now = new Date()): Promise<{ clientId: string; scopes: string[] } | null> {
+  if (!CLIENT_TOKEN_PATTERN.test(token)) return null;
+  const row = await prisma.oAuthClientToken.findUnique({
+    where: { tokenHash: sha256Hex(token) },
+    select: { clientId: true, scopes: true, expiresAt: true, client: { select: { status: true } } },
+  });
+  if (!row || row.expiresAt <= now || row.client.status !== "ACTIVE") return null;
+  return { clientId: row.clientId, scopes: row.scopes };
 }
 
 // ── Connected apps (account settings) ────────────────────────────────────

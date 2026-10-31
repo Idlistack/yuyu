@@ -234,6 +234,11 @@ function activeResolver(): Resolver {
   return (process.env.NODE_ENV === "test" && g[RESOLVER_KEY]) || systemResolver;
 }
 
+/** DNS answers for a host through the active resolver (test override included). */
+export async function lookupWebhookHost(hostname: string): Promise<ResolvedAddress[]> {
+  return activeResolver()(hostname);
+}
+
 /**
  * Resolves the URL's host and returns the vetted addresses to connect to.
  * Throws `WebhookTargetBlockedError` when any resolved address is blocked

@@ -8,6 +8,15 @@ export const OIDC_SCOPES = ["openid", "profile", "yuyu.events"] as const;
 export type OidcScope = (typeof OIDC_SCOPES)[number];
 
 /**
+ * Machine scopes, granted only through `client_credentials` to a confidential,
+ * first-party client that lists them; never requestable at /oauth/authorize.
+ * `yuyu.integration` is the People's Gallery integration API (docs/PG_INTEGRATION.md).
+ */
+export const CLIENT_CREDENTIALS_SCOPES = ["yuyu.integration"] as const;
+export type ClientCredentialsScope = (typeof CLIENT_CREDENTIALS_SCOPES)[number];
+export const CLIENT_TOKEN_TTL_MS = 10 * 60_000;
+
+/**
  * What the one-time authorisation screen says each scope allows. `openid` and
  * `profile` share one line: an app that knows who you are sees your name and
  * photo, never your email address (People's Gallery plan, D-Mail/D-3).

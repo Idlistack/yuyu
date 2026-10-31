@@ -56,3 +56,30 @@ Every command is recorded in the audit log (see [Security and the audit log](/he
 - Each app sees a different, unchanging identifier for the same person, so two apps can't link their users together.
 - When someone changes or resets their password, changes two-step verification or chooses **Sign out everywhere**, their sign-in to connected apps ends too: apps can no longer refresh it or read their profile. People can disconnect an app themselves under **Account settings** → **Security** → **Connected apps**.
 - The signing keys and per-app identifiers are encrypted with a key derived from `MFA_ENCRYPTION_KEY`. Keep that key unchanged on every server; `node scripts/check-instance-secrets.mjs` confirms it can still read them. If it were lost, every app sign-in would stop working and people would appear as new users in each app.
+
+## Share events with People's Gallery
+
+People's Gallery also needs to know which events exist, who registered and who organises them, so the right people see the right photos. You switch this on per organisation, from the command line, after registering People's Gallery as above.
+
+<Steps>
+
+1. Connect the integration, using the app's **client_id** and the event address People's Gallery gives you:
+
+   ```bash
+   npm run pg:integration -- configure --client-id yyc_… \
+     --endpoint-url https://photos.example.org/api/v2/integrations/yuyu/events
+   ```
+
+   Copy the **signing secret** it prints into People's Gallery straight away; it is shown only once. If both apps run in the same cluster and People's Gallery has only an internal address, add `--allow-internal-target`.
+
+2. Turn it on for each organisation that uses People's Gallery:
+
+   ```bash
+   npm run pg:integration -- enable-org --org your-organisation
+   ```
+
+3. Check it with `npm run pg:integration -- status`, and send a test with `npm run pg:integration -- ping`.
+
+</Steps>
+
+People's Gallery then receives event changes, registrations and organiser roles within about a minute, and catches up on everything else by itself. It never receives email addresses, form answers or tickets: people are identified by the same per-app identifier as their sign-in. `disable-org` stops sharing an organisation, `disable` pauses everything, `rotate-secret` replaces the secret, and `redrive` resends deliveries that failed for too long. The technical reference is `docs/PG_INTEGRATION.md`.

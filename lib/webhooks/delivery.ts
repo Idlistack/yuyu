@@ -12,6 +12,7 @@ import { webhookSignatureHeader } from "@/lib/webhooks/signature";
 import {
   pinnedLookup,
   resolveWebhookTarget,
+  type ResolvedAddress,
   webhookHostLabel,
   webhookPrivateTargetsAllowed,
   WebhookTargetBlockedError,
@@ -92,15 +93,23 @@ export type WebhookHttpResult = { statusCode: number; responseTimeMs: number; ex
  * them; a 3xx is reported as a failure) and a socket pinned to the vetted
  * address. Only a short response excerpt is read.
  */
-export async function postWebhook(params: { url: string; body: string; headers: Record<string, string>; timeoutMs?: number }): Promise<WebhookHttpResult> {
+export async function postWebhook(params: {
+  url: string;
+  body: string;
+  headers: Record<string, string>;
+  timeoutMs?: number;
+  /** Target vetting; defaults to the organisation-webhook SSRF rules. */
+  resolveTarget?: (url: string) => Promise<ResolvedAddress[]>;
+}): Promise<WebhookHttpResult> {
   const allowPrivate = webhookPrivateTargetsAllowed();
+  const resolveTarget = params.resolveTarget ?? ((url: string) => resolveWebhookTarget(url, { allowPrivate }));
   const body = Buffer.from(params.body, "utf8");
   if (body.length > WEBHOOK_MAX_PAYLOAD_BYTES) throw new WebhookDeliveryError("Payload too large", true);
   const started = performance.now();
   const timeoutMs = params.timeoutMs ?? WEBHOOK_TIMEOUT_MS;
   const deadline = AbortSignal.timeout(timeoutMs);
   const addresses = await Promise.race([
-    resolveWebhookTarget(params.url, { allowPrivate }),
+    resolveTarget(params.url),
     new Promise<never>((_, reject) => deadline.addEventListener("abort", () => reject(new WebhookDeliveryError(`Timed out after ${timeoutMs / 1000} s`)), { once: true })),
   ]);
   const target = new URL(params.url);

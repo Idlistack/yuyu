@@ -383,9 +383,14 @@ describe("token endpoint", () => {
     expect(await prisma.auditEvent.count({ where: { action: "OAUTH_REFRESH_TOKEN_REUSED", actorUserId: users.asha } })).toBeGreaterThanOrEqual(1);
   });
 
-  it("refuses unsupported grant types", async () => {
+  it("refuses unsupported grant types, and client_credentials without a machine scope", async () => {
+    const password = await tokenRoute(form({ grant_type: "password", username: "a", password: "b" }, { basic: [clients.pg.clientId, clients.pg.secret!] }));
+    expect((await password.json()).error).toBe("unsupported_grant_type");
+    // client_credentials exists for the People's Gallery integration (docs/PG_INTEGRATION.md),
+    // but only for first-party confidential clients holding `yuyu.integration`.
     const response = await tokenRoute(form({ grant_type: "client_credentials" }, { basic: [clients.pg.clientId, clients.pg.secret!] }));
-    expect((await response.json()).error).toBe("unsupported_grant_type");
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("unauthorized_client");
   });
 });
 

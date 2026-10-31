@@ -173,6 +173,28 @@ from another organisation is "not found" (a 404 page, or the action error
 "Webhook endpoint not found."). See [Organisation webhooks](WEBHOOKS.md). Collaborators who are not members see only the list of events they
 co-organise on `/dashboard/:orgSlug`.
 
+## People's Gallery role mapping
+
+The [People's Gallery integration](PG_INTEGRATION.md) shares roles with
+People's Gallery for organisations the instance operator has enabled. No
+organisation role or grant can enable it, change its endpoint or read its
+deliveries: that is the operator CLI only. Yuyu sends the facts (organisation
+role and collaborator grants, by pairwise subject) and the reference mapping
+(decision D-2, `pgRoleFor` in `lib/pgIntegration/contract.ts`):
+
+| Yuyu fact | People's Gallery role on the event |
+| --- | --- |
+| Organisation owner or admin | Event admin (every event of the organisation) |
+| `EDIT_DETAILS` or `PUBLISH_AND_SCHEDULE` | Event admin |
+| `MANAGE_REGISTRATIONS` (without the two above) | Event viewer |
+| Member without an admin-level grant | Event viewer |
+| `CHECK_IN`, `MANAGE_INVITATIONS` or `JUDGE` only | None |
+| Confirmed registration of a signed-in person (crew included) | Attendee |
+
+Every membership and collaborator change in an enabled organisation is sent
+to People's Gallery as `access.changed` in the same transaction.
+`tests/unit/pg-integration.test.ts` pins this table.
+
 ## Mobile API
 
 `lib/mobile/permissions.ts` derives `EventPermissions` for `/api/mobile/v1`:
