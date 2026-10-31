@@ -32,11 +32,18 @@ npm run pg:integration -- configure --client-id yyc_… \
 
 # 3. Each organisation that uses "Photos by People's Gallery"
 npm run pg:integration -- enable-org --org t4g
+
+# 4. PG's public browser origin: where attendees upload selfies, and the only
+#    origin allowed in "your photos are ready" email links. Without it the
+#    selfie step and the notification API stay off.
+npm run pg:integration -- configure --client-id yyc_… \
+  --endpoint-url https://photos.example.org/api/v2/integrations/yuyu/events \
+  --public-url https://photos.example.org
 ```
 
 | Command | Effect |
 | --- | --- |
-| `configure --client-id --endpoint-url [--allow-internal-target \| --public-target-only]` | Creates the integration (prints the `whsec_…` secret once) or changes the endpoint, client or target rule. Audited `PG_INTEGRATION_CONFIGURED` / `PG_INTEGRATION_UPDATED` (host only) |
+| `configure --client-id --endpoint-url [--allow-internal-target \| --public-target-only] [--public-url <origin>]` | Creates the integration (prints the `whsec_…` secret once) or changes the endpoint, client, target rule or PG's public origin (an origin only; `https://`, or `http://` only with `--allow-internal-target`). Audited `PG_INTEGRATION_CONFIGURED` / `PG_INTEGRATION_UPDATED` (hosts only) |
 | `status` | Endpoint host, client, enabled organisations, last success/failure, delivery counts by status |
 | `enable-org --org <slug>` / `disable-org --org <slug>` | Shares an organisation (or stops sharing it). Enabling seeds a fresh version for every existing event and registration so PG's backfill lists them all. Audited |
 | `enable` / `disable` | Switches the whole integration. While disabled nothing new is captured and queued deliveries wait; nothing is lost |
@@ -99,13 +106,13 @@ x-yuyu-signature: t=1792656000,v1=…
 
 - **Signature:** exactly the org-webhook scheme: `v1 = hex(HMAC-SHA256(full secret as UTF-8, "<t>.<raw body>"))`, tolerance 300 seconds. Every attempt is re-signed with a fresh `t`. The shared test vector is pinned on both sides (`tests/unit/pg-integration.test.ts`).
 - **Idempotency:** `id` is stable across retries and redrives; PG de-duplicates on it. The body is serialised with sorted keys, so a retry is byte for byte identical.
-- **Ordering:** `resourceVersion` increases strictly **per resource** in commit order. The trigger bumps a row-locked counter (`PgIntegrationResource`) to `max(previous + 1, epoch milliseconds)` in the same transaction. Resource keys: `event:{id}:` (with the occurrence id after the colon when series are synced), `registration:{id}`, `access:{subject}:{organisationId}`, `user:{subject}`. Every `data` is a full snapshot, so PG applies a change only when `resourceVersion` is greater than what it stored, and safely drops older ones. Deliveries can arrive out of order.
+- **Ordering:** `resourceVersion` increases strictly **per resource** in commit order. The trigger bumps a row-locked counter (`PgIntegrationResource`) to `max(previous + 1, epoch milliseconds)` in the same transaction. Resource keys: `event:{id}:` (with the occurrence id after the colon when series are synced), `registration:{id}`, `access:{subject}:{organisationId}`, `user:{subject}`, `selfie:{registrationId}`, `consent:{registrationId}` (or an internal per-person key for `scope: "all"`). Every `data` is a full snapshot, so PG applies a change only when `resourceVersion` is greater than what it stored, and safely drops older ones. Deliveries can arrive out of order.
 - `organisation` is `null` for `user.*` and `ping`.
 
 ### Catalogue
 
 `EventDTO` = `{ kind: "event", id, occurrenceId: null, title, slug, startDateTime, endDateTime, timezone, location, coverImageUrl (absolute URL or null), status, privacyType }`.
-`RegistrationDTO` = `{ id, status (CONFIRMED | WAITLISTED | PENDING_APPROVAL | REJECTED | CANCELLED | REMOVED), displayName (falls back to "Participant"), registeredAt, checkedInAt, subject (null for a guest without an account), isCrew, isMinor (false until the P3 age attestation) }`.
+`RegistrationDTO` = `{ id, status (CONFIRMED | WAITLISTED | PENDING_APPROVAL | REJECTED | CANCELLED | REMOVED), displayName (falls back to "Participant"), registeredAt, checkedInAt, subject (null for a guest without an account), isCrew, isMinor (true once the account attested to being under 18 in the selfie step) }`.
 Event references are `{ kind: "event", id, occurrenceId: null }`.
 
 | Type | `data` |
@@ -120,7 +127,10 @@ Event references are `{ kind: "event", id, occurrenceId: null }`.
 | `user.sessions_revoked` | `{ subject, reason }` |
 | `user.deleted` | `{ subject }` |
 | `ping` | `{ message }` |
-| `selfie.added`, `selfie.removed`, `consent.granted`, `consent.withdrawn` | Schemas fixed now, emitted from P3 (selfie step and consent records) |
+| `consent.granted` | `{ registrationId, subject, purpose: "face_matching", noticeVersion, grantedAt }`: a selfie ticket was minted with a new grant or a new notice version. Key `consent:{registrationId}` |
+| `consent.withdrawn` | `{ registrationId, subject, purpose, scope: "event" \| "all", withdrawnAt }`. `scope: "all"` has `registrationId: null` and `organisation: null` ("Stop face matching everywhere", or a withdrawal made in PG). PG purges the selfie and matches |
+| `selfie.added` | `{ registrationId, subject, enrollmentId }`: PG reported an accepted selfie (confirmation; PG stores it as informational). Key `selfie:{registrationId}` |
+| `selfie.removed` | same shape: the selfie must go (withdrawal, a replaced enrollment, or an upload that arrived after the person withdrew). PG purges it if it is the current one |
 
 ### Role mapping (decision D-2)
 
@@ -175,12 +185,68 @@ Errors are `{ "error": { "code", "message" } }`: `INVALID_REQUEST` 400, `INVALID
 
 **Versions in the API.** Each row carries the resource's current `resourceVersion`, read in the same repeatable-read snapshot as its data. PG should apply a backfill row when its version is **at least** the stored one: an equal version never carries older data. `updatedSince` filters by the time of the last captured change; because a transaction can commit after a later one started, poll with an overlap of a few minutes.
 
+## Selfie step
+
+Decision D-Selfie (plan §4): the attendee adds an optional selfie **in Yuyu**, and **only People's Gallery keeps it**, for matching the person in that event's photos. The browser (or the Yuyu app) uploads the image straight to PG with a short-lived ticket. Yuyu never receives, stores, hashes or logs the image: no Yuyu route accepts image bytes for this, and the consent tables hold only consent, the age attestation, the state PG reports, PG's opaque enrollment id and ticket ids.
+
+**Where it appears.** On the ticket page (`/ticket/{token}#find-your-photos`) for a signed-in account that owns a **confirmed** registration of a one-off event in an organisation shared with PG, while the integration is enabled and has a public URL, until 180 days after the event ends (D-7). A guest registration without an account sees nothing until it is claimed (D-4); someone else viewing the ticket is asked to sign in. The event page's registration card points a confirmed attendee to it, and **Account → Privacy** lists every event with face matching. The Yuyu app uses `/api/mobile/v1/me/registrations/{rsvpId}/face-matching` (GET view and notice, POST `…/ticket`, POST `…/under-18`, DELETE to stop; see [the mobile API](mobile-api.openapi.yaml)).
+
+**Notice and consent.** The versioned notice (`lib/pgIntegration/faceNotice.ts`, `FACE_NOTICE_VERSION`) is shown before the camera: purpose, that Yuyu keeps no copy, who sees results, retention (180 days after the event), that it is optional and can be stopped at any time, and that it is for adults only. Two separate checkboxes, "Match me in this event's photos" and "I am 18 or older", must both be ticked; the ticket request must carry `consent: true`, `adult: true` and the current notice version or nothing is written. Changing the wording means a new version, and people who agreed to an older one are asked again before their next selfie. "I'm under 18" records a `MINOR` attestation for that registration: no ticket can ever be minted for it (a database check forbids a grant on a minor's record), and PG learns `isMinor: true` through `registration.updated` and the registrations API (D-12).
+
+`PgFaceConsent` (one per registration) records the account, age attestation, notice version, `grantedAt`, `withdrawnAt` and the selfie state (`NONE`, `PENDING`, `ADDED`, `REJECTED`, `REMOVED`). Audit: `PG_FACE_CONSENT_GRANTED`, `PG_FACE_CONSENT_WITHDRAWN`, `PG_FACE_AGE_UNDER_18`.
+
+### Enrollment ticket
+
+Contract v1.2 §4.1. A compact JWS, HS256, header exactly `{"alg":"HS256","typ":"yuyu-pg-enroll+jwt"}`. The key is `HMAC-SHA256(key = the integration signing secret "whsec_…" as UTF-8, msg = "yuyu-pg-enrollment-ticket-v1")`, so the delivery signature and the ticket never share a key; PG tries each configured secret during a rotation. Claims: `iss` (Yuyu's issuer, as for OIDC), `aud: "peoples-gallery:enrollment"`, `sub` (pairwise subject), `jti` (`yet_` + 32 hex), `iat`, `exp = iat + 600`, `org`, `evt`, `occ: null`, `reg`, `pur: "face_matching"`, `nv` (notice version), `age: "adult"`, `act` (`add` or `replace`). `lib/pgIntegration/enrollmentTicket.ts` holds the reference signer and verifier; the shared vector is pinned in `tests/unit/pg-selfie.test.ts` and in the contract.
+
+The ticket is a bearer capability for one upload: it is returned once to its owner, never logged, audited or stored. Yuyu keeps only its `jti`, expiry and outcome (`PgSelfieTicket`, purged a day after expiry). At most **5 tickets per person per hour**; the Server Actions and the mobile API also apply their usual rate limits.
+
+The browser re-encodes the photo to a JPEG of at most 1,600 px (dropping EXIF/GPS; HEIC is passed through for PG to decode) and POSTs `multipart/form-data` (`ticket`, `file`) to `{publicUrl}/api/v2/integrations/yuyu/selfies` with `credentials: "omit"` and no referrer. PG answers `201 { enrollmentId, state: "ready" }`, or `422 { state: "rejected", reason }` for a photo that fails its quality gate (no face, several faces, face too small, too dark or blurry, unreadable). The CSP already allows `connect-src https:` and `Permissions-Policy` allows `camera=(self)`; an `http://` PG origin (development only) is blocked by the browser.
+
+### PG callbacks
+
+Through the integration API (Bearer `yoi_`, as above):
+
+| Route | Body | Effect |
+| --- | --- | --- |
+| `POST /enrollments/status` | `{ registrationId, subject, enrollmentId, jti, state: "added" \| "rejected" \| "removed", reason }` (`jti` required for `added`/`rejected`, `null` for `removed`) | `200 { data: { selfieState } }`. Each `jti` confirms one enrollment: an identical replay is `200`, the same `jti` with another `enrollmentId` is `409 TICKET_USED`. `404` unless the registration belongs to `subject`, in an enabled organisation, and the ticket was issued for it. `added` emits `selfie.added` (and `selfie.removed` for a replaced one); an upload whose ticket predates a withdrawal is answered by `selfie.removed`. A rejected retake keeps an existing selfie |
+| `POST /consents/withdraw` | `{ subject, scope: "event", registrationId }` or `{ subject, scope: "all", registrationId: null }` | `200 { data: { withdrawn } }`, idempotent. The person withdrew inside PG; Yuyu records it and echoes `consent.withdrawn` |
+
+Bodies are strict JSON (`application/json`, at most 256 KB); unknown fields or a query string are `400`.
+
+**Withdrawal in Yuyu.** "Stop face matching" (ticket page, Account → Privacy, or `DELETE` in the app) marks the consent withdrawn, spends outstanding tickets and emits `consent.withdrawn` (+ `selfie.removed` when an enrollment exists) in the same transaction. "Stop face matching everywhere" withdraws every registration and emits one `consent.withdrawn` with `scope: "all"`. PG purges the selfie and matches (plan §4.4). Registrations that leave `CONFIRMED` are purged by PG from the `registration.*` events; deleting the account removes the consent rows (`user.deleted`).
+
+## Attendee notifications
+
+Decision D-Mail (plan §5.7): People's Gallery never emails attendees and holds no addresses. It asks Yuyu, and Yuyu sends the email **as Yuyu, on behalf of People's Gallery**.
+
+```http
+POST /api/integrations/pg/v1/notifications
+Authorization: Bearer yoi_…
+Idempotency-Key: pgn_<8–64 of [A-Za-z0-9_-]>
+Content-Type: application/json
+
+{ "eventId": "…", "occurrenceId": null, "kind": "photos_ready" | "photos_published",
+  "link": "https://photos.example.org/app/events/<pg id>/photos",
+  "recipients": [ { "registrationId": "…", "subject": "<43>", "counts": { "photosOfYou": 23, "newSinceLast": 23 } } ] }
+→ 202 { "data": { "accepted": 1, "skipped": [ { "registrationId": "…", "reason": "not_found" | "not_confirmed" | "withdrawn" | "unsubscribed" | "no_email" | "duplicate" } ] } }
+```
+
+- 1 to 500 recipients; `photosOfYou` 1–100,000; `newSinceLast` at most `photosOfYou`. Strict body.
+- `link` must be on **PG's public origin** (`--public-url`), `https` (or `http` only with an internal target); anything else is `400`, so Yuyu never emails a link to another site.
+- The event must belong to an enabled organisation (`404`). A recipient must be a registration of that event whose account's pairwise subject equals `subject` (`not_found` otherwise, including guests: no oracle beyond that), `CONFIRMED`, with face-matching consent given and not withdrawn, the photo email switched on (Account → Privacy, default on) and an address.
+- **Idempotency:** the receipt (`PgNotificationReceipt`: key, SHA-256 of the canonical body, the `202` body) commits in the same transaction as the queued emails and is kept 7 days. The same key and body return the stored answer and send nothing; the same key with another body is `409 IDEMPOTENCY_CONFLICT`.
+- **Rate limits:** 60 notification calls per minute per client (`pgNotifications`) on top of the 600 requests per minute API budget. Debounce (one per person, event and 6 hours) and zero-count suppression are PG's job.
+- **Delivery:** one `pg-photos` outbox email per recipient (a bulk kind: transactional mail goes first). The payload holds ids and counts only; at send time the worker re-checks the registration, consent and preference and drops the row if any changed. Subject `Your 23 photos from <event> are ready` / `7 new photos of you from <event>`; the footer says it was sent on behalf of People's Gallery and links to Account → Privacy. Audit `PG_NOTIFICATION_ACCEPTED` with counts only.
+- **Push:** Yuyu has no push channel yet. `pgPhotosPush` in `lib/pgIntegration/notifications.ts` fixes the text and deep link (ATT-09) for when the app registers devices.
+
 ## Data model
 
-`PgIntegration` (one row), `PgIntegrationOrganisation`, `PgIntegrationResource` (per-resource version counter and tombstone; its key is internal and may embed a user id, which is never sent), `PgIntegrationDelivery` (outbox), `OAuthClientToken`, and `OAuthGrant.subject` (the client's pairwise subject, filled when a grant is approved, so `/users/{subject}/roles` needs no reverse search). `npm run db:verify` checks that the twelve `pg_integration_*` triggers exist.
+`PgIntegration` (one row, with `publicUrl`), `PgIntegrationOrganisation`, `PgIntegrationResource` (per-resource version counter and tombstone; its key is internal and may embed a user id, which is never sent), `PgIntegrationDelivery` (outbox), `OAuthClientToken`, and `OAuthGrant.subject` (the client's pairwise subject, filled when a grant is approved, so `/users/{subject}/roles` needs no reverse search). `npm run db:verify` checks that the twelve `pg_integration_*` triggers exist. P3 (migration `20261101000000_pg_selfie_notifications`) adds `PgFaceConsent`, `PgSelfieTicket`, `PgNotificationReceipt` and `UserNotificationPreference`; none holds image data.
 
 ## Not in this release
 
 - A super-admin page for the integration (the CLI covers it).
 - Series occurrences.
-- The PG → Yuyu notification API (`POST /api/integrations/pg/v1/notifications`, plan §5.7) and the selfie and consent events: phase P3.
+- Push notifications (no device registration yet); `selfie_rejected` and `matching_complete` notification kinds (PG shows those in its own UI).
+- Face matching for series events.

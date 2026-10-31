@@ -65,6 +65,7 @@ export const helpSections = [
       { slug: "attending/joining-the-crew", title: "Joining an event's crew", summary: "Sign up with a crew link, get your crew ticket and check in on the day." },
       { slug: "attending/teams", title: "Registering as a team", summary: "Create or join a team, register solo, find teammates, and manage your team page." },
       { slug: "attending/submitting-a-project", title: "Submitting a hackathon project", summary: "Draft, submit, edit and withdraw your team's or your own project." },
+      { slug: "attending/find-your-photos", title: "Finding your photos with a selfie", summary: "Add an optional selfie so People's Gallery can find the event photos you're in, and stop at any time." },
       { slug: "attending/feedback-and-certificates", title: "Feedback and certificates", summary: "Answer an event's feedback form and download your certificate." },
     ],
   },
